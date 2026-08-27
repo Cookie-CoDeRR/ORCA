@@ -43,15 +43,33 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
     markdown_lines = [
         f"### 🐬 Project ORCA — Maritime Intelligence & Operational Advisory",
         f"**Coordinate Sector:** Origin: `[{origin[0]}, {origin[1]}]` | Target: `[{target[0]}, {target[1]}]`\n",
-        f"#### 🌊 1. Ocean State & Potential Fishing Zones (PFZ)",
+        f"#### 🐟 1. Fishery Potential & Target Species Availability",
         f"- **Sea Surface Temperature (SST):** `{sst}°C` (Optimal thermal range for pelagics)",
-        f"- **Chlorophyll-a Concentration:** `{chl} mg/m³` (High plankton density)",
+        f"- **Chlorophyll-a Concentration:** `{chl} mg/m³` (High phytoplankton density)",
         f"- **Significant Wave Height (SWH):** `{swh} m` ({ocean.get('sea_state', 'Moderate')})",
-        f"- **PFZ Cluster Detection:** Found **{ocean.get('pfz_clusters_count', 0)}** active thermal/color aggregation zones.\n",
+        f"- **PFZ Cluster Detection:** Found **{ocean.get('pfz_clusters_count', 0)}** active thermal/color aggregation zones."
+    ]
+
+    pfz_features = ocean.get("pfz_geojson_features", [])
+    if pfz_features:
+        markdown_lines.append("\n**🎯 Detected Fish Species in this Sector:**")
+        for idx, pfz in enumerate(pfz_features, 1):
+            props = pfz.get("properties", {})
+            species = props.get("target_species", "Pelagic Finfish")
+            conf = int(props.get("confidence_score", 0.85) * 100)
+            sst_f = props.get("sst_thermal_front", f"{sst}°C")
+            dist = props.get("distance_km", 20.0)
+            markdown_lines.append(f"  {idx}. **{species}** — `{conf}% PFZ confidence` at SST `{sst_f}` (~{dist} km offshore)")
+
+    markdown_lines.extend([
+        f"\n**⏰ Most Suitable Fishing Timing & Operational Windows:**",
+        f"- **Diurnal Peak Feeding Window:** **Dawn (04:30 – 07:30 IST)** and **Dusk (17:30 – 20:30 IST)** when planktonic vertical migration attracts surface and mid-water pelagics.",
+        f"- **Tidal Current Strategy:** Optimal during **Spring Tides (New Moon / Full Moon)** with max current velocity along shelf breaks.",
+        f"- **Seasonal Legality:** Active season is **August to May** (Strict 61-day West Coast Monsoon Ban applies June 1 – July 31).\n",
         f"#### 🛡️ 2. Geospatial Safety & Border Geofencing",
         f"- **IMBL Border Proximity:** `{dist_imbl} km` to nearest International Maritime Boundary Line.",
         f"- **Marine Protected Area (MPA):** {'Inside Sanctuary (Restrictions Apply)' if risk.get('mpa_check', {}).get('in_protected_area') else 'Clear of No-Trawl Zones.'}"
-    ]
+    ])
 
     if warnings:
         markdown_lines.append("\n> ⚠️ **ACTIVE SAFETY WARNINGS:**")
