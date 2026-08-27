@@ -12,21 +12,10 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..state import AgentState
 from .schemas import SubTaskPlan
+from .prompts import SUPERVISOR_SYSTEM_PROMPT, supervisor_prompt_template
 from ...agent.llm_config import get_chat_llm, check_ollama_health
 
 logger = logging.getLogger("ORCA.SupervisorAgent")
-
-SUPERVISOR_ROLE_PROMPT = """
-You are the Chief Maritime Supervisor Agent for Project ORCA (SIH26176).
-Your role is to decompose the user's maritime, fishing, or navigation request into specific sub-tasks.
-
-You must output a structured SubTaskPlan indicating:
-1. `intent_summary`: Short summary of user inquiry.
-2. `tasks_to_trigger`: Select one or more of ['ocean_analytics', 'risk_geofencing', 'navigation', 'policy_rag'].
-3. `origin_coordinates`: [latitude, longitude] of starting harbor.
-4. `target_coordinates`: [latitude, longitude] of destination or fishing zone.
-5. `reasoning`: Technical justification for the plan.
-"""
 
 # Quick sovereign coastal lookup
 GAZETTEER = {
@@ -69,7 +58,7 @@ async def supervisor_agent_node(state: AgentState) -> dict[str, Any]:
             llm = get_chat_llm(model="qwen2.5:7b-instruct-q5_k_m", temperature=0.0)
             structured_llm = llm.with_structured_output(SubTaskPlan)
             res = await structured_llm.ainvoke([
-                SystemMessage(content=SUPERVISOR_ROLE_PROMPT),
+                SystemMessage(content=SUPERVISOR_SYSTEM_PROMPT),
                 HumanMessage(content=user_query)
             ])
             if isinstance(res, SubTaskPlan):

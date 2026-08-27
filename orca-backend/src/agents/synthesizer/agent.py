@@ -9,6 +9,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from ..state import AgentState
+from .prompts import SYNTHESIZER_SYSTEM_PROMPT, synthesizer_prompt_template
 
 logger = logging.getLogger("ORCA.SynthesizerAgent")
 

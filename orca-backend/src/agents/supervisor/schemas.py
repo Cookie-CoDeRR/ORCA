@@ -1,15 +1,37 @@
 """
-Project ORCA — Supervisor Agent Schemas
-Defines structured decomposition plans for dispatching sub-agents in parallel or sequence.
+Project ORCA (SIH26176) — Supervisor Agent Schemas
+Defines structured decomposition plans and routing schemas for dispatching sub-agents.
 """
 
 from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class RouteDecision(BaseModel):
+    """
+    Structured output schema for atomic Qwen2.5 supervisor intent routing.
+    """
+    intent: str = Field(
+        ...,
+        description="Categorization of user request: 'FIND_FISHING_ZONE', 'CHECK_SAFETY', or 'POLICY_QUERY'."
+    )
+    target_coordinates: list[float] = Field(
+        default_factory=list,
+        description="A list of exactly two floats: [latitude, longitude]."
+    )
+    next_agent: Literal["ocean_analytics", "risk_geofencing", "policy_rag", "synthesizer"] = Field(
+        ...,
+        description="Target worker agent to invoke next."
+    )
+    reasoning: str = Field(
+        ...,
+        description="Brief explanation of the routing choice."
+    )
+
+
 class SubTaskPlan(BaseModel):
     """
-    Deconstructed execution plan emitted by the Supervisor LLM.
+    Deconstructed multi-task execution plan emitted by the Supervisor LLM.
     """
     intent_summary: str = Field(
         ...,
