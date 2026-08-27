@@ -98,11 +98,10 @@ class QueryRequest(BaseModel):
     language_code: str = Field("en", description="Target Indic language code (en, gu, ta, hi, te, ml, mr)")
 
 
-class RAGSearchRequest(BaseModel):
-    query: str = Field(..., description="Policy question or search term")
-    top_k: int = Field(4, description="Number of closest regulatory chunks to return")
-    category: str | None = None
-    jurisdiction: str | None = None
+class OptimalRouteRequest(BaseModel):
+    start: list[float] = Field(..., description="[latitude, longitude] origin coordinates (e.g. [18.94, 72.86])")
+    destination: list[float] = Field(..., description="[latitude, longitude] destination coordinates (e.g. [19.50, 71.20])")
+    speed_knots: float = Field(10.0, description="Vessel cruise speed in knots (default: 10.0)")
 
 
 # ==============================================================================
@@ -119,7 +118,8 @@ async def root_health_check():
             "postgis_database": "ENABLED",
             "pgvector_rag": "ENABLED",
             "langgraph_checkpointer": "POSTGRES_SAVER",
-            "minio_object_storage": "CONNECTED"
+            "minio_object_storage": "CONNECTED",
+            "vector_routing_engine": "ACTIVE"
         }
     }
 
@@ -148,6 +148,41 @@ async def execute_query(req: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/v1/navigation/optimal-route")
+async def get_optimal_marine_route(req: OptimalRouteRequest):
+    """
+    Vector-Assisted Fuel-Optimal Marine Routing Engine.
+    Calculates dynamic A* path over surface currents and 10m wind fields,
+    returning GeoJSON LineString with fuel savings, distance, duration, and deck.gl segment color codes.
+    """
+    from .navigation.router import compute_optimal_marine_route
+
+    if len(req.start) != 2 or len(req.destination) != 2:
+        raise HTTPException(status_code=400, detail="Start and destination must each contain [latitude, longitude].")
+
+    result = compute_optimal_marine_route(
+        start_lat=req.start[0],
+        start_lon=req.start[1],
+        end_lat=req.destination[0],
+        end_lon=req.destination[1],
+        vessel_knots=req.speed_knots
+    )
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/api/v1/navigation/vectors")
+async def get_surface_current_vectors():
+    """Returns the surface current and wind vector grid for deck.gl Particle / FlowLayer."""
+    import json
+    json_path = Path(__file__).resolve().parent.parent / "data" / "vectors" / "surface_currents_wind.json"
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Vector dataset not yet compiled. Run script 10.")
+    with open(json_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 @app.post("/api/v1/rag/ingest")
 async def ingest_rag_knowledge_base():
     """Ingests the generated maritime policy chunks JSON into pgvector."""
@@ -160,3 +195,4 @@ async def ingest_rag_knowledge_base():
         "chunks_ingested": count,
         "source_file": str(kb_path.name)
     }
+
