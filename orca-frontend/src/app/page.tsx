@@ -25,20 +25,23 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-// Robust high-resolution Carto Dark Matter raster style (100% reliable, zero CORS/glyph errors)
+const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+
+// Authenticated CARTO Dark Matter 2x Raster Specification
 const DARK_MATTER_STYLE: any = {
   version: 8,
   sources: {
     "carto-dark": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        `https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
       ],
       tileSize: 256,
-      attribution: "© CARTO, © OpenStreetMap",
+      attribution: "© CARTO, © OpenStreetMap contributors",
     },
   },
   layers: [
@@ -46,6 +49,33 @@ const DARK_MATTER_STYLE: any = {
       id: "carto-dark-tiles",
       type: "raster",
       source: "carto-dark",
+      minzoom: 0,
+      maxzoom: 20,
+    },
+  ],
+};
+
+// Authenticated CARTO Voyager / Nautical Coastal Chart Style
+const VOYAGER_STYLE: any = {
+  version: 8,
+  sources: {
+    "carto-voyager": {
+      type: "raster",
+      tiles: [
+        `https://a.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://b.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://c.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+        `https://d.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}@2x.png?api_key=${CARTO_API_KEY}`,
+      ],
+      tileSize: 256,
+      attribution: "© CARTO, © OpenStreetMap contributors",
+    },
+  },
+  layers: [
+    {
+      id: "carto-voyager-tiles",
+      type: "raster",
+      source: "carto-voyager",
       minzoom: 0,
       maxzoom: 20,
     },
@@ -75,8 +105,6 @@ const SATELLITE_STYLE: any = {
   ],
 };
 
-const API_BASE = "http://localhost:8000";
-
 interface Message {
   id: string;
   role: "user" | "assistant" | "system";
@@ -96,7 +124,7 @@ export default function OrcaDashboard() {
   const [currentThoughts, setCurrentThoughts] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGeojson, setActiveGeojson] = useState<any>(null);
-  const [activeMapMode, setActiveMapMode] = useState<"dark" | "satellite">("dark");
+  const [activeMapMode, setActiveMapMode] = useState<"dark" | "voyager" | "satellite">("dark");
 
   // Initial 2.5D ViewState centered over Arabian Sea & Indian EEZ
   const [viewState, setViewState] = useState({
@@ -550,6 +578,15 @@ export default function OrcaDashboard() {
               <span>Dark Matter</span>
             </button>
             <button
+              onClick={() => setActiveMapMode("voyager")}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                activeMapMode === "voyager" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Compass className="h-3 w-3" />
+              <span>Voyager Chart</span>
+            </button>
+            <button
               onClick={() => setActiveMapMode("satellite")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
                 activeMapMode === "satellite" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
@@ -606,7 +643,13 @@ export default function OrcaDashboard() {
         >
           <Map
             mapLib={maplibregl}
-            mapStyle={activeMapMode === "dark" ? DARK_MATTER_STYLE : SATELLITE_STYLE}
+            mapStyle={
+              activeMapMode === "dark"
+                ? DARK_MATTER_STYLE
+                : activeMapMode === "voyager"
+                ? VOYAGER_STYLE
+                : SATELLITE_STYLE
+            }
             reuseMaps={true}
             attributionControl={false}
           />
