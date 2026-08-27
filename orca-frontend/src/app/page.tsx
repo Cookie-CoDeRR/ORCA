@@ -21,18 +21,33 @@ import {
   User,
   Navigation,
   Globe,
-  Maximize2,
+  Mountain,
   RotateCcw,
+  Eye,
 } from "lucide-react";
 
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
-// Authenticated CARTO Dark Matter (Zero Watermark via ?key= parameter)
-const DARK_MATTER_STYLE: any = {
-  version: 8,
-  sources: {
-    "carto-dark": {
+// AWS Open Data Global DEM & Ocean Bathymetry Terrarium Tiles
+const TERRAIN_DEM_SOURCE = {
+  type: "raster-dem",
+  tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+  tileSize: 256,
+  encoding: "terrarium",
+  maxzoom: 15,
+};
+
+// Builder function for Dynamic 3D Terrain & Hillshade Basemap Styles
+function buildMapStyle(mode: "dark" | "voyager" | "satellite", enable3D: boolean, exaggeration: number = 2.0): any {
+  const sources: any = {
+    "terrain-dem": TERRAIN_DEM_SOURCE,
+  };
+
+  let basemapLayer: any = null;
+
+  if (mode === "dark") {
+    sources["carto-dark"] = {
       type: "raster",
       tiles: [
         `https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
@@ -42,24 +57,16 @@ const DARK_MATTER_STYLE: any = {
       ],
       tileSize: 256,
       attribution: "© CARTO, © OpenStreetMap contributors",
-    },
-  },
-  layers: [
-    {
+    };
+    basemapLayer = {
       id: "carto-dark-tiles",
       type: "raster",
       source: "carto-dark",
       minzoom: 0,
       maxzoom: 20,
-    },
-  ],
-};
-
-// Authenticated CARTO Voyager Nautical Chart (Zero Watermark via ?key= parameter)
-const VOYAGER_STYLE: any = {
-  version: 8,
-  sources: {
-    "carto-voyager": {
+    };
+  } else if (mode === "voyager") {
+    sources["carto-voyager"] = {
       type: "raster",
       tiles: [
         `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
@@ -69,41 +76,65 @@ const VOYAGER_STYLE: any = {
       ],
       tileSize: 256,
       attribution: "© CARTO, © OpenStreetMap contributors",
-    },
-  },
-  layers: [
-    {
+    };
+    basemapLayer = {
       id: "carto-voyager-tiles",
       type: "raster",
       source: "carto-voyager",
       minzoom: 0,
       maxzoom: 20,
-    },
-  ],
-};
-
-const SATELLITE_STYLE: any = {
-  version: 8,
-  sources: {
-    "esri-satellite": {
+    };
+  } else {
+    sources["esri-satellite"] = {
       type: "raster",
       tiles: [
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
       attribution: "© Esri, Maxar, Earthstar Geographics",
-    },
-  },
-  layers: [
-    {
+    };
+    basemapLayer = {
       id: "satellite-tiles",
       type: "raster",
       source: "esri-satellite",
       minzoom: 0,
       maxzoom: 19,
-    },
-  ],
-};
+    };
+  }
+
+  const layers = [basemapLayer];
+
+  if (enable3D) {
+    layers.push({
+      id: "hillshade-relief",
+      type: "hillshade",
+      source: "terrain-dem",
+      minzoom: 0,
+      maxzoom: 18,
+      paint: {
+        "hillshade-shadow-color": "#020617",
+        "hillshade-highlight-color": mode === "satellite" ? "#ffffff" : "#38bdf8",
+        "hillshade-accent-color": mode === "satellite" ? "#475569" : "#0284c7",
+        "hillshade-exaggeration": 0.85,
+      },
+    });
+  }
+
+  const styleObj: any = {
+    version: 8,
+    sources,
+    layers,
+  };
+
+  if (enable3D) {
+    styleObj.terrain = {
+      source: "terrain-dem",
+      exaggeration: exaggeration,
+    };
+  }
+
+  return styleObj;
+}
 
 interface Message {
   id: string;
@@ -124,15 +155,19 @@ export default function OrcaDashboard() {
   const [currentThoughts, setCurrentThoughts] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGeojson, setActiveGeojson] = useState<any>(null);
+  
+  // Basemap & 3D Terrain State
   const [activeMapMode, setActiveMapMode] = useState<"dark" | "voyager" | "satellite">("dark");
+  const [enable3DTerrain, setEnable3DTerrain] = useState<boolean>(true);
+  const [terrainExaggeration, setTerrainExaggeration] = useState<number>(2.2);
 
-  // Initial 2.5D ViewState centered over Arabian Sea & Indian EEZ
+  // Initial 2.5D / 3D ViewState centered over Arabian Sea & Indian EEZ
   const [viewState, setViewState] = useState({
     longitude: 70.368,
     latitude: 20.902,
-    zoom: 5.5,
-    pitch: 45,
-    bearing: 0,
+    zoom: 5.8,
+    pitch: 55, // 55° pitch for high-impact 3D terrain elevation
+    bearing: 15,
   });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -150,7 +185,7 @@ export default function OrcaDashboard() {
         content: `### 🐬 Welcome to Project ORCA (SIH26176)
 **India's Sovereign Multi-Agent Marine Intelligence & Fuel-Optimal Navigation Engine.**
 
-1. Click anywhere on the **2.5D Marine Radar Map** to lock a target coordinate.
+1. Click anywhere on the **3D Bathymetry & Elevation Radar** to lock a target coordinate.
 2. Ask any fishing, boundary risk, monsoon regulation, or fuel routing inquiry below.
 3. Watch the local **Qwen 2.5 7B & BGE-M3** multi-agent swarm execute in real time.`,
         timestamp: new Date().toLocaleTimeString(),
@@ -175,10 +210,19 @@ export default function OrcaDashboard() {
     setViewState({
       longitude: 70.368,
       latitude: 20.902,
-      zoom: 5.5,
-      pitch: 45,
-      bearing: 0,
+      zoom: 5.8,
+      pitch: enable3DTerrain ? 55 : 0,
+      bearing: 15,
     });
+  };
+
+  // Toggle 2D Flat vs 3D Perspective Pitch
+  const handleTogglePerspective = () => {
+    setViewState((prev) => ({
+      ...prev,
+      pitch: prev.pitch > 20 ? 0 : 55,
+      bearing: prev.pitch > 20 ? 0 : 15,
+    }));
   };
 
   // Preset Scenario Inquiries
@@ -188,9 +232,9 @@ export default function OrcaDashboard() {
     setViewState({
       longitude: coords[0],
       latitude: coords[1],
-      zoom: 6.8,
-      pitch: 45,
-      bearing: 0,
+      zoom: 7.2,
+      pitch: 55,
+      bearing: 20,
     });
   };
 
@@ -342,7 +386,7 @@ export default function OrcaDashboard() {
         id: "selected-target-layer",
         data: [{ position: selectedCoordinates }],
         getPosition: (d: any) => d.position,
-        getFillColor: [0, 240, 255, 220], // Neon Cyan Glow
+        getFillColor: [0, 240, 255, 240], // Electric Cyan
         getLineColor: [255, 255, 255, 255],
         getRadius: 16000,
         stroked: true,
@@ -384,10 +428,13 @@ export default function OrcaDashboard() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#060913] text-sky-400 font-mono">
         <Compass className="h-8 w-8 animate-spin" />
-        <span className="ml-3">Loading Project ORCA 2.5D Radar...</span>
+        <span className="ml-3">Loading Project ORCA 3D Marine Radar...</span>
       </div>
     );
   }
+
+  // Generate the active MapLibre Style Specification
+  const currentMapStyle = buildMapStyle(activeMapMode, enable3DTerrain, terrainExaggeration);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#060913] text-slate-100">
@@ -545,7 +592,7 @@ export default function OrcaDashboard() {
       </div>
 
       {/* ===================================================================== */}
-      {/* RIGHT PANEL: THE INTERACTIVE DECK.GL 2.5D MAP (70% Width)             */}
+      {/* RIGHT PANEL: THE INTERACTIVE DECK.GL 2.5D / 3D MAP (70% Width)        */}
       {/* ===================================================================== */}
       <div className="relative flex-1 h-full w-full bg-[#060913]">
         {/* Floating Top Controls */}
@@ -553,7 +600,7 @@ export default function OrcaDashboard() {
           <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#0d1424]/90 px-3.5 py-2 shadow-xl backdrop-blur-md">
             <Waves className="h-4 w-4 text-sky-400" />
             <span className="text-xs font-bold text-slate-200">
-              Indian Ocean 2.5D Radar
+              Indian Ocean 3D Radar
             </span>
           </div>
 
@@ -597,6 +644,27 @@ export default function OrcaDashboard() {
             </button>
           </div>
 
+          {/* 3D Terrain Toggle */}
+          <button
+            onClick={() => setEnable3DTerrain(!enable3DTerrain)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-[#0d1424]/90 text-[11px] font-semibold shadow-xl backdrop-blur-md transition cursor-pointer ${
+              enable3DTerrain ? "text-cyan-300 border-cyan-500/50 bg-cyan-950/60" : "text-slate-400 hover:text-slate-200"
+            }`}
+            title="Toggle 3D Terrain Elevation"
+          >
+            <Mountain className="h-3.5 w-3.5 text-cyan-400" />
+            <span>3D Terrain {enable3DTerrain ? "ON" : "OFF"}</span>
+          </button>
+
+          {/* 2D / 3D Perspective Tilt Switcher */}
+          <button
+            onClick={handleTogglePerspective}
+            className="flex items-center justify-center h-8 w-8 rounded-xl border border-slate-800 bg-[#0d1424]/90 text-slate-400 hover:text-sky-400 shadow-xl backdrop-blur-md transition cursor-pointer"
+            title="Toggle 2D Flat / 3D Perspective Tilt"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+
           {/* Reset Camera */}
           <button
             onClick={handleResetView}
@@ -631,7 +699,7 @@ export default function OrcaDashboard() {
           </div>
         </div>
 
-        {/* DeckGL & MapLibre Canvas */}
+        {/* DeckGL & MapLibre Canvas with 3D Terrain */}
         <DeckGL
           viewState={viewState}
           onViewStateChange={(e: any) => setViewState(e.viewState)}
@@ -643,15 +711,14 @@ export default function OrcaDashboard() {
         >
           <Map
             mapLib={maplibregl}
-            mapStyle={
-              activeMapMode === "dark"
-                ? DARK_MATTER_STYLE
-                : activeMapMode === "voyager"
-                ? VOYAGER_STYLE
-                : SATELLITE_STYLE
-            }
+            mapStyle={currentMapStyle}
             reuseMaps={true}
             attributionControl={false}
+            terrain={
+              enable3DTerrain
+                ? { source: "terrain-dem", exaggeration: terrainExaggeration }
+                : undefined
+            }
           />
         </DeckGL>
       </div>
