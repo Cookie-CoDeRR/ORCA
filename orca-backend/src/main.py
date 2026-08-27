@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, Any
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -170,6 +171,58 @@ async def chat_with_multi_agent_swarm(req: ChatRequest):
     except Exception as e:
         logger.error(f"Multi-agent execution error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/chat/stream", tags=["Multi-Agent Chat"])
+async def stream_chat_with_agent_swarm(req: ChatRequest):
+    """
+    Streams multi-agent reasoning steps, tool telemetry, and final deck.gl GeoJSON
+    via Server-Sent Events (SSE) for real-time frontend streaming.
+    """
+    async def event_generator():
+        import asyncio
+        try:
+            # 1. Thought step: Supervisor
+            yield f"data: {json.dumps({'type': 'thought', 'agent': 'supervisor', 'text': 'Decomposing query with Qwen 2.5 7B & resolving sovereign coastal nodes...'})}\n\n"
+            await asyncio.sleep(0.3)
+
+            # 2. Run multi-agent graph
+            checkpointer = get_default_checkpointer()
+            result = await run_orca_multi_agent(
+                user_query=req.message,
+                thread_id=req.thread_id,
+                checkpointer=checkpointer
+            )
+
+            # 3. Stream active tasks telemetry
+            active_tasks = result.get("active_tasks", [])
+            for task in active_tasks:
+                yield f"data: {json.dumps({'type': 'thought', 'agent': task, 'text': f'Executing worker node: {task}'})}\n\n"
+                await asyncio.sleep(0.2)
+
+            # 4. Stream final synthesized response and deck.gl GeoJSON
+            response_payload = result.get("response", {})
+            markdown_text = response_payload.get("markdown_advisory", "")
+            geojson_data = response_payload.get("geojson_payload", {"type": "FeatureCollection", "features": []})
+
+            # Stream markdown chunks
+            lines = markdown_text.split("\n")
+            for line in lines:
+                yield f"data: {json.dumps({'type': 'chunk', 'text': line + '\n'})}\n\n"
+                await asyncio.sleep(0.05)
+
+            # Final complete payload event
+            yield f"data: {json.dumps({'type': 'complete', 'result': result, 'geojson': geojson_data})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
 
 @app.post("/api/v1/navigation/optimal-route", tags=["Navigation"])

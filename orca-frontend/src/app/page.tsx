@@ -1,0 +1,524 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import DeckGL from "@deck.gl/react";
+import { ScatterplotLayer, PathLayer, GeoJsonLayer } from "@deck.gl/layers";
+import Map from "react-map-gl/maplibre";
+import * as maplibregl from "maplibre-gl";
+import { v4 as uuidv4 } from "uuid";
+import {
+  Send,
+  Trash2,
+  Compass,
+  Shield,
+  Fish,
+  AlertTriangle,
+  Waves,
+  RefreshCw,
+  Anchor,
+  Layers,
+  MapPin,
+  Bot,
+  User,
+  Sparkles,
+  Zap,
+} from "lucide-react";
+
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const API_BASE = "http://localhost:8000";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  thoughts?: string[];
+  activeTasks?: string[];
+  geojson?: any;
+  timestamp: string;
+}
+
+export default function OrcaDashboard() {
+  // Session & Coordinates
+  const [threadId, setThreadId] = useState<string>("");
+  const [selectedCoordinates, setSelectedCoordinates] = useState<[number, number] | null>(null); // [lon, lat]
+  const [inputMessage, setInputMessage] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [currentThoughts, setCurrentThoughts] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [activeGeojson, setActiveGeojson] = useState<any>(null);
+
+  // Deck.gl ViewState
+  const [viewState, setViewState] = useState({
+    longitude: 70.5,
+    latitude: 18.2,
+    zoom: 5.2,
+    pitch: 45,
+    bearing: 0,
+  });
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize session thread
+  useEffect(() => {
+    const savedThread = localStorage.getItem("orca_thread_id") || uuidv4();
+    localStorage.setItem("orca_thread_id", savedThread);
+    setThreadId(savedThread);
+
+    // Initial system greeting
+    setMessages([
+      {
+        id: "msg_welcome",
+        role: "assistant",
+        content: `### 🐬 Welcome to Project ORCA (SIH26176)
+**India's Sovereign Multi-Agent Marine Intelligence & Fuel-Optimal Routing Engine.**
+
+1. Click anywhere on the **2.5D Arabian Sea Map** to lock a target coordinate.
+2. Ask any fishing, boundary risk, monsoon regulation, or fuel routing inquiry below.
+3. Watch the local **Qwen 2.5 7B & BGE-M3** multi-agent swarm execute in real time.`,
+        timestamp: new Date().toLocaleTimeString(),
+      },
+    ]);
+  }, []);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, currentThoughts]);
+
+  // Handle Map Click
+  const handleMapClick = (info: any) => {
+    if (info && info.coordinate) {
+      const [lon, lat] = info.coordinate;
+      setSelectedCoordinates([Number(lon.toFixed(4)), Number(lat.toFixed(4))]);
+    }
+  };
+
+  // Preset Inquiries
+  const handlePresetClick = (query: string, coords: [number, number]) => {
+    setInputMessage(query);
+    setSelectedCoordinates(coords);
+    setViewState({
+      longitude: coords[0],
+      latitude: coords[1],
+      zoom: 6.8,
+      pitch: 45,
+      bearing: 0,
+    });
+  };
+
+  // Submit Chat Form
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = inputMessage.trim();
+    if (!query || isStreaming) return;
+
+    // Convert [lon, lat] to [lat, lon] for backend API schema
+    const targetCoords = selectedCoordinates
+      ? [selectedCoordinates[1], selectedCoordinates[0]]
+      : null;
+
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: "user",
+      content: query,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage("");
+    setIsStreaming(true);
+    setCurrentThoughts(["Orchestrating supervisor reasoning with Qwen 2.5 7B..."]);
+
+    const assistantMsgId = uuidv4();
+    let accumulatedContent = "";
+    let finalGeojsonPayload: any = null;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/chat/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: json_payload_string({
+          message: query,
+          thread_id: threadId,
+          target_coordinates: targetCoords,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "thought") {
+                  setCurrentThoughts((prev) => [...prev, `[${data.agent.toUpperCase()}] ${data.text}`]);
+                } else if (data.type === "chunk") {
+                  accumulatedContent += data.text;
+                  setMessages((prev) => {
+                    const existing = prev.find((m) => m.id === assistantMsgId);
+                    if (existing) {
+                      return prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulatedContent } : m));
+                    } else {
+                      return [
+                        ...prev,
+                        {
+                          id: assistantMsgId,
+                          role: "assistant",
+                          content: accumulatedContent,
+                          timestamp: new Date().toLocaleTimeString(),
+                        },
+                      ];
+                    }
+                  });
+                } else if (data.type === "complete") {
+                  if (data.geojson) {
+                    finalGeojsonPayload = data.geojson;
+                    setActiveGeojson(data.geojson);
+                  }
+                }
+              } catch (parseErr) {
+                console.error("SSE JSON Parse Error", parseErr);
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("Falling back to standard chat API:", err);
+      // Fallback to standard non-streaming API
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/agent/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: query,
+            thread_id: threadId,
+            target_coordinates: targetCoords,
+          }),
+        });
+        const data = await res.json();
+        const responsePayload = data.response || {};
+        accumulatedContent = responsePayload.markdown_advisory || "Advisory generated successfully.";
+        finalGeojsonPayload = responsePayload.geojson_payload;
+        if (finalGeojsonPayload) {
+          setActiveGeojson(finalGeojsonPayload);
+        }
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: "assistant",
+            content: accumulatedContent,
+            geojson: finalGeojsonPayload,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+      } catch (fallbackErr: any) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: "assistant",
+            content: `⚠️ Error connecting to Project ORCA backend at ${API_BASE}. Make sure the FastAPI server is running.`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+      }
+    } finally {
+      setIsStreaming(false);
+      setCurrentThoughts([]);
+    }
+  };
+
+  // Helper for JSON payload
+  function json_payload_string(obj: any) {
+    return JSON.stringify(obj);
+  }
+
+  // ============================================================================
+  // DECK.GL LAYERS
+  // ============================================================================
+  const layers: any[] = [];
+
+  // 1. Target Locked Cursor Layer
+  if (selectedCoordinates) {
+    layers.push(
+      new ScatterplotLayer({
+        id: "selected-target-layer",
+        data: [{ position: selectedCoordinates }],
+        getPosition: (d: any) => d.position,
+        getFillColor: [0, 240, 255, 200], // Cyan Glow
+        getLineColor: [255, 255, 255, 255],
+        getRadius: 18000,
+        stroked: true,
+        filled: true,
+        lineWidthMinPixels: 2,
+      })
+    );
+  }
+
+  // 2. Active AI GeoJSON Layer (PFZ Points, Optimal Routes, Sanctuary Polygons)
+  if (activeGeojson && activeGeojson.features) {
+    layers.push(
+      new GeoJsonLayer({
+        id: "active-orca-geojson-layer",
+        data: activeGeojson,
+        pickable: true,
+        stroked: true,
+        filled: true,
+        extruded: true,
+        lineWidthMinPixels: 4,
+        getLineColor: (f: any) => {
+          if (f.geometry?.type === "LineString") {
+            return [34, 197, 94, 255]; // Fuel-optimal route green
+          }
+          return [244, 63, 94, 255]; // Border/Risk red
+        },
+        getFillColor: (f: any) => {
+          if (f.properties?.type === "origin_node") return [56, 189, 248, 255];
+          if (f.properties?.target_species) return [16, 185, 129, 220]; // PFZ Green
+          return [244, 63, 94, 120];
+        },
+        getPointRadius: (f: any) => (f.properties?.target_species ? 14000 : 8000),
+        pointRadiusMinPixels: 6,
+      })
+    );
+  }
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-[#060913] text-slate-100">
+      {/* ===================================================================== */}
+      {/* LEFT PANEL: THE CHAT & MULTI-AGENT ADVISORY INTERFACE (30% Width)     */}
+      {/* ===================================================================== */}
+      <div className="flex w-full md:w-[380px] lg:w-[440px] flex-col border-r border-slate-800/80 bg-[#090d16]/95 backdrop-blur-md z-10">
+        {/* Top Header */}
+        <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3 bg-[#0d1424]">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-400">
+              <Compass className="h-5 w-5 animate-spin-slow" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold tracking-wide text-sky-400">PROJECT ORCA</h1>
+              <p className="text-[10px] text-slate-400">SIH26176 Multi-Agent Swarm</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-[11px] font-semibold text-emerald-400">AIR-GAPPED</span>
+          </div>
+        </div>
+
+        {/* Preset Query Quick Actions */}
+        <div className="border-b border-slate-800/60 p-2.5 bg-[#080d1a] space-y-1.5">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
+            ⚡ Quick Tactical Scenarios
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() =>
+                handlePresetClick(
+                  "Can 4 mechanized boats fish 30km off Veraval for Tuna?",
+                  [70.368, 20.902]
+                )
+              }
+              className="flex items-center gap-1.5 rounded border border-sky-500/30 bg-sky-950/40 px-2 py-1.5 text-left text-[11px] text-sky-300 hover:bg-sky-900/60 transition"
+            >
+              <Fish className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+              <span className="truncate">Veraval Tuna PFZ</span>
+            </button>
+
+            <button
+              onClick={() =>
+                handlePresetClick(
+                  "Am I crossing the Sri Lanka IMBL boundary near Rameswaram?",
+                  [79.315, 9.285]
+                )
+              }
+              className="flex items-center gap-1.5 rounded border border-rose-500/30 bg-rose-950/40 px-2 py-1.5 text-left text-[11px] text-rose-300 hover:bg-rose-900/60 transition"
+            >
+              <Shield className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+              <span className="truncate">IMBL Border Alert</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Chat Message History */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              {msg.role !== "user" && (
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs">
+                  <Bot className="h-4 w-4" />
+                </div>
+              )}
+
+              <div
+                className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-sky-600 text-white rounded-br-none shadow-md shadow-sky-900/30"
+                    : "bg-[#0f172a] text-slate-200 border border-slate-800/80 rounded-bl-none shadow-sm"
+                }`}
+              >
+                <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
+                <div className="mt-1 text-[9px] text-slate-400/80 text-right">{msg.timestamp}</div>
+              </div>
+
+              {msg.role === "user" && (
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-700 text-slate-300 text-xs">
+                  <User className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Real-time Thought Process Streaming Badge */}
+          {isStreaming && (
+            <div className="flex flex-col gap-1.5 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 text-xs text-sky-300">
+              <div className="flex items-center gap-2 font-semibold text-sky-400">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <span>Multi-Agent Thought Stream</span>
+              </div>
+              <div className="space-y-1 pl-5 border-l border-sky-500/20">
+                {currentThoughts.map((t, idx) => (
+                  <p key={idx} className="text-[11px] font-mono text-slate-300 leading-tight">
+                    {t}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input Bar & Coordinate Badge */}
+        <div className="border-t border-slate-800/80 bg-[#0c1220] p-3">
+          {/* Target Locked Pill */}
+          {selectedCoordinates && (
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-cyan-500/40 bg-cyan-950/40 px-2.5 py-1 text-[11px] text-cyan-300">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-cyan-400 animate-bounce" />
+                <span>
+                  Target Locked: <strong>[{selectedCoordinates[1]}, {selectedCoordinates[0]}]</strong>
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedCoordinates(null)}
+                className="text-slate-400 hover:text-rose-400 transition"
+                title="Clear locked coordinate"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder={
+                selectedCoordinates
+                  ? "Ask about locked coordinate (PFZ, Fuel route, IMBL)..."
+                  : "Click on the map or type an ocean inquiry..."
+              }
+              disabled={isStreaming}
+              className="flex-1 rounded-lg border border-slate-700/80 bg-[#050811] px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            <button
+              type="submit"
+              disabled={!inputMessage.trim() || isStreaming}
+              className="flex items-center justify-center rounded-lg bg-sky-600 px-3.5 py-2 text-white hover:bg-sky-500 disabled:opacity-40 transition font-medium shadow-md shadow-sky-900/30"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* RIGHT PANEL: THE INTERACTIVE DECK.GL 2.5D MAP (70% Width)             */}
+      {/* ===================================================================== */}
+      <div className="relative flex-1 h-full w-full bg-[#060913]">
+        {/* Floating Top Controls & Coordinate Display */}
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-[#0d1424]/90 px-3 py-1.5 shadow-lg backdrop-blur-md">
+            <Waves className="h-4 w-4 text-sky-400" />
+            <span className="text-xs font-semibold text-slate-200">
+              Indian EEZ 2.5D Surface Radar
+            </span>
+          </div>
+
+          {selectedCoordinates && (
+            <div className="flex items-center gap-2 rounded-lg border border-cyan-500/50 bg-cyan-950/80 px-3 py-1.5 shadow-lg backdrop-blur-md text-cyan-300 text-xs">
+              <MapPin className="h-4 w-4 text-cyan-400" />
+              <span>
+                Mesh Cursor: {selectedCoordinates[1]}°N, {selectedCoordinates[0]}°E
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Legend Card */}
+        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-1.5 rounded-xl border border-slate-800 bg-[#0d1424]/90 p-3 shadow-xl backdrop-blur-md text-[11px] text-slate-300">
+          <div className="font-bold text-sky-400 flex items-center gap-1.5 mb-0.5">
+            <Layers className="h-3.5 w-3.5" />
+            <span>Map Layers Legend</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+            <span>Potential Fishing Zones (PFZ)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-5 rounded bg-emerald-400"></span>
+            <span>Vector-Assisted Fuel Route (Green)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-5 rounded bg-rose-500"></span>
+            <span>IMBL Sovereign Border (Red)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 ring-2 ring-white"></span>
+            <span>Active Target Mesh</span>
+          </div>
+        </div>
+
+        {/* DeckGL & MapLibre Canvas */}
+        <DeckGL
+          viewState={viewState}
+          onViewStateChange={(e: any) => setViewState(e.viewState)}
+          controller={true}
+          layers={layers}
+          onClick={handleMapClick}
+          getCursor={({ isHovering }) => (isHovering ? "pointer" : "crosshair")}
+        >
+          <Map
+            mapLib={maplibregl}
+            mapStyle={MAP_STYLE}
+            reuseMaps={true}
+            attributionControl={false}
+          />
+        </DeckGL>
+      </div>
+    </div>
+  );
+}
