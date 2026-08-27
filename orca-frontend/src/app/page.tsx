@@ -28,20 +28,20 @@ import {
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
-// High-Resolution Clean Dark Matter Raster Specification (Zero Watermark)
+// Authenticated CARTO Dark Matter (Zero Watermark via ?key= parameter)
 const DARK_MATTER_STYLE: any = {
   version: 8,
   sources: {
     "carto-dark": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
+        `https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
       ],
       tileSize: 256,
-      attribution: "© CARTO, © OpenStreetMap",
+      attribution: "© CARTO, © OpenStreetMap contributors",
     },
   },
   layers: [
@@ -55,20 +55,20 @@ const DARK_MATTER_STYLE: any = {
   ],
 };
 
-// High-Resolution Nautical Coastal Voyager Chart Style (Zero Watermark)
+// Authenticated CARTO Voyager Nautical Chart (Zero Watermark via ?key= parameter)
 const VOYAGER_STYLE: any = {
   version: 8,
   sources: {
     "carto-voyager": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/voyager/{z}/{x}/{y}@2x.png",
-        "https://c.basemaps.cartocdn.com/voyager/{z}/{x}/{y}@2x.png",
-        "https://d.basemaps.cartocdn.com/voyager/{z}/{x}/{y}@2x.png",
+        `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
       ],
       tileSize: 256,
-      attribution: "© CARTO, © OpenStreetMap",
+      attribution: "© CARTO, © OpenStreetMap contributors",
     },
   },
   layers: [
