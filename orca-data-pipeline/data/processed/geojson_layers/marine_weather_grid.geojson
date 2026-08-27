@@ -1,6 +1,6 @@
 {
   "type": "FeatureCollection",
-  "name": "Indian_Coastal_Marine_Weather_Grid",
+  "name": "marine_weather_grid",
   "crs": {
     "type": "name",
     "properties": {
@@ -13,26 +13,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          68.6,
-          23.2
+          70.36,
+          20.9
         ]
       },
       "properties": {
-        "station_id": "WX-GUJ-JAKHAU",
-        "station_name": "Jakhau (North Gujarat / Kutch)",
-        "coastal_sector": "Gulf of Kutch",
-        "significant_wave_height_m": 1.5,
-        "swell_height_m": 1.2,
-        "swell_period_s": 6.8,
-        "swell_direction_deg": 239,
-        "wind_speed_knots": 16.5,
-        "wind_gust_knots": 22.0,
-        "wind_direction_deg": 235,
-        "mslp_hpa": 1008.2,
-        "air_temp_c": 29.5,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Normal coastal operations. Exercise caution near shallow sandbanks."
+        "name": "Veraval",
+        "state": "Gujarat",
+        "sector": "North-West Arabian Sea",
+        "wave_height": 1.72,
+        "wave_period": 7.5,
+        "wind_speed": 18.0,
+        "surface_pressure": 1007.8,
+        "current_velocity": 0.48,
+        "warning_level": "YELLOW (Precautionary Advisory)"
       }
     },
     {
@@ -40,26 +34,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          70.2,
-          20.8
+          72.83,
+          18.92
         ]
       },
       "properties": {
-        "station_id": "WX-GUJ-VERAVAL",
-        "station_name": "Veraval Offshore Station",
-        "coastal_sector": "Saurashtra Coast",
-        "significant_wave_height_m": 2.1,
-        "swell_height_m": 1.1,
-        "swell_period_s": 7.65,
-        "swell_direction_deg": 238,
-        "wind_speed_knots": 14.0,
-        "wind_gust_knots": 18.5,
-        "wind_direction_deg": 225,
-        "mslp_hpa": 1009.0,
-        "air_temp_c": 28.8,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Favorable sea state for commercial pelagic fishing."
+        "name": "Mumbai",
+        "state": "Maharashtra",
+        "sector": "Konkan Coast",
+        "wave_height": 1.78,
+        "wave_period": 7.25,
+        "wind_speed": 13.5,
+        "surface_pressure": 1008.7,
+        "current_velocity": 1.5,
+        "warning_level": "GREEN"
       }
     },
     {
@@ -67,26 +55,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          71.35,
-          19.25
+          73.28,
+          16.99
         ]
       },
       "properties": {
-        "station_id": "WX-MAH-MUMBAI",
-        "station_name": "Mumbai High Offshore Platform",
-        "coastal_sector": "Konkan Coast",
-        "significant_wave_height_m": 1.7,
-        "swell_height_m": 1.3,
-        "swell_period_s": 8.5,
-        "swell_direction_deg": 245,
-        "wind_speed_knots": 15.8,
-        "wind_gust_knots": 21.0,
-        "wind_direction_deg": 240,
-        "mslp_hpa": 1009.5,
-        "air_temp_c": 29.2,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Standard offshore vessel routing operational."
+        "name": "Ratnagiri",
+        "state": "Maharashtra",
+        "sector": "Central Konkan Coast",
+        "wave_height": 1.62,
+        "wave_period": 7.5,
+        "wind_speed": 4.4,
+        "surface_pressure": 1011.9,
+        "current_velocity": 0.49,
+        "warning_level": "GREEN"
       }
     },
     {
@@ -94,26 +76,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          73.65,
-          15.4
+          74.84,
+          12.86
         ]
       },
       "properties": {
-        "station_id": "WX-GOA-PANJIM",
-        "station_name": "Mormugao Offshore Station",
-        "coastal_sector": "Goa Coast",
-        "significant_wave_height_m": 1.6,
-        "swell_height_m": 1.3,
-        "swell_period_s": 9.0,
-        "swell_direction_deg": 230,
-        "wind_speed_knots": 14.5,
-        "wind_gust_knots": 19.0,
-        "wind_direction_deg": 220,
-        "mslp_hpa": 1010.2,
-        "air_temp_c": 28.5,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Calm coastal conditions."
+        "name": "Mangalore",
+        "state": "Karnataka",
+        "sector": "Canara Coast",
+        "wave_height": 1.52,
+        "wave_period": 7.5,
+        "wind_speed": 5.0,
+        "surface_pressure": 1010.4,
+        "current_velocity": 0.49,
+        "warning_level": "GREEN"
       }
     },
     {
@@ -121,26 +97,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          75.9,
-          9.9
+          76.26,
+          9.94
         ]
       },
       "properties": {
-        "station_id": "WX-KER-KOCHI",
-        "station_name": "Kochi Harbor Channel Station",
-        "coastal_sector": "Malabar Coast",
-        "significant_wave_height_m": 2.2,
-        "swell_height_m": 1.9,
-        "swell_period_s": 12.5,
-        "swell_direction_deg": 215,
-        "wind_speed_knots": 19.5,
-        "wind_gust_knots": 26.0,
-        "wind_direction_deg": 210,
-        "mslp_hpa": 1008.8,
-        "air_temp_c": 27.8,
-        "sea_state": "Rough",
-        "warning_level": "YELLOW",
-        "advisory": "High swell surges observed. Small motorized country craft advised to exercise extreme caution."
+        "name": "Kochi",
+        "state": "Kerala",
+        "sector": "Malabar Coast",
+        "wave_height": 1.3,
+        "wave_period": 9.3,
+        "wind_speed": 3.9,
+        "surface_pressure": 1013.2,
+        "current_velocity": 0.5,
+        "warning_level": "GREEN"
       }
     },
     {
@@ -148,26 +118,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          76.9,
-          8.2
+          78.16,
+          8.8
         ]
       },
       "properties": {
-        "station_id": "WX-KER-VIZHINJAM",
-        "station_name": "Vizhinjam / Kanyakumari Trijunction",
-        "coastal_sector": "Laccadive Sea",
-        "significant_wave_height_m": 2.4,
-        "swell_height_m": 2.1,
-        "swell_period_s": 13.0,
-        "swell_direction_deg": 205,
-        "wind_speed_knots": 21.0,
-        "wind_gust_knots": 28.0,
-        "wind_direction_deg": 200,
-        "mslp_hpa": 1008.0,
-        "air_temp_c": 28.0,
-        "sea_state": "Rough",
-        "warning_level": "YELLOW",
-        "advisory": "Cross-sea conditions in southern maritime corridor."
+        "name": "Tuticorin",
+        "state": "Tamil Nadu",
+        "sector": "Gulf of Mannar",
+        "wave_height": 1.06,
+        "wave_period": 8.15,
+        "wind_speed": 18.7,
+        "surface_pressure": 1011.4,
+        "current_velocity": 0.6,
+        "warning_level": "YELLOW (Precautionary Advisory)"
       }
     },
     {
@@ -175,26 +139,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          79.4,
-          9.3
+          80.3,
+          13.13
         ]
       },
       "properties": {
-        "station_id": "WX-TAM-RAMESWARAM",
-        "station_name": "Palk Strait Marine Station",
-        "coastal_sector": "Palk Bay",
-        "significant_wave_height_m": 0.9,
-        "swell_height_m": 0.6,
-        "swell_period_s": 6.0,
-        "swell_direction_deg": 130,
-        "wind_speed_knots": 11.0,
-        "wind_gust_knots": 14.5,
-        "wind_direction_deg": 125,
-        "mslp_hpa": 1011.0,
-        "air_temp_c": 30.2,
-        "sea_state": "Slight",
-        "warning_level": "GREEN",
-        "advisory": "Sheltered waters. Maintain strict compliance with IMBL geofence."
+        "name": "Chennai",
+        "state": "Tamil Nadu",
+        "sector": "Coromandel Coast",
+        "wave_height": 0.8,
+        "wave_period": 6.85,
+        "wind_speed": 9.3,
+        "surface_pressure": 1009.3,
+        "current_velocity": 0.8,
+        "warning_level": "GREEN"
       }
     },
     {
@@ -202,26 +160,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          80.4,
-          13.15
+          83.3,
+          17.7
         ]
       },
       "properties": {
-        "station_id": "WX-TAM-CHENNAI",
-        "station_name": "Chennai Port Roadstead",
-        "coastal_sector": "Coromandel Coast",
-        "significant_wave_height_m": 1.3,
-        "swell_height_m": 1.0,
-        "swell_period_s": 7.5,
-        "swell_direction_deg": 145,
-        "wind_speed_knots": 13.2,
-        "wind_gust_knots": 17.0,
-        "wind_direction_deg": 140,
-        "mslp_hpa": 1010.5,
-        "air_temp_c": 29.8,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Normal commercial fishing conditions."
+        "name": "Visakhapatnam",
+        "state": "Andhra Pradesh",
+        "sector": "Northern Circars",
+        "wave_height": 1.3,
+        "wave_period": 9.1,
+        "wind_speed": 13.0,
+        "surface_pressure": 1004.6,
+        "current_velocity": 0.4,
+        "warning_level": "ORANGE (Squall / Rough Sea Warning)"
       }
     },
     {
@@ -229,26 +181,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          83.5,
-          17.6
+          86.69,
+          20.3
         ]
       },
       "properties": {
-        "station_id": "WX-AND-VIZAG",
-        "station_name": "Visakhapatnam Deep Water Station",
-        "coastal_sector": "Northern Circars",
-        "significant_wave_height_m": 1.6,
-        "swell_height_m": 1.3,
-        "swell_period_s": 8.0,
-        "swell_direction_deg": 160,
-        "wind_speed_knots": 15.0,
-        "wind_gust_knots": 20.0,
-        "wind_direction_deg": 155,
-        "mslp_hpa": 1009.2,
-        "air_temp_c": 29.4,
-        "sea_state": "Moderate",
-        "warning_level": "GREEN",
-        "advisory": "Good visibility, gentle to moderate swell."
+        "name": "Paradip",
+        "state": "Odisha",
+        "sector": "North-East Bay of Bengal",
+        "wave_height": 1.54,
+        "wave_period": 9.1,
+        "wind_speed": 10.4,
+        "surface_pressure": 1003.6,
+        "current_velocity": 0.8,
+        "warning_level": "ORANGE (Squall / Rough Sea Warning)"
       }
     },
     {
@@ -256,53 +202,20 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          86.8,
-          20.2
+          92.74,
+          11.67
         ]
       },
       "properties": {
-        "station_id": "WX-ODI-PARADIP",
-        "station_name": "Paradip Anchorage Station",
-        "coastal_sector": "Odisha Coast",
-        "significant_wave_height_m": 2.5,
-        "swell_height_m": 2.2,
-        "swell_period_s": 9.5,
-        "swell_direction_deg": 170,
-        "wind_speed_knots": 23.5,
-        "wind_gust_knots": 32.0,
-        "wind_direction_deg": 165,
-        "mslp_hpa": 1004.5,
-        "air_temp_c": 28.2,
-        "sea_state": "Rough to Very Rough",
-        "warning_level": "ORANGE",
-        "advisory": "Low-pressure trough deepening in NW Bay of Bengal. Squally winds up to 35 knots expected."
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          88.25,
-          21.05
-        ]
-      },
-      "properties": {
-        "station_id": "WX-WBE-SANDHEADS",
-        "station_name": "Sandheads Light Vessel Station",
-        "coastal_sector": "North Bay of Bengal",
-        "significant_wave_height_m": 2.8,
-        "swell_height_m": 2.5,
-        "swell_period_s": 10.0,
-        "swell_direction_deg": 175,
-        "wind_speed_knots": 26.0,
-        "wind_gust_knots": 36.0,
-        "wind_direction_deg": 170,
-        "mslp_hpa": 1003.8,
-        "air_temp_c": 27.9,
-        "sea_state": "Very Rough",
-        "warning_level": "ORANGE",
-        "advisory": "Severe weather alert: Fishermen are advised not to venture into deep sea for the next 48 hours."
+        "name": "Port Blair",
+        "state": "Andaman & Nicobar",
+        "sector": "Andaman Sea",
+        "wave_height": 1.04,
+        "wave_period": 5.7,
+        "wind_speed": 20.2,
+        "surface_pressure": 1009.6,
+        "current_velocity": 0.6,
+        "warning_level": "ORANGE (Squall / Rough Sea Warning)"
       }
     }
   ]

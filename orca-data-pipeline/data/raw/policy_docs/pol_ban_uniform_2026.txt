@@ -1,0 +1,18 @@
+TITLE: Uniform Seasonal Monsoon Fishing Ban Rules in Indian Exclusive Economic Zone
+CATEGORY: Monsoon Fishing Ban
+SOURCE: Ministry of Fisheries, Animal Husbandry and Dairying, Government of India (Order No. 31035/01/2026-FY)
+METADATA:
+{
+  "authority": "Department of Fisheries, GoI",
+  "jurisdiction": "Indian EEZ (All Coastal States)",
+  "effective_dates": "West Coast: June 1 to July 31 (61 days) | East Coast: April 15 to June 14 (61 days)",
+  "applicable_to": "Mechanized and motorized fishing vessels beyond territorial waters",
+  "exemption": "Traditional non-motorized artisanal country craft",
+  "penalties": "Vessel impoundment, confiscation of catch and gear, suspension of subsidized diesel"
+}
+================================================================================
+
+The Government of India enforces an annual uniform seasonal fishing ban in the Indian Exclusive Economic Zone (EEZ) to facilitate fish breeding, biological rejuvenation, and conservation of pelagic and demersal marine stocks.
+On the West Coast (covering the maritime zones of Gujarat, Maharashtra, Goa, Karnataka, Kerala, Daman & Diu, and Lakshadweep), the 61-day ban is active from midnight of 1st June to midnight of 31st July every year.
+On the East Coast (covering the maritime zones of Tamil Nadu, Andhra Pradesh, Odisha, West Bengal, Puducherry, and Andaman & Nicobar Islands), the 61-day ban is active from midnight of 15th April to midnight of 14th June every year.
+The prohibition applies strictly to all mechanized fishing trawlers, purse-seiners, and motorized vessels venturing beyond 12 nautical miles. Traditional non-motorized country crafts are permitted to fish in nearshore waters. Violating vessels face interception by the Indian Coast Guard, seizure of vessel, and cancellation of maritime fishing permits.

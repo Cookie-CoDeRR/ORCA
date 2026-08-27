@@ -1,0 +1,16 @@
+TITLE: Marine Protected Areas, Coral Reef Protection & Wildlife Protection Act Guidelines
+CATEGORY: Marine Conservation & Coral Reefs
+SOURCE: Wild Life (Protection) Act, 1972 (Schedule I Marine Taxa) & Ministry of Environment, Forest and Climate Change (MoEFCC)
+METADATA:
+{
+  "authority": "Forest & Environment Departments / Wildlife Crime Control Bureau",
+  "protected_sanctuaries": "Gulf of Mannar Marine National Park, Marine National Park Gulf of Kutch, Gahirmatha, Sundarbans, Malvan",
+  "schedule_i_species": "All Hard Corals (Scleractinia), Sea Cow (Dugong), Whale Shark, Olive Ridley Turtle, Sea Horses",
+  "prohibited_actions": "Bottom trawling, coral reef destruction, blast fishing, collection of sea cucumbers"
+}
+================================================================================
+
+The Wild Life (Protection) Act of 1972 accords the highest level of statutory protection (Schedule I) to vulnerable marine species and sensitive reef ecosystems in India.
+All species of stony hard corals (Scleractinia), black corals (Antipatharia), sea fans (Gorgonians), sea cucumbers (Holothurians), Dugongs (Dugong dugon), Whale Sharks (Rhincodon typus), and all species of Sea Turtles are classified under Schedule I.
+In designated Marine Protected Areas (MPAs) such as the Gulf of Mannar Marine National Park (Tamil Nadu), Marine National Park Gulf of Kutch (Gujarat), and Gahirmatha Marine Sanctuary (Odisha), bottom trawling, purse-seining, and anchoring on live coral reefs are strictly prohibited.
+At Gahirmatha and the Rushikulya estuary, an annual 7-month total mechanized fishing ban is enforced between 1st November and 31st May to protect Olive Ridley mass nesting rookeries. All mechanized trawlers operating in adjacent waters must install certified Turtle Excluder Devices (TED). Violators face mandatory imprisonment up to 7 years and vessel confiscation under Section 51 of the Wildlife Protection Act.

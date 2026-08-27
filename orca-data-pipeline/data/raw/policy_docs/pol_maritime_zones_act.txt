@@ -1,0 +1,18 @@
+TITLE: Territorial Waters, Continental Shelf, Exclusive Economic Zone and other Maritime Zones Act
+CATEGORY: Maritime Boundaries & Jurisdiction
+SOURCE: The Territorial Waters, Continental Shelf, Exclusive Economic Zone and other Maritime Zones Act, 1976 (Act No. 80 of 1976)
+METADATA:
+{
+  "authority": "Parliament of India / Ministry of External Affairs",
+  "jurisdiction": "Sovereign Maritime Zones of the Republic of India",
+  "zones_defined": "Territorial Waters (12 NM), Contiguous Zone (24 NM), EEZ (200 NM)",
+  "treaties": "Indo-Sri Lanka Maritime Agreements 1974/1976, UNCLOS 1982",
+  "penalties": "Prosecution under Maritime Zones of India (Regulation of Fishing by Foreign Vessels) Act 1981"
+}
+================================================================================
+
+Under the Maritime Zones Act of 1976, the sovereignty of India extends to territorial waters up to 12 nautical miles (NM) measured from the baseline. The state fisheries departments exercise primary regulatory control within this 12 NM territorial zone.
+The Contiguous Zone extends to 24 nautical miles, wherein Indian authorities exercise customs, fiscal, immigration, and sanitary jurisdiction.
+The Exclusive Economic Zone (EEZ) of India extends up to 200 nautical miles from the baseline, enclosing approximately 2.02 million square kilometers. India holds sovereign rights for the purpose of exploring, exploiting, conserving, and managing natural living and non-living resources within the EEZ.
+Foreign vessels are strictly prohibited from fishing or conducting scientific research within the Indian EEZ without explicit license from the Central Government.
+Furthermore, the International Maritime Boundary Line (IMBL) between India and Sri Lanka (Palk Bay & Gulf of Mannar) and India and Pakistan (Sir Creek Arabian Sea sector) represents inviolable sovereign borders; unauthorized crossing by Indian fishing craft carries high risk of arrest, detention, and confiscation under foreign jurisdiction.

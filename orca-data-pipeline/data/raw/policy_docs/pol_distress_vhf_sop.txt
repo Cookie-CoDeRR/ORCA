@@ -1,0 +1,17 @@
+TITLE: Standard Operating Procedures for Maritime Distress Signaling & VHF Channel 16
+CATEGORY: Maritime Safety & Distress
+SOURCE: Indian Coast Guard Coastal Security & Search and Rescue (SAR) Directive
+METADATA:
+{
+  "authority": "Indian Coast Guard (Ministry of Defence)",
+  "jurisdiction": "Indian Maritime Search and Rescue Region (ISRR)",
+  "emergency_frequencies": "VHF Marine Channel 16 (156.8 MHz), MF 2182 kHz, Toll-free 1554",
+  "mandatory_equipment": "Life jackets, Lifebuoys with lines, Parachute flares, Smoke signals, AIS Class B",
+  "mcc_contact": "Maritime Rescue Coordination Centre (MRCC) Mumbai, Chennai, Port Blair"
+}
+================================================================================
+
+All seagoing commercial and fishing vessels operating within the Indian Search and Rescue Region (ISRR) must maintain continuous listening watch on VHF Marine Channel 16 (156.800 MHz) for distress, urgency, and safety alerts.
+In emergency situations (vessel sinking, collision, fire, medical evacuation, man overboard), the international standard distress call 'MAYDAY MAYDAY MAYDAY' must be broadcast on Channel 16 stating vessel name, GPS coordinates, nature of distress, and crew count.
+Every mechanized fishing vessel is legally required to carry approved life jackets for all crew members, minimum 2 lifebuoys with self-igniting lights, pyrotechnic distress signals (minimum 3 red hand flares and 2 orange smoke signals), and certified fire extinguishers.
+Coastal fishermen can also trigger one-touch emergency distress alerts using ISRO Distress Alert Transmitters (DAT-SG) or dial the Coast Guard national toll-free helpline 1554. When Port Warning Signal No. 3 or severe weather alerts are hoisted by IMD/INCOIS, all offshore vessels must immediately retreat to the nearest designated harbor of refuge.
