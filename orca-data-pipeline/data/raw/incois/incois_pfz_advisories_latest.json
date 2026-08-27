@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "source": "INCOIS Marine Observation & PFZ Division",
+    "issued_at": "2026-08-27T16:00:32.638688+00:00",
+    "valid_until": "2026-08-29T16:00:32.638688+00:00",
+    "records_count": 7
+  },
+  "advisories": [
+    {
+      "advisory_id": "INCOIS-PFZ-GUJ-2026-081",
+      "landing_center": "Veraval",
+      "state": "Gujarat",
+      "sector": "North-West Coast",
+      "latitude": 20.72,
+      "longitude": 70.15,
+      "bearing_deg": 225,
+      "bearing_direction": "South-West",
+      "distance_km": 32.5,
+      "depth_m": 45,
+      "target_species": [
+        "Yellowfin Tuna",
+        "Ribbonfish",
+        "Indian Mackerel"
+      ],
+      "sst_celsius": 28.3,
+      "chlorophyll_mg_m3": 1.45,
+      "confidence_score": 0.89,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-GUJ-2026-082",
+      "landing_center": "Porbandar",
+      "state": "Gujarat",
+      "sector": "North-West Coast",
+      "latitude": 21.48,
+      "longitude": 69.35,
+      "bearing_deg": 240,
+      "bearing_direction": "West-South-West",
+      "distance_km": 41.0,
+      "depth_m": 60,
+      "target_species": [
+        "Skipjack Tuna",
+        "Pomfret"
+      ],
+      "sst_celsius": 27.9,
+      "chlorophyll_mg_m3": 1.8,
+      "confidence_score": 0.92,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-MAH-2026-064",
+      "landing_center": "Ratnagiri (Mirkarwada)",
+      "state": "Maharashtra",
+      "sector": "West Coast",
+      "latitude": 16.92,
+      "longitude": 72.85,
+      "bearing_deg": 260,
+      "bearing_direction": "West",
+      "distance_km": 28.0,
+      "depth_m": 52,
+      "target_species": [
+        "King Seer",
+        "Sardines",
+        "Squid"
+      ],
+      "sst_celsius": 28.6,
+      "chlorophyll_mg_m3": 1.15,
+      "confidence_score": 0.85,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-KER-2026-112",
+      "landing_center": "Kochi (Thoppumpady)",
+      "state": "Kerala",
+      "sector": "South-West Coast",
+      "latitude": 9.85,
+      "longitude": 75.82,
+      "bearing_deg": 250,
+      "bearing_direction": "West-South-West",
+      "distance_km": 36.0,
+      "depth_m": 75,
+      "target_species": [
+        "Indian Oil Sardine",
+        "Mackerel",
+        "Carangids"
+      ],
+      "sst_celsius": 27.2,
+      "chlorophyll_mg_m3": 2.1,
+      "confidence_score": 0.94,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-TAM-2026-095",
+      "landing_center": "Tuticorin (Thoothukudi)",
+      "state": "Tamil Nadu",
+      "sector": "Gulf of Mannar",
+      "latitude": 8.65,
+      "longitude": 78.45,
+      "bearing_deg": 130,
+      "bearing_direction": "South-East",
+      "distance_km": 24.0,
+      "depth_m": 35,
+      "target_species": [
+        "Seer Fish",
+        "Lethrinids",
+        "Tuna"
+      ],
+      "sst_celsius": 28.8,
+      "chlorophyll_mg_m3": 1.3,
+      "confidence_score": 0.88,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-AND-2026-073",
+      "landing_center": "Visakhapatnam",
+      "state": "Andhra Pradesh",
+      "sector": "East Coast",
+      "latitude": 17.58,
+      "longitude": 83.52,
+      "bearing_deg": 115,
+      "bearing_direction": "East-South-East",
+      "distance_km": 30.0,
+      "depth_m": 68,
+      "target_species": [
+        "Yellowfin Tuna",
+        "Mahi Mahi",
+        "Barracuda"
+      ],
+      "sst_celsius": 29.2,
+      "chlorophyll_mg_m3": 1.65,
+      "confidence_score": 0.9,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    },
+    {
+      "advisory_id": "INCOIS-PFZ-ODI-2026-051",
+      "landing_center": "Paradip",
+      "state": "Odisha",
+      "sector": "North-East Coast",
+      "latitude": 20.15,
+      "longitude": 86.85,
+      "bearing_deg": 145,
+      "bearing_direction": "South-East",
+      "distance_km": 26.0,
+      "depth_m": 42,
+      "target_species": [
+        "Hilsa",
+        "Pomfret",
+        "Croakers"
+      ],
+      "sst_celsius": 29.7,
+      "chlorophyll_mg_m3": 2.35,
+      "confidence_score": 0.91,
+      "valid_from": "2026-08-27T16:00:32.638688+00:00",
+      "valid_to": "2026-08-29T16:00:32.638688+00:00"
+    }
+  ]
+}

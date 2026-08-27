@@ -1,0 +1,27 @@
+# ==============================================================================
+# PROJECT ORCA (SIH26176) — DATA PIPELINE DEPENDENCIES
+# ==============================================================================
+
+# Multidimensional Array & Scientific NetCDF Processing
+xarray>=2023.1.0
+netCDF4>=1.6.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Geospatial Raster & Cloud Optimized GeoTIFF (COG) Creation
+rasterio>=1.3.0
+rio-cogeo>=5.0.0
+
+# Geospatial Vector & Geometry Manipulation
+shapely>=2.0.0
+geopandas>=0.13.0
+
+# API Ingestion & Web Scraping
+requests>=2.31.0
+urllib3>=2.0.0
+copernicusmarine>=1.0.0
+
+# Environment & Pipeline CLI Utilities
+python-dotenv>=1.0.0
+tqdm>=4.65.0
+rich>=13.0.0

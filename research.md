@@ -1,60 +1,40 @@
-# Project ORCA — Research & Scientific Foundation (SIH26176)
+Here are the core research papers, foundational datasets, and methodologies you need to reference in your presentation and synopsis to prove the scientific validity of your ORCA architecture.
 
-This document details the scientific references, academic papers, marine datasets, and mathematical formulations underpinning **Project ORCA (Ocean Resource & Coastal Advisory)**.
+### I. Multi-Agent AI and Geospatial Reasoning
 
----
+To validate the LangGraph architecture and the use of LLMs for geospatial tool execution, you must cite recent advancements in spatial AI agents.
 
-## 1. Multi-Agent Systems (MAS) & Orchestrated Reasoning
+- **Reference Paper:** "GeoJSON Agents: A Multi-Agent LLM Architecture for Geospatial Analysis—Function Calling vs Code Generation".
+- **Key Concept to Include in PPT:** This paper introduces a multi-agent framework specifically designed for geographic information systems (GIS). It validates the exact architecture you are building: a "Planner agent" that decomposes natural language tasks, and "Worker agents" that process spatial data by invoking APIs or executing Python code.
+- **Application for ORCA:** Cite this to justify why your Supervisor Agent uses function calling for structured operations (like querying PostGIS) and why the final output is formatted as reusable GeoJSON for the frontend map.
 
-### 1.1 Orchestrated Reasoning with Collaborative Agents
-- **Citation:** *ORCA: Orchestrated Reasoning with Collaborative Agents* (2026).
-- **Core Concept:** Multi-agent architectures that divide complex decision processes into modular execution stages: intent decomposition, specialized tool routing, and collaborative synthesis.
-- **Application in Project ORCA:** The LangGraph supervisor acts as the primary orchestrator, decomposing natural language user queries into parallel deterministic tasks (spatial risk validation and ocean raster analytics) and semantic retrieval (regulatory RAG).
+### II. Potential Fishing Zone (PFZ) & Ocean State Methodology
 
-### 1.2 Multi-Agent Collaboration Mechanisms
-- **Citation:** *Multi-Agent Collaboration Mechanisms: A Survey of LLMs* (2025).
-- **Core Concept:** Surveys how specialized, task-constrained agents outperform monolithic Large Language Models by eliminating hallucination loops and enabling verifiable sub-tasks.
-- **Application in Project ORCA:** Enforces our core architectural rule: **"Deterministic engines for numerical and spatial calculations; LLMs strictly for semantic parsing and language synthesis."**
+ISRO and INCOIS rely on specific satellite parameters to define safe and productive ocean zones. Your Ocean Analytics Agent must use these exact methodologies.
 
----
+- **Reference Paper:** "Multiple ocean parameter-based potential fishing zone (PFZ) location generation and validation in the Western Bay of Bengal".
+- **Key Concept to Include in PPT:** Modern PFZ forecasting relies on tracking thermal fronts, cyclonic eddies, and high chlorophyll patches. The methodology uses data from the Moderate Resolution Imaging Spectroradiometer (MODIS) for chlorophyll and Sea Surface Temperature (SST), alongside SCATSAT-1 for ocean surface winds.
+- **Application for ORCA:** Use this to explain the deterministic math in your Ocean Analytics Agent. Show the jury that your Python scripts are replicating the Canny algorithm for chlorophyll fronts and tracking SST gradients to find fish aggregations, just as INCOIS does.
+- **Reference Paper:** "A remote sensing approach to monitor potential fishing zone associated with sea surface temperature and chlorophyll concentration".
+- **Key Concept to Include in PPT:** This paper validates that regions with low SST (24–27°C) combined with high chlorophyll concentrations are assigned the highest rank for Potential Fishing Zones. It also highlights that fish aggregation often moves closer to international maritime boundary lines, increasing the risk for fishermen.
+- **Application for ORCA:** This justifies your Risk & Geofencing Agent. Because PFZs often drift near maritime borders, your PostGIS `ST_Intersects` boundary check is a scientifically proven safety necessity.
 
-## 2. Marine Science & Oceanographic Data Sources
+### III. Multilingual Localization (The Bhashini / Indic Pipeline)
 
-### 2.1 Potential Fishing Zone (PFZ) Identification Methodology
-- **Reference:** *Indian National Centre for Ocean Information Services (INCOIS) PFZ Advisory WebGIS Manual*.
-- **Scientific Principle:** Marine pelagic fish (such as Tuna, Mackerel, and Sardine) aggregate at oceanographic features like thermal fronts, oceanic eddies, and upwelling zones where chlorophyll-a concentrations are highest.
-- **Mathematical Formulations for PFZ Detection:**
-  1. **Sea Surface Temperature (SST) Thermal Gradient:**
-     $$\|\nabla \text{SST}\| = \sqrt{\left(\frac{\partial \text{SST}}{\partial x}\right)^2 + \left(\frac{\partial \text{SST}}{\partial y}\right)^2} \ge 0.5^\circ\text{C / km}$$
-  2. **Chlorophyll-a Concentration Threshold:**
-     $$\text{Chl-}a \ge 0.3\,\text{mg/m}^3 \quad \text{with oceanic frontal intersection}$$
-  3. **Wind & Wave Operational Envelope:**
-     $$\text{SWH (Significant Wave Height)} \le 2.5\,\text{m}, \quad \text{Wind Speed} \le 20\,\text{knots}$$
+To fulfill the mandate for regional language support, you must reference the state-of-the-art open-source models developed for Indian vernaculars.
 
-### 2.2 Official Indian Satellite & Marine Feeds
-- **MOSDAC (ISRO):**
-  - High-resolution Sea Surface Temperature (INSAT-3D / 3DR) in NetCDF4 / HDF5.
-  - Oceansat-3 Ocean Colour Monitor (OCM) Chlorophyll-a grids.
-  - Scatterometer wind vector fields.
-- **INCOIS ERDDAP Server:**
-  - Real-time & forecasted Significant Wave Height (SWH).
-  - Ocean Surface Current velocity vectors ($u, v$ components).
-  - High-wave and swell surge warning bulletins.
+- **Reference Paper:** "IndicTrans2: Toward High-Quality and Accessible Machine Translation Models for all 22 Scheduled Indian Languages" (AI4Bharat).
+- **Key Concept to Include in PPT:** IndicTrans2 is the first open-source transformer-based multilingual model supporting high-quality translations across all 22 scheduled Indic languages. It was trained on the Bharat Parallel Corpus Collection (BPCC), which contains roughly 230 million bitext pairs.
+- **Application for ORCA:** Cite this as the engine behind your Synthesizer Agent. Explain that your text responses are translated using the IndicTrans2 architecture to ensure accurate coastal vernaculars.
+- **Reference Paper:** "IndicConformer / IndicWhisper" (AI4Bharat ASR Suite).
+- **Key Concept to Include in PPT:** These are state-of-the-art Automatic Speech Recognition (ASR) models fine-tuned on datasets like Vistaar (10,700 hours of labeled audio) and Shruti to handle diverse Indian accents and dialects.
+- **Application for ORCA:** Mention this if you build a WhatsApp audio-bot feature, proving your speech-to-text pipeline can handle the dialects of rural fishermen.
 
----
+### IV. Structuring the Synopsis
 
-## 3. Marine Visual Understanding & Species Archiving
+When drafting the hackathon synopsis, structure it around these peer-reviewed pillars:
 
-### 3.1 Object Recognition and Marine Species Archiving
-- **Citation:** *ORCA: Object Recognition and Comprehension for Archiving Marine Species* (WACV 2026).
-- **Core Concept:** Multi-modal benchmark capturing morphology-oriented visual attributes across marine species for visual grounding and conservation tracking.
-- **Application in Project ORCA:** Provides foundation for species-level catch advisory, juvenile mesh compliance checking, and future computer vision vessel catch analysis.
-
----
-
-## 4. OGC Standards & Sovereign Geospatial Infrastructure
-
-### 4.1 National Spatial Data Infrastructure (NSDI) Compliance
-- **OGC Web Map Service (WMS):** Dynamically rendering raster tiles via TiTiler directly from S3/MinIO NetCDF archives.
-- **OGC Web Feature Service (WFS):** Serving vector maritime boundaries, MPAs, and coastal gazetteers.
-- **PostGIS Spatial SQL Calculations:** Geodesic distance checks using `ST_Distance` on WGS84 spheroids (`EPSG:4326` / `EPSG:3857`) for infallible border geofencing.
+1. **The Problem:** Fragmented marine data and the risk of crossing maritime boundaries.
+2. **The AI Innovation:** Implementing a Multi-Agent GeoJSON architecture to process natural language into deterministic spatial functions.
+3. **The Scientific Engine:** Utilizing MODIS and ISRO satellite data to track SST and chlorophyll gradients for accurate PFZ mapping.
+4. **The Accessibility Layer:** Integrating IndicTrans2 transformer models to deliver the spatial intelligence in 22 regional languages.

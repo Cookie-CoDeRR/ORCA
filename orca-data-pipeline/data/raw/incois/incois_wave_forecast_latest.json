@@ -1,0 +1,90 @@
+{
+  "metadata": {
+    "source": "INCOIS Ocean State Forecast (OSF) Division",
+    "issued_at": "2026-08-27T16:00:32.638688+00:00",
+    "valid_until": "2026-08-29T16:00:32.638688+00:00",
+    "sectors_count": 5
+  },
+  "forecasts": [
+    {
+      "coastal_sector": "Gujarat Coast (Jakhau to Daman)",
+      "state": "Gujarat",
+      "significant_wave_height_m": 1.4,
+      "wave_height_range_m": [
+        1.1,
+        1.8
+      ],
+      "wave_period_seconds": 7.5,
+      "wave_direction_deg": 230,
+      "wind_speed_knots": 14.5,
+      "wind_direction": "SW",
+      "sea_state": "Moderate",
+      "warning_level": "GREEN (Safe)",
+      "safety_advisory": "Normal fishing operations permitted. Standard offshore safety protocol applies."
+    },
+    {
+      "coastal_sector": "Maharashtra Coast (Palghar to Sindhudurg)",
+      "state": "Maharashtra",
+      "significant_wave_height_m": 1.6,
+      "wave_height_range_m": [
+        1.2,
+        2.0
+      ],
+      "wave_period_seconds": 8.0,
+      "wave_direction_deg": 240,
+      "wind_speed_knots": 15.0,
+      "wind_direction": "WSW",
+      "sea_state": "Moderate",
+      "warning_level": "GREEN (Safe)",
+      "safety_advisory": "Normal coastal & deep sea operations."
+    },
+    {
+      "coastal_sector": "Kerala Coast (Kasaragod to Thiruvananthapuram)",
+      "state": "Kerala",
+      "significant_wave_height_m": 2.1,
+      "wave_height_range_m": [
+        1.8,
+        2.6
+      ],
+      "wave_period_seconds": 12.0,
+      "wave_direction_deg": 210,
+      "wind_speed_knots": 18.0,
+      "wind_direction": "SSW",
+      "sea_state": "Rough to Very Rough",
+      "warning_level": "YELLOW (Caution)",
+      "safety_advisory": "Swell surge expected off Kollam and Vizhinjam. Small craft operators advised to exercise caution."
+    },
+    {
+      "coastal_sector": "Tamil Nadu & Palk Strait (Chennai to Kanyakumari)",
+      "state": "Tamil Nadu",
+      "significant_wave_height_m": 1.2,
+      "wave_height_range_m": [
+        0.8,
+        1.5
+      ],
+      "wave_period_seconds": 6.5,
+      "wave_direction_deg": 120,
+      "wind_speed_knots": 12.0,
+      "wind_direction": "SE",
+      "sea_state": "Slight to Moderate",
+      "warning_level": "GREEN (Safe)",
+      "safety_advisory": "Favorable conditions. Stay at least 5 nautical miles clear of the Sri Lanka IMBL."
+    },
+    {
+      "coastal_sector": "Odisha & West Bengal (Gopalpur to Digha)",
+      "state": "Odisha / West Bengal",
+      "significant_wave_height_m": 2.4,
+      "wave_height_range_m": [
+        2.0,
+        3.1
+      ],
+      "wave_period_seconds": 9.5,
+      "wave_direction_deg": 160,
+      "wind_speed_knots": 22.0,
+      "wind_direction": "SSE",
+      "sea_state": "Rough",
+      "warning_level": "ORANGE (Hazard Alert)",
+      "safety_advisory": "Squally weather in North Bay of Bengal. Fishermen advised not to venture beyond 50 km offshore."
+    }
+  ]
+}
