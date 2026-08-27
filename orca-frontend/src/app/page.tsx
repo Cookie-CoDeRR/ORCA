@@ -7,6 +7,8 @@ import { ScatterplotLayer, GeoJsonLayer } from "@deck.gl/layers";
 import Map from "react-map-gl/maplibre";
 import * as maplibregl from "maplibre-gl";
 import { v4 as uuidv4 } from "uuid";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Send,
   Trash2,
@@ -508,14 +510,22 @@ export default function OrcaDashboard() {
               )}
 
               <div
-                className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                className={`max-w-[88%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                   msg.role === "user"
                     ? "bg-sky-600 text-white rounded-br-none shadow-md shadow-sky-900/30"
-                    : "bg-[#0f172a] text-slate-200 border border-slate-800/80 rounded-bl-none shadow-sm"
+                    : "bg-[#0f172a]/95 text-slate-200 border border-slate-800/90 rounded-bl-none shadow-md"
                 }`}
               >
-                <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
-                <div className="mt-1 text-[9px] text-slate-400/80 text-right">{msg.timestamp}</div>
+                {msg.role === "user" ? (
+                  <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
+                ) : (
+                  <div className="orca-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                <div className="mt-1.5 text-[9px] text-slate-400/80 text-right">{msg.timestamp}</div>
               </div>
 
               {msg.role === "user" && (
