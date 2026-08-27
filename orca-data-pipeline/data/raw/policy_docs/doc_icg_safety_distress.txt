@@ -1,0 +1,19 @@
+TITLE: Indian Coast Guard Coastal Maritime Safety, Distress Signaling & Navigation Mandate
+AUTHORITY: Indian Coast Guard Headquarters, New Delhi
+JURISDICTION: All Indian Coastal Waters & EEZ
+CATEGORY: SAFETY_EQUIPMENT_AND_EMERGENCY
+EFFECTIVE: Active / Mandatory Compliance
+LEGAL REFERENCE: Merchant Shipping Act & Indian Coast Guard Coastal Safety SOP
+================================================================================
+
+1. Distress Communication Channels: All seagoing vessels must monitor and maintain communication on official maritime distress frequencies:
+   - VHF Marine Channel 16 (156.800 MHz): Continuous watch for distress, safety, and urgency calls.
+   - MF Distress Frequency: 2182 kHz.
+   - Indian Coast Guard National Emergency Toll-Free Number: 1554 (accessible via coastal mobile networks).
+2. Mandatory Vessel Safety Equipment: Every mechanized vessel venturing beyond 5 nautical miles from shore must carry:
+   - Approved Life Jackets (one per crew member on board).
+   - Minimum 2 Life Buoys fitted with buoyant lifelines and self-igniting lights.
+   - Red Hand Flares (minimum 3 units) and Orange Smoke Signals (minimum 2 units) with unexpired shelf life.
+   - Magnetic Marine Compass and operational GPS receiver.
+   - Certified Class B Fire Extinguishers (minimum 2 units in engine and galley compartments).
+3. Cyclone & Heavy Weather Protocol: When Port Warning Signals (Signal No. 3 or higher) or INCOIS Red Alerts are hoisted, all vessels must immediately cease fishing and return to the nearest designated harbor of refuge.

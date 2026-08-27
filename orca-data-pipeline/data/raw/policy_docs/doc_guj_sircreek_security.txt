@@ -1,0 +1,14 @@
+TITLE: Gujarat Fisheries Regulation & Indo-Pak Maritime Boundary Safety Protocol
+AUTHORITY: Directorate of Fisheries, Government of Gujarat & Indian Coast Guard (North-West Region)
+JURISDICTION: Gujarat
+CATEGORY: BORDER_SECURITY_AND_COASTAL_ALERT
+EFFECTIVE: Active / Year-Round Enforcement
+LEGAL REFERENCE: Gujarat Fisheries Act 2003 & SOP for Sir Creek Maritime Border
+================================================================================
+
+1. Sir Creek and Notified Sensitive Border Sector: The maritime boundary between India and Pakistan in the Arabian Sea off the Kutch and Saurashtra coast is heavily militarized.
+   - A 'No-Fishing Sensitive Security Zone' is established extending 10 nautical miles south of the Sir Creek mouth.
+   - Indian fishing boats operating from Jakhau, Okha, and Porbandar must strictly avoid straying past Latitude 23°00'N in the western sector near Pakistan maritime coordinates.
+2. Transponder & GPS Requirement: All mechanized fishing boats exceeding 12 meters in Length Overall (LOA) operating from Gujarat harbors must be equipped with active satellite-based Automatic Identification System (AIS Class B) or ISRO NAVIC / DAT-SG transponders.
+3. Tampering Penalties: Switching off GPS transponders or operating without a valid fishing token from Gujarat Fisheries Department check-posts will result in immediate cancellation of registration and blacklisting under the Coastal Security Act.
+4. Juvenile Silver Pomfret Catch Ban: Trawlers operating in the Gulf of Khambhat and Saurashtra waters must avoid landing silver pomfret below 100 grams body weight to prevent recruitment overfishing.

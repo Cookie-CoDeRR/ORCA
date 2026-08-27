@@ -1,0 +1,16 @@
+TITLE: Kerala Marine Fishing Regulation Act (KMFRA) — Operational Guidelines & Mesh Specifications
+AUTHORITY: Department of Fisheries, Government of Kerala
+JURISDICTION: Kerala
+CATEGORY: STATE_MFRA_GEAR_REGULATION
+EFFECTIVE: Active / Year-Round Enforcement
+LEGAL REFERENCE: Kerala Act 10 of 1980 & Subsequent Amendments (KMFRA)
+================================================================================
+
+1. Territorial Water Zoning: Kerala territorial waters (up to 12 nautical miles from baseline) are stratified for resource protection. The nearshore zone up to 10 kilometers (approx. 5.4 nautical miles) is exclusively reserved for traditional non-motorized and small motorized artisanal fishermen. Mechanized trawlers are strictly prohibited from operating within this 10 km artisanal reserve.
+2. Minimum Legal Mesh Size Standards: To prevent juvenile catch depletion, all commercial gear must strictly adhere to minimum cod-end mesh sizes:
+   - Trawl Net Cod-End: Minimum 35 mm square/diamond mesh.
+   - Ring Seine / Purse Seine (Sardine & Mackerel target): Minimum 24 mm mesh size.
+   - Gill Nets for Seer Fish: Minimum 75 mm to 100 mm stretched mesh.
+3. Total Night Trawling Prohibition: Bottom trawling is strictly prohibited between 18:00 hours (sunset) and 06:00 hours (sunrise) within Kerala territorial waters.
+4. Engine Power Limitations: Inboard and outboard fishing vessels operating in coastal waters shall not exceed authorized horsepower ratings (maximum 350 HP for multi-day trawlers and 9.9 to 25 HP for motorized country crafts).
+5. Penalties for Violations: Non-compliant gear will be confiscated on-the-spot by Fisheries Enforcement Officers, and fines up to Rs. 2,50,000 shall be levied under Section 17 of KMFRA.

@@ -1,0 +1,665 @@
+{
+  "metadata": {
+    "source": "OBIS (Ocean Biodiversity Information System) & Project ORCA Marine Catalog",
+    "generated_at": "2026-08-27T16:14:43.123509+00:00",
+    "spatial_bounds": "Indian EEZ (Lon 50-100, Lat 0-25)",
+    "species_count": 13,
+    "records_count": 30
+  },
+  "species_catalog": [
+    {
+      "scientific_name": "Thunnus albacares",
+      "vernacular": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "iucn": "Near Threatened",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Katsuwonus pelamis",
+      "vernacular": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "iucn": "Least Concern",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Scomberomorus commerson",
+      "vernacular": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "iucn": "Near Threatened",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Rastrelliger kanagurta",
+      "vernacular": "Indian Mackerel / Bangda / Ayala",
+      "category": "COMMERCIAL_PELAGIC",
+      "iucn": "Least Concern",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Sardinella longiceps",
+      "vernacular": "Indian Oil Sardine / Mathi / Tarli",
+      "category": "COMMERCIAL_PELAGIC",
+      "iucn": "Least Concern",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Tenualosa ilisha",
+      "vernacular": "Hilsa Shad / Ilish / Palva",
+      "category": "ESTUARINE_COMMERCIAL",
+      "iucn": "Least Concern",
+      "wpa_status": "State Monitored"
+    },
+    {
+      "scientific_name": "Pampus argenteus",
+      "vernacular": "Silver Pomfret / Paplet / Vawall",
+      "category": "COMMERCIAL_DEMERSAL",
+      "iucn": "Vulnerable",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Portunus pelagicus",
+      "vernacular": "Blue Swimming Crab / Nandu",
+      "category": "CRUSTACEAN",
+      "iucn": "Least Concern",
+      "wpa_status": "Non-Schedule"
+    },
+    {
+      "scientific_name": "Lepidochelys olivacea",
+      "vernacular": "Olive Ridley Sea Turtle",
+      "category": "PROTECTED_REPTILE",
+      "iucn": "Vulnerable",
+      "wpa_status": "Schedule I (Strict Protection)"
+    },
+    {
+      "scientific_name": "Dugong dugon",
+      "vernacular": "Sea Cow / Dugong (Gulf of Mannar)",
+      "category": "PROTECTED_MAMMAL",
+      "iucn": "Vulnerable",
+      "wpa_status": "Schedule I (Strict Protection)"
+    },
+    {
+      "scientific_name": "Rhincodon typus",
+      "vernacular": "Whale Shark (Gujarat Saurashtra Coast)",
+      "category": "PROTECTED_ELASMOBRANCH",
+      "iucn": "Endangered",
+      "wpa_status": "Schedule I (Strict Protection)"
+    },
+    {
+      "scientific_name": "Sousa chinensis",
+      "vernacular": "Indo-Pacific Humpback Dolphin",
+      "category": "PROTECTED_MAMMAL",
+      "iucn": "Vulnerable",
+      "wpa_status": "Schedule I (Strict Protection)"
+    },
+    {
+      "scientific_name": "Hippocampus kuda",
+      "vernacular": "Spotted Seahorse",
+      "category": "PROTECTED_SYNGNATHID",
+      "iucn": "Vulnerable",
+      "wpa_status": "Schedule I (Strict Protection)"
+    }
+  ],
+  "occurrences": [
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -31.0387992859,
+      "lon": 30.2322998047,
+      "depth_m": 25.0,
+      "habitat": "North Sand Bluff",
+      "count": 1,
+      "date": "2000-07-12T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 27.33,
+      "lon": -89.28,
+      "depth_m": 162.0,
+      "habitat": "Gulf of Mexico",
+      "count": 3,
+      "date": "1995-02-15",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 7.21806666666669,
+      "lon": 59.6707666666669,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 25.6,
+      "lon": -92.0,
+      "depth_m": 140.0,
+      "habitat": "Gulf of Mexico",
+      "count": 2,
+      "date": "1996-03-25",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -3.500139,
+      "lon": 69.55014,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 38.0,
+      "lon": -73.0,
+      "depth_m": 22.0,
+      "habitat": "Mid Atlantic Bight",
+      "count": 2,
+      "date": "2001-09-13",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 39.83,
+      "lon": -71.03,
+      "depth_m": 20.0,
+      "habitat": "Mid Atlantic Bight",
+      "count": 6,
+      "date": "2001-12-15",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 26.25,
+      "lon": -90.25,
+      "depth_m": 260.0,
+      "habitat": "Gulf of Mexico",
+      "count": 24,
+      "date": "1995-08-12",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 31.0,
+      "lon": -79.11,
+      "depth_m": 20.0,
+      "habitat": "South Atlantic Bight",
+      "count": 13,
+      "date": "1999-11-06",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Thunnus albacares",
+      "common_name": "Yellowfin Tuna / Surmai / Kelawalla",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -34.0527992249,
+      "lon": 18.3549995422,
+      "depth_m": 25.0,
+      "habitat": "Hout Bay",
+      "count": 1,
+      "date": "1989-11-24T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": -0.61680555,
+      "lon": 2.1834724,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": 19.383472,
+      "lon": -18.766806,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": -34.3568992615,
+      "lon": 18.4972000122,
+      "depth_m": 25.0,
+      "habitat": "Cape Point",
+      "count": 1,
+      "date": "1990-03-21T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": -0.36680555,
+      "lon": -13.116806,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": -6.483472,
+      "lon": 53.350136,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": 6.1668053,
+      "lon": -21.933472,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": 10.10014,
+      "lon": -26.70014,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": -15.516806,
+      "lon": 44.466805,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": 36.88513333,
+      "lon": -25.16771667,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2009-08-10",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Katsuwonus pelamis",
+      "common_name": "Skipjack Tuna / Chura",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Least Concern",
+      "lat": 4.150139,
+      "lon": 52.450138,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -30.278799057,
+      "lon": 30.7590007782,
+      "depth_m": 25.0,
+      "habitat": "Scottburgh",
+      "count": 1,
+      "date": "1997-05-23T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -30.051399231,
+      "lon": 30.8918991089,
+      "depth_m": 25.0,
+      "habitat": "Inyoni Rocks",
+      "count": 1,
+      "date": "2001-03-11T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -29.6630001068,
+      "lon": 31.1243000031,
+      "depth_m": 25.0,
+      "habitat": "Umhloti Beach",
+      "count": 1,
+      "date": "1993-12-23T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -30.8066997528,
+      "lon": 30.4129009247,
+      "depth_m": 25.0,
+      "habitat": "Shelly Beach",
+      "count": 1,
+      "date": "1989-02-02T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -29.2229003906,
+      "lon": 31.504699707,
+      "depth_m": 25.0,
+      "habitat": "Tugela River",
+      "count": 1,
+      "date": "1989-12-22T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": 11.0,
+      "lon": 123.0,
+      "depth_m": 25.0,
+      "habitat": "Indian Ocean Maritime Zone",
+      "count": 1,
+      "date": "2026-08-27",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -29.2229003906,
+      "lon": 31.504699707,
+      "depth_m": 25.0,
+      "habitat": "Tugela River",
+      "count": 1,
+      "date": "1991-02-03T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -30.8066997528,
+      "lon": 30.4129009247,
+      "depth_m": 25.0,
+      "habitat": "Shelly Beach",
+      "count": 1,
+      "date": "1988-07-11T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -30.278799057,
+      "lon": 30.7590007782,
+      "depth_m": 25.0,
+      "habitat": "Scottburgh",
+      "count": 1,
+      "date": "1997-04-25T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    },
+    {
+      "species": "Scomberomorus commerson",
+      "common_name": "Narrow-barred Spanish Mackerel / Surmai",
+      "category": "COMMERCIAL_PELAGIC",
+      "wpa": "Non-Schedule",
+      "iucn": "Near Threatened",
+      "lat": -28.8094005585,
+      "lon": 32.0182991028,
+      "depth_m": 25.0,
+      "habitat": "Richard's Bay Harbour",
+      "count": 1,
+      "date": "1991-04-03T12:00:00Z",
+      "alert": "COMMERCIAL_OBSERVATION"
+    }
+  ],
+  "habitats": [
+    {
+      "habitat_id": "HAB-CORAL-GOM",
+      "name": "Gulf of Mannar Coral Reef Ecosystem",
+      "type": "Coral Reef & Seagrass",
+      "conservation_priority": "CRITICAL",
+      "key_taxa": [
+        "Hard Corals",
+        "Dugong dugon",
+        "Holothurians",
+        "Green Turtles"
+      ],
+      "coordinates": [
+        [
+          [
+            78.7,
+            9.15
+          ],
+          [
+            79.2,
+            9.2
+          ],
+          [
+            79.1,
+            8.8
+          ],
+          [
+            78.6,
+            8.75
+          ],
+          [
+            78.7,
+            9.15
+          ]
+        ]
+      ]
+    },
+    {
+      "habitat_id": "HAB-MANGROVE-SUN",
+      "name": "Sundarbans Delta Marine Estuary",
+      "type": "Mangrove Nursery & Estuary",
+      "conservation_priority": "CRITICAL",
+      "key_taxa": [
+        "Tenualosa ilisha",
+        "Saltwater Crocodile",
+        "Mangrove Horseshoe Crab"
+      ],
+      "coordinates": [
+        [
+          [
+            88.4,
+            21.9
+          ],
+          [
+            89.1,
+            21.9
+          ],
+          [
+            89.1,
+            21.45
+          ],
+          [
+            88.4,
+            21.45
+          ],
+          [
+            88.4,
+            21.9
+          ]
+        ]
+      ]
+    },
+    {
+      "habitat_id": "HAB-TURTLE-GAH",
+      "name": "Gahirmatha Olive Ridley Mass Nesting Corridor",
+      "type": "Marine Turtle Mass Rookery",
+      "conservation_priority": "STRICT_SANCTUARY",
+      "key_taxa": [
+        "Lepidochelys olivacea"
+      ],
+      "coordinates": [
+        [
+          [
+            86.75,
+            20.85
+          ],
+          [
+            87.15,
+            20.85
+          ],
+          [
+            87.15,
+            20.3
+          ],
+          [
+            86.7,
+            20.3
+          ],
+          [
+            86.75,
+            20.85
+          ]
+        ]
+      ]
+    },
+    {
+      "habitat_id": "HAB-CORAL-LAK",
+      "name": "Lakshadweep Atoll Reef Systems",
+      "type": "Oceanic Atoll Corals",
+      "conservation_priority": "HIGH",
+      "key_taxa": [
+        "Skipjack Tuna",
+        "Acropora Corals",
+        "Manta Rays"
+      ],
+      "coordinates": [
+        [
+          [
+            71.8,
+            11.2
+          ],
+          [
+            73.2,
+            11.2
+          ],
+          [
+            73.2,
+            9.8
+          ],
+          [
+            71.8,
+            9.8
+          ],
+          [
+            71.8,
+            11.2
+          ]
+        ]
+      ]
+    }
+  ]
+}
