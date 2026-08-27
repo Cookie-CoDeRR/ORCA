@@ -47,12 +47,15 @@ async def get_db_pool() -> AsyncConnectionPool:
             conninfo=DATABASE_URL,
             min_size=POSTGRES_POOL_MIN_SIZE,
             max_size=POSTGRES_POOL_MAX_SIZE,
-            timeout=30.0,
+            timeout=1.0,
             max_idle=300.0,
-            kwargs={"row_factory": dict_row, "autocommit": False}
+            kwargs={"row_factory": dict_row, "autocommit": False, "connect_timeout": 1}
         )
-        await _pool.open()
-        logger.info("✅ PostgreSQL AsyncConnectionPool successfully opened.")
+        try:
+            await _pool.open(wait=False)
+            logger.info("✅ PostgreSQL AsyncConnectionPool opened.")
+        except Exception as e:
+            logger.debug(f"Pool open deferred: {e}")
     return _pool
 
 
