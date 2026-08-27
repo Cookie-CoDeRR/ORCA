@@ -14,6 +14,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from .state import ChatState
+from .supervisor import supervisor_node
 from ..database.vector_store import PGVectorStore
 from ..database.connection import fetch_all
 
@@ -21,53 +22,8 @@ logger = logging.getLogger("ORCA.GraphBuilder")
 
 
 # ==============================================================================
-# AGENT NODE DEFINITIONS
+# SUB-AGENT NODE DEFINITIONS
 # ==============================================================================
-
-async def supervisor_node(state: ChatState) -> dict[str, Any]:
-    """
-    Agent 1: Supervisor & Intent Orchestrator
-    Parses user query, resolves landing center names from local gazetteer,
-    and extracts target spatial bounding boxes and species.
-    """
-    logger.info("🤖 [Agent 1: Supervisor] Decomposing query and resolving coastal gazetteer...")
-    messages = state.get("messages", [])
-    last_msg = messages[-1].content if messages else ""
-
-    # Gazetteer lookup for common Indian coastal harbors
-    text_lower = str(last_msg).lower()
-    
-    # Default origin: Veraval (Gujarat) or detected landing site
-    origin = {"name": "Veraval", "state": "Gujarat", "lat": 20.90, "lon": 70.36}
-    target_bbox = [69.80, 20.40, 70.60, 21.10]
-    detected_species = "Yellowfin Tuna"
-
-    if "kochi" in text_lower or "cochin" in text_lower or "kerala" in text_lower:
-        origin = {"name": "Kochi", "state": "Kerala", "lat": 9.94, "lon": 76.26}
-        target_bbox = [75.80, 9.40, 76.50, 10.20]
-        detected_species = "Indian Oil Sardine"
-    elif "mumbai" in text_lower or "ratnagiri" in text_lower or "maharashtra" in text_lower:
-        origin = {"name": "Ratnagiri", "state": "Maharashtra", "lat": 16.99, "lon": 73.28}
-        target_bbox = [72.80, 16.50, 73.60, 17.30]
-        detected_species = "King Seer / Surmai"
-    elif "rameswaram" in text_lower or "palk" in text_lower or "tamil" in text_lower:
-        origin = {"name": "Rameswaram", "state": "Tamil Nadu", "lat": 9.28, "lon": 79.31}
-        target_bbox = [79.00, 9.00, 79.60, 9.60]
-        detected_species = "Tuna / Pelagics"
-    elif "vizag" in text_lower or "visakhapatnam" in text_lower or "andhra" in text_lower:
-        origin = {"name": "Visakhapatnam", "state": "Andhra Pradesh", "lat": 17.70, "lon": 83.30}
-        target_bbox = [83.00, 17.30, 83.80, 18.00]
-        detected_species = "Yellowfin Tuna"
-    elif "paradip" in text_lower or "odisha" in text_lower:
-        origin = {"name": "Paradip", "state": "Odisha", "lat": 20.30, "lon": 86.69}
-        target_bbox = [86.30, 19.90, 87.10, 20.60]
-        detected_species = "Hilsa / Pomfret"
-
-    return {
-        "origin": origin,
-        "target_bbox": target_bbox,
-        "species": detected_species
-    }
 
 
 async def ocean_analytics_node(state: ChatState) -> dict[str, Any]:

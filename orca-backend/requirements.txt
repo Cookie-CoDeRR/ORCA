@@ -6,7 +6,10 @@
 langgraph>=0.2.0
 langgraph-checkpoint-postgres>=2.0.0
 langchain-core>=0.3.0
-langchain-postgres>=0.0.12
+langchain-postgres>=0.0.17
+
+# Local LLM & Embeddings (Ollama)
+langchain-ollama>=0.2.0
 
 # PostgreSQL 16 + PostGIS + pgvector Connection Pooling
 psycopg[binary]>=3.2.0
