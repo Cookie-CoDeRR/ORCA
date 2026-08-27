@@ -1,7 +1,7 @@
 """
-Project ORCA (SIH26176) — Local LLM & Embeddings Configuration
-Configures sovereign, air-gappable local models using ChatOllama and OllamaEmbeddings.
-Ensures zero external cloud data egress and deterministic temperature profiles.
+Project ORCA (SIH26176) — Local LLM & Embedding Engine Configuration
+Configures sovereign, 100% local open-weight models using ChatOllama (Qwen 2.5) and OllamaEmbeddings (BGE-M3).
+Ensures zero external cloud data egress and deterministic (temp=0.0) spatial routing.
 """
 
 import os
@@ -14,34 +14,44 @@ from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 logger = logging.getLogger("ORCA.LLMConfig")
 
-# Environment & Server Config
+# ==============================================================================
+# OLLAMA CONFIGURATION DEFAULTS
+# ==============================================================================
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+
+# Primary Reasoning & Structured Output LLM (Qwen 2.5 7B Instruct)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q5_k_m")
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.0"))
 OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+
+# Primary Multilingual Dense Embedding Model (BGE-M3)
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "bge-m3")
 EMBEDDING_DIMENSION = 768
 
 
-def get_chat_llm(
+# ==============================================================================
+# FACTORY FUNCTIONS & EXPORTED INSTANCES
+# ==============================================================================
+
+def init_chat_llm(
     model: str | None = None,
     temperature: float | None = None,
     format: str | None = None,
     timeout: float = 60.0
 ) -> ChatOllama:
     """
-    Returns an initialized ChatOllama instance configured for sovereign local inference.
+    Initializes a ChatOllama instance configured for deterministic structured routing.
     
     Args:
-        model: Target local LLM (defaults to OLLAMA_MODEL, e.g. 'llama3.1:8b' or 'qwen2.5:7b').
-        temperature: Sampling temperature (0.0 for deterministic structured JSON output).
-        format: Optional output format specification ('json' for forced JSON mode).
+        model: Target local LLM (defaults to 'qwen2.5:7b-instruct-q5_k_m').
+        temperature: Set strictly to 0.0 for deterministic spatial & mathematical routing.
+        format: Optional format mode ('json' or None for schema-guided output).
         timeout: Maximum HTTP timeout in seconds for local inference.
     """
     target_model = model or OLLAMA_MODEL
     target_temp = temperature if temperature is not None else OLLAMA_TEMPERATURE
 
-    logger.debug(f"Initializing ChatOllama [model='{target_model}', temp={target_temp}, url='{OLLAMA_BASE_URL}']")
+    logger.info(f"Initializing ChatOllama [model='{target_model}', temperature={target_temp}, base_url='{OLLAMA_BASE_URL}']")
     return ChatOllama(
         base_url=OLLAMA_BASE_URL,
         model=target_model,
@@ -52,25 +62,40 @@ def get_chat_llm(
     )
 
 
-def get_embeddings_model(model: str | None = None) -> OllamaEmbeddings:
+def init_embeddings_model(model: str | None = None) -> OllamaEmbeddings:
     """
-    Returns an initialized OllamaEmbeddings instance for 768-dimensional vector encoding.
+    Initializes an OllamaEmbeddings instance targeting BGE-M3 for sovereign vector encoding.
     
     Args:
-        model: Target local embedding model (defaults to OLLAMA_EMBED_MODEL, e.g. 'nomic-embed-text').
+        model: Target local embedding model (defaults to 'bge-m3').
     """
     target_embed_model = model or OLLAMA_EMBED_MODEL
-    logger.debug(f"Initializing OllamaEmbeddings [model='{target_embed_model}', url='{OLLAMA_BASE_URL}']")
+    logger.info(f"Initializing OllamaEmbeddings [model='{target_embed_model}', base_url='{OLLAMA_BASE_URL}']")
     return OllamaEmbeddings(
         base_url=OLLAMA_BASE_URL,
         model=target_embed_model
     )
 
 
+# Export standard pre-configured instances for direct import across agent nodes
+chat_llm: ChatOllama = init_chat_llm()
+embed_model: OllamaEmbeddings = init_embeddings_model()
+
+
+def get_chat_llm() -> ChatOllama:
+    """Returns the primary configured ChatOllama instance."""
+    return chat_llm
+
+
+def get_embeddings_model() -> OllamaEmbeddings:
+    """Returns the primary configured OllamaEmbeddings instance."""
+    return embed_model
+
+
 def generate_deterministic_embedding(text: str, dim: int = EMBEDDING_DIMENSION) -> list[float]:
     """
-    Generates a deterministic 768-dimensional normalized unit vector from input text.
-    Acts as a high-fidelity local fallback when the Ollama daemon is offline during testing.
+    Generates a deterministic normalized unit vector from input text.
+    Ensures 100% test reliability and offline resilience when the local Ollama daemon is starting up.
     """
     h = hashlib.sha256(text.encode("utf-8")).digest()
     seed = int.from_bytes(h[:4], "big")
@@ -81,7 +106,7 @@ def generate_deterministic_embedding(text: str, dim: int = EMBEDDING_DIMENSION) 
 
 
 async def check_ollama_health() -> bool:
-    """Checks if the local Ollama instance is reachable and responding."""
+    """Checks if the local Ollama server is reachable and serving models."""
     import httpx
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
