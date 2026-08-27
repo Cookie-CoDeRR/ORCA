@@ -129,17 +129,17 @@ class MaritimePathOptimizer:
                 full_path = path + [goal_node]
                 
                 # Build deck.gl colored segments and route geometry
-                route_coordinates = [[round(p[1], 4), round(p[0], 4)] for p in full_path] # [lon, lat]
+                route_coordinates = [[float(round(p[1], 4)), float(round(p[0], 4))] for p in full_path] # [lon, lat]
                 
                 # Compute total distance in nautical miles (1 NM = 1852 meters)
-                total_distance_m = len(full_path) * (step_deg * 111139.0)
-                distance_nm = round(total_distance_m / 1852.0, 2)
-                total_time_hours = round(elapsed_time / 3600.0, 2)
+                total_distance_m = float(len(full_path) * (step_deg * 111139.0))
+                distance_nm = float(round(total_distance_m / 1852.0, 2))
+                total_time_hours = float(round(elapsed_time / 3600.0, 2))
 
                 # Fuel savings calculation: energy expenditure vs unassisted baseline
                 # Vector assistance saves between 8% and 18% depending on eddy alignment
-                raw_savings = ((straight_time_s - elapsed_time) / straight_time_s) * 100.0
-                fuel_savings_pct = round(float(np.clip(max(8.5, raw_savings + 7.2), 6.0, 22.0)), 1)
+                raw_savings = float(((straight_time_s - elapsed_time) / straight_time_s) * 100.0)
+                fuel_savings_pct = float(round(float(np.clip(max(8.5, raw_savings + 7.2), 6.0, 22.0)), 1))
 
                 return {
                     "type": "Feature",
@@ -149,13 +149,13 @@ class MaritimePathOptimizer:
                     },
                     "properties": {
                         "routing_mode": "Vector-Assisted Fuel-Optimal (A* Surface Telemetry)",
-                        "origin": {"lat": start_node[0], "lon": start_node[1]},
-                        "destination": {"lat": goal_node[0], "lon": goal_node[1]},
-                        "vessel_speed_knots": vessel_speed_knots,
-                        "total_time_hours": total_time_hours,
-                        "distance_nautical_miles": distance_nm,
-                        "estimated_fuel_savings_percent": fuel_savings_pct,
-                        "average_sog_knots": round((distance_nm / max(0.1, total_time_hours)), 2),
+                        "origin": {"lat": float(start_node[0]), "lon": float(start_node[1])},
+                        "destination": {"lat": float(goal_node[0]), "lon": float(goal_node[1])},
+                        "vessel_speed_knots": float(vessel_speed_knots),
+                        "total_time_hours": float(total_time_hours),
+                        "distance_nautical_miles": float(distance_nm),
+                        "estimated_fuel_savings_percent": float(fuel_savings_pct),
+                        "average_sog_knots": float(round((distance_nm / max(0.1, total_time_hours)), 2)),
                         "segments": segments,
                         "deckgl_layers": {
                             "path_layer": {

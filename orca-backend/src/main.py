@@ -1,22 +1,27 @@
 """
 Project ORCA (SIH26176) — FastAPI Backend Gateway
-Exposes asynchronous REST APIs for multi-agent reasoning, pgvector RAG queries,
-and MinIO scientific raster retrieval with persistent LangGraph session memory.
+Exposes asynchronous REST APIs for multi-agent reasoning, dynamic A* vector routing,
+pgvector policy RAG, and live ocean telemetry optimized for Next.js & deck.gl frontends.
 """
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional, Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .database.connection import get_db_pool, close_db_pool, init_db
 from .database.vector_store import PGVectorStore
-from .memory.checkpointer import setup_checkpointer, get_checkpointer
+from .memory.checkpointer import setup_checkpointer, get_default_checkpointer
 from .storage.minio_client import get_minio_client
-from .agent.graph_builder import build_orca_agent_graph, execute_agent_turn
+from .agents.graph import run_orca_multi_agent
+from .agents.ocean_analytics.tools import get_sst_and_chlorophyll, find_nearby_pfz_clusters
+from .agents.risk_geofencing.tools import check_imbl_proximity, check_protected_area_intersection, check_active_cyclone_warnings
+from .navigation.router import compute_optimal_marine_route
 
 # Configure logging
 logging.basicConfig(
@@ -26,8 +31,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ORCA.FastAPIGateway")
 
-# Global Agent Graph instance
-_agent_graph = None
+# Preloaded vectors path
+VECTORS_JSON_PATH = Path(__file__).resolve().parent.parent / "data" / "vectors" / "surface_currents_wind.json"
 
 
 @asynccontextmanager
@@ -35,10 +40,9 @@ async def lifespan(app: FastAPI):
     """
     Application Lifespan Manager:
     Initializes PostgreSQL connection pool, applies PostGIS & pgvector schema,
-    provisions LangGraph memory checkpointer, and compiles the agent graph.
+    and provisions LangGraph memory checkpointer.
     """
-    global _agent_graph
-    logger.info("🌊 Starting Project ORCA Backend Gateway...")
+    logger.info("🌊 Starting Project ORCA Backend Gateway (SIH26176)...")
 
     # 1. Initialize PostgreSQL Connection Pool & Schema
     try:
@@ -47,14 +51,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database connection not available at startup ({e}). Continuing in standalone mode.")
 
-    # 2. Setup LangGraph Checkpointer & Compile Graph
+    # 2. Setup LangGraph Checkpointer
     try:
         await setup_checkpointer()
-        checkpointer = await get_checkpointer()
-        _agent_graph = build_orca_agent_graph(checkpointer=checkpointer)
     except Exception as e:
-        logger.warning(f"Checkpointer setup failed ({e}). Compiling ephemeral graph.")
-        _agent_graph = build_orca_agent_graph(checkpointer=None)
+        logger.warning(f"Checkpointer setup deferred ({e}).")
 
     # 3. Initialize MinIO S3 Storage Client
     try:
@@ -78,10 +79,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for Next.js frontend
+# Allowed Origins for Next.js Frontend
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://cookiecoderr.online",
+    "*"
+]
+
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,31 +98,47 @@ app.add_middleware(
 
 
 # ==============================================================================
-# API REQUEST & RESPONSE SCHEMAS
+# 1. PYDANTIC REQUEST & RESPONSE SCHEMAS
 # ==============================================================================
 
-class QueryRequest(BaseModel):
-    query: str = Field(..., description="Natural language marine inquiry (e.g. 'Can 4 boats go southwest of Veraval for Tuna?')")
-    thread_id: str = Field("default-session", description="Unique session ID for LangGraph memory tracking")
-    language_code: str = Field("en", description="Target Indic language code (en, gu, ta, hi, te, ml, mr)")
+class ChatRequest(BaseModel):
+    """Incoming user chat inquiry for multi-agent reasoning."""
+    message: str = Field(..., description="User's natural language marine or navigation query")
+    thread_id: str = Field("default-session", description="Unique conversation session ID for state checkpointer")
+    target_coordinates: Optional[list[float]] = Field(None, description="Optional target coordinates [latitude, longitude]")
+    origin_coordinates: Optional[list[float]] = Field(None, description="Optional origin coordinates [latitude, longitude]")
 
 
 class OptimalRouteRequest(BaseModel):
-    start: list[float] = Field(..., description="[latitude, longitude] origin coordinates (e.g. [18.94, 72.86])")
-    destination: list[float] = Field(..., description="[latitude, longitude] destination coordinates (e.g. [19.50, 71.20])")
-    speed_knots: float = Field(10.0, description="Vessel cruise speed in knots (default: 10.0)")
+    """Input parameters for vector-assisted dynamic A* navigation solver."""
+    start: list[float] = Field(..., description="Starting coordinates [lat, lon] (e.g. Mumbai Harbor [18.94, 72.86])")
+    destination: list[float] = Field(..., description="Destination coordinates [lat, lon]")
+    speed_knots: float = Field(10.0, description="Cruising speed in knots (default: 10.0)")
+
+
+class RAGSearchRequest(BaseModel):
+    """Query payload for pgvector semantic search."""
+    query: str = Field(..., description="Search phrase (e.g. 'monsoon trawl ban penalty')")
+    top_k: int = Field(3, description="Number of results to retrieve")
 
 
 # ==============================================================================
-# REST API ENDPOINTS
+# 2. REST API ENDPOINTS
 # ==============================================================================
 
-@app.get("/")
+@app.get("/", tags=["Health"])
 async def root_health_check():
-    """Health check and service status."""
+    """
+    Health check endpoint returning active backend subsystems and models.
+    """
     return {
-        "project": "Project ORCA (SIH26176)",
         "status": "ONLINE",
+        "platform": "Project ORCA (SIH26176)",
+        "sovereign_mode": "AIR_GAPPED_READY",
+        "models": {
+            "reasoning_llm": "qwen2.5:7b-instruct-q5_k_m (via Ollama)",
+            "embedding_model": "bge-m3 (1024-dim dense representation)"
+        },
         "services": {
             "postgis_database": "ENABLED",
             "pgvector_rag": "ENABLED",
@@ -124,75 +149,108 @@ async def root_health_check():
     }
 
 
-@app.post("/api/v1/query")
-async def execute_query(req: QueryRequest):
+@app.post("/api/v1/agent/chat", tags=["Multi-Agent Chat"])
+async def chat_with_multi_agent_swarm(req: ChatRequest):
     """
-    Primary Multi-Agent Ingress Endpoint.
-    Executes LangGraph workflow, persists memory to PostgreSQL, and returns
-    synthesized advisory, telemetry, and MapLibre/deck.gl GeoJSON payload.
+    Executes a complete multi-agent turn through the compiled LangGraph.
+    
+    1. Supervisor decomposes query into sub-tasks (PFZ, Geofence, Routing, Policy).
+    2. Parallel workers execute deterministic tools (xarray, PostGIS, A*, pgvector).
+    3. Synthesizer formats actionable markdown and deck.gl GeoJSON FeatureCollection.
     """
-    global _agent_graph
-    if _agent_graph is None:
-        _agent_graph = build_orca_agent_graph()
-
     try:
-        result = await execute_agent_turn(
-            graph=_agent_graph,
-            user_message=req.query,
+        checkpointer = get_default_checkpointer()
+
+        result = await run_orca_multi_agent(
+            user_query=req.message,
             thread_id=req.thread_id,
-            language_code=req.language_code
+            checkpointer=checkpointer
         )
         return result
     except Exception as e:
-        logger.error(f"Error executing agent turn: {e}")
+        logger.error(f"Multi-agent execution error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/v1/navigation/optimal-route")
-async def get_optimal_marine_route(req: OptimalRouteRequest):
+@app.post("/api/v1/navigation/optimal-route", tags=["Navigation"])
+async def calculate_optimal_marine_route(req: OptimalRouteRequest):
     """
-    Vector-Assisted Fuel-Optimal Marine Routing Engine.
-    Calculates dynamic A* path over surface currents and 10m wind fields,
-    returning GeoJSON LineString with fuel savings, distance, duration, and deck.gl segment color codes.
+    Computes a fuel-optimal marine route over dynamic surface currents (uo, vo) and wind (u10, v10).
+    Returns GeoJSON Feature LineString with colored segments for deck.gl PathLayer.
     """
-    from .navigation.router import compute_optimal_marine_route
-
-    if len(req.start) != 2 or len(req.destination) != 2:
-        raise HTTPException(status_code=400, detail="Start and destination must each contain [latitude, longitude].")
-
-    result = compute_optimal_marine_route(
-        start_lat=req.start[0],
-        start_lon=req.start[1],
-        end_lat=req.destination[0],
-        end_lon=req.destination[1],
-        vessel_knots=req.speed_knots
-    )
-    if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
-    return result
-
-
-@app.get("/api/v1/navigation/vectors")
-async def get_surface_current_vectors():
-    """Returns the surface current and wind vector grid for deck.gl Particle / FlowLayer."""
-    import json
-    json_path = Path(__file__).resolve().parent.parent / "data" / "vectors" / "surface_currents_wind.json"
-    if not json_path.exists():
-        raise HTTPException(status_code=404, detail="Vector dataset not yet compiled. Run script 10.")
-    with open(json_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        route_geojson = compute_optimal_marine_route(
+            start_lat=req.start[0],
+            start_lon=req.start[1],
+            end_lat=req.destination[0],
+            end_lon=req.destination[1],
+            vessel_knots=req.speed_knots
+        )
+        if "error" in route_geojson:
+            raise HTTPException(status_code=400, detail=route_geojson["error"])
+        return route_geojson
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Path optimization error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Routing failure: {str(e)}")
 
 
-@app.post("/api/v1/rag/ingest")
-async def ingest_rag_knowledge_base():
-    """Ingests the generated maritime policy chunks JSON into pgvector."""
-    kb_path = Path(__file__).resolve().parent.parent.parent / "orca-data-pipeline" / "data" / "processed" / "knowledge_base" / "maritime_policy_chunks.json"
-    
-    store = PGVectorStore()
-    count = await store.ingest_from_chunks_json(kb_path)
-    return {
-        "status": "SUCCESS",
-        "chunks_ingested": count,
-        "source_file": str(kb_path.name)
-    }
+@app.get("/api/v1/navigation/vectors", tags=["Navigation"])
+async def get_surface_current_vector_grid():
+    """
+    Returns pre-computed surface current and wind vector points across the Indian EEZ
+    for frontend deck.gl Flow / Particle visualization.
+    """
+    if VECTORS_JSON_PATH.exists():
+        try:
+            with open(VECTORS_JSON_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data
+        except Exception as e:
+            logger.error(f"Failed to read vector JSON: {e}")
+            raise HTTPException(status_code=500, detail="Failed to load vector data")
+    else:
+        raise HTTPException(status_code=404, detail="Vector dataset not found. Run scripts/10_fetch_current_vectors.py.")
 
+
+@app.get("/api/v1/ocean/telemetry", tags=["Ocean Telemetry"])
+async def get_ocean_telemetry(lat: float = Query(..., ge=0.0, le=25.0), lon: float = Query(..., ge=50.0, le=100.0)):
+    """
+    Returns Sea Surface Temperature (°C), Chlorophyll-a (mg/m³), Significant Wave Height (m),
+    and nearby high-probability Potential Fishing Zone (PFZ) clusters for specified coordinates.
+    """
+    try:
+        telemetry = get_sst_and_chlorophyll(lat, lon)
+        pfz_clusters = find_nearby_pfz_clusters(lat, lon, radius_km=50.0)
+        return {
+            "coordinates": [lat, lon],
+            "telemetry": telemetry,
+            "pfz_clusters_count": len(pfz_clusters),
+            "pfz_geojson_features": pfz_clusters
+        }
+    except Exception as e:
+        logger.error(f"Ocean telemetry error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/risk/geofence", tags=["Risk & Geofencing"])
+async def check_geospatial_risk(lat: float = Query(..., ge=0.0, le=25.0), lon: float = Query(..., ge=50.0, le=100.0)):
+    """
+    Executes PostGIS spatial queries for IMBL proximity, MPA coral sanctuary overlap,
+    and active cyclone warnings.
+    """
+    try:
+        imbl_info = await check_imbl_proximity(lat, lon, threshold_km=10.0)
+        mpa_info = await check_protected_area_intersection(lat, lon)
+        cyclone_info = check_active_cyclone_warnings(lat, lon)
+        return {
+            "coordinates": [lat, lon],
+            "is_safe": not imbl_info["is_near_border"] and not mpa_info["in_protected_area"],
+            "imbl_check": imbl_info,
+            "mpa_check": mpa_info,
+            "cyclone_check": cyclone_info
+        }
+    except Exception as e:
+        logger.error(f"Risk geofencing error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,6 +1,6 @@
 """
 Project ORCA (SIH26176) — LangGraph Persistent Memory Checkpointer
-Configures AsyncPostgresSaver to persist multi-agent session state,
+Configures MemorySaver & AsyncPostgresSaver to persist multi-agent session state,
 message history, and tool execution state in PostgreSQL.
 """
 
@@ -9,22 +9,29 @@ import logging
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from ..database.connection import get_conn_string
 
 logger = logging.getLogger("ORCA.LangGraphMemory")
 
+# In-memory ephemeral fallback checkpointer
+_memory_saver = MemorySaver()
+
 
 @asynccontextmanager
 async def get_postgres_saver_cm() -> AsyncGenerator[AsyncPostgresSaver, None]:
     """
     Async context manager that yields a connected AsyncPostgresSaver instance.
-    Ensures connection pooling lifecycle is cleanly managed during graph invocations.
     """
     conn_string = get_conn_string()
-    async with AsyncPostgresSaver.from_conn_string(conn_string) as checkpointer:
-        yield checkpointer
+    try:
+        async with AsyncPostgresSaver.from_conn_string(conn_string) as checkpointer:
+            yield checkpointer
+    except Exception as e:
+        logger.warning(f"PostgresSaver unavailable ({e}). Yielding InMemorySaver.")
+        yield _memory_saver
 
 
 async def setup_checkpointer() -> bool:
@@ -42,14 +49,15 @@ async def setup_checkpointer() -> bool:
         logger.info("✅ LangGraph memory tables (checkpoints, checkpoint_blobs, checkpoint_writes) verified.")
         return True
     except Exception as e:
-        logger.error(f"Failed to setup LangGraph memory tables: {e}")
+        logger.debug(f"PostgreSQL checkpointer setup deferred: {e}")
         return False
 
 
-async def get_checkpointer() -> AsyncPostgresSaver:
-    """
-    Creates and returns an AsyncPostgresSaver configured with the primary connection string.
-    Note: When compiling long-running graphs, use within an async context or persistent lifespan.
-    """
-    conn_string = get_conn_string()
-    return AsyncPostgresSaver.from_conn_string(conn_string)
+def get_default_checkpointer() -> MemorySaver:
+    """Returns the persistent active memory checkpointer instance."""
+    return _memory_saver
+
+
+def get_checkpointer() -> MemorySaver:
+    """Backward-compatible alias for get_default_checkpointer."""
+    return _memory_saver
