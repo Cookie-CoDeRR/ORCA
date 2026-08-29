@@ -20,7 +20,7 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
     // 1. Scene & Camera
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.z = 220;
+    camera.position.z = 210;
 
     // 2. WebGL Renderer with Alpha
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -29,45 +29,45 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
     mount.appendChild(renderer.domElement);
 
     // 3. Globe Core Wireframe Sphere
-    const globeRadius = 68;
+    const globeRadius = 66;
     const globeGroup = new THREE.Group();
     scene.add(globeGroup);
 
-    // Sphere inner dark glow
+    // Sphere inner void black
     const innerGeo = new THREE.SphereGeometry(globeRadius - 0.5, 48, 48);
     const innerMat = new THREE.MeshBasicMaterial({
-      color: 0x07111e,
+      color: 0x050507,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.95,
     });
     const innerSphere = new THREE.Mesh(innerGeo, innerMat);
     globeGroup.add(innerSphere);
 
-    // Wireframe Mesh Rings
-    const wireGeo = new THREE.SphereGeometry(globeRadius, 32, 32);
+    // Wireframe Mesh - Stark Titanium Lines
+    const wireGeo = new THREE.SphereGeometry(globeRadius, 36, 36);
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x0284c7,
+      color: 0x52525b,
       wireframe: true,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.22,
     });
     const wireSphere = new THREE.Mesh(wireGeo, wireMat);
     globeGroup.add(wireSphere);
 
-    // 4. Dot Cloud Matrix representing Indian Ocean & Global Coastlines
-    const pointCount = 1200;
+    // 4. Dot Cloud Matrix - Monochromatic Starlight Particles
+    const pointCount = 1600;
     const pointPositions = new Float32Array(pointCount * 3);
     const pointColors = new Float32Array(pointCount * 3);
 
-    const cCyan = new THREE.Color(0x38bdf8);
-    const cEmerald = new THREE.Color(0x34d399);
-    const cDarkBlue = new THREE.Color(0x0369a1);
+    const cPureWhite = new THREE.Color(0xffffff);
+    const cSilver = new THREE.Color(0xd4d4d8);
+    const cDeepZinc = new THREE.Color(0x71717a);
 
     for (let i = 0; i < pointCount; i++) {
       const phi = Math.acos(-1 + (2 * i) / pointCount);
       const theta = Math.sqrt(pointCount * Math.PI) * phi;
 
-      const r = globeRadius + (Math.random() - 0.5) * 1.5;
+      const r = globeRadius + (Math.random() - 0.5) * 1.8;
       const x = r * Math.cos(theta) * Math.sin(phi);
       const y = r * Math.sin(theta) * Math.sin(phi);
       const z = r * Math.cos(phi);
@@ -76,7 +76,8 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
       pointPositions[i * 3 + 1] = y;
       pointPositions[i * 3 + 2] = z;
 
-      const randColor = Math.random() > 0.4 ? (Math.random() > 0.5 ? cCyan : cEmerald) : cDarkBlue;
+      const rand = Math.random();
+      const randColor = rand > 0.6 ? cPureWhite : rand > 0.3 ? cSilver : cDeepZinc;
       pointColors[i * 3] = randColor.r;
       pointColors[i * 3 + 1] = randColor.g;
       pointColors[i * 3 + 2] = randColor.b;
@@ -90,7 +91,7 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
       size: 2.2,
       vertexColors: true,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
     });
     const pointCloud = new THREE.Points(pointGeo, pointMat);
     globeGroup.add(pointCloud);
@@ -121,20 +122,20 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
     indianNodes.forEach((node) => {
       const pos = convertLatLonToVector3(node.lat, node.lon, globeRadius + 1.2);
       
-      // Node Beacon
-      const dotGeo = new THREE.SphereGeometry(1.6, 12, 12);
-      const dotMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+      // Node Core Beacon (Bright White)
+      const dotGeo = new THREE.SphereGeometry(1.8, 16, 16);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const dotMesh = new THREE.Mesh(dotGeo, dotMat);
       dotMesh.position.copy(pos);
       nodeGroup.add(dotMesh);
 
-      // Node Halo Ring
-      const ringGeo = new THREE.RingGeometry(2.4, 3.4, 18);
+      // Node Halo Ring (Pure White Translucent)
+      const ringGeo = new THREE.RingGeometry(2.4, 3.8, 24);
       const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
+        color: 0xffffff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.65,
       });
       const ringMesh = new THREE.Mesh(ringGeo, ringMat);
       ringMesh.position.copy(pos);
@@ -142,10 +143,10 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
       nodeGroup.add(ringMesh);
     });
 
-    // 6. Equatorial Orbital Rings & Radar Halo
-    const orbitRingGeo = new THREE.RingGeometry(globeRadius + 16, globeRadius + 17.5, 64);
+    // 6. Equatorial Orbital Rings - Titanium White Sleek Line
+    const orbitRingGeo = new THREE.RingGeometry(globeRadius + 16, globeRadius + 17, 96);
     const orbitRingMat = new THREE.MeshBasicMaterial({
-      color: 0x0284c7,
+      color: 0xffffff,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.35,
@@ -154,9 +155,9 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
     orbitRing.rotation.x = Math.PI / 2.3;
     globeGroup.add(orbitRing);
 
-    const orbitRingGeo2 = new THREE.RingGeometry(globeRadius + 24, globeRadius + 25, 64);
+    const orbitRingGeo2 = new THREE.RingGeometry(globeRadius + 24, globeRadius + 24.8, 96);
     const orbitRingMat2 = new THREE.MeshBasicMaterial({
-      color: 0x059669,
+      color: 0xa1a1aa,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.25,
@@ -193,15 +194,15 @@ export default function ThreeGlobe({ className = "" }: ThreeGlobeProps) {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Continuous Slow Rotation
-      targetRotationY += 0.0035;
+      // Continuous Slow Planetary Rotation
+      targetRotationY += 0.003;
 
       globeGroup.rotation.y += (targetRotationY + mouseX - globeGroup.rotation.y) * 0.05;
       globeGroup.rotation.x += (targetRotationX - mouseY - globeGroup.rotation.x) * 0.05;
 
       // Pulse orbits
-      orbitRing.rotation.z = elapsedTime * 0.15;
-      orbitRing2.rotation.z = -elapsedTime * 0.12;
+      orbitRing.rotation.z = elapsedTime * 0.12;
+      orbitRing2.rotation.z = -elapsedTime * 0.09;
 
       renderer.render(scene, camera);
     };

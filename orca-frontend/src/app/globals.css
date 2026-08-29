@@ -1,66 +1,99 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --background: #060913;
-  --foreground: #f1f5f9;
+  --background: #000000;
+  --foreground: #ffffff;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: #000000;
+  color: #ffffff;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  overflow: hidden;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 code, kbd, samp, pre {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Custom sleek scrollbars */
+/* Deep Space Sleek Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #050505;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #27272a;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #52525b;
 }
 
-/* Maritime Tactical Markdown Card Styling */
+/* Deep Space Starlight Particles Background */
+.space-stars {
+  background-image: 
+    radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(1px 1px at 40px 70px, rgba(255,255,255,0.7), rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 90px 40px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(1px 1px at 160px 120px, rgba(255,255,255,0.6), rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 230px 190px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(1px 1px at 310px 80px, rgba(255,255,255,0.8), rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 400px 250px, #ffffff, rgba(0,0,0,0));
+  background-repeat: repeat;
+  background-size: 500px 500px;
+}
+
+/* Space Glassmorphism Cards */
+.space-card {
+  background: rgba(10, 10, 12, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.space-card:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(15, 15, 18, 0.85);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.04);
+}
+
+/* High-Contrast Maritime Tactical Markdown Card Styling */
 .orca-markdown {
   font-size: 0.8125rem;
-  line-height: 1.55;
-  color: #cbd5e1;
+  line-height: 1.6;
+  color: #d4d4d8;
 }
 
 .orca-markdown h3 {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #38bdf8;
+  color: #ffffff;
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   padding-bottom: 0.35rem;
+  letter-spacing: -0.01em;
 }
 
 .orca-markdown h4 {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #f4f4f5;
   margin-top: 0.75rem;
   margin-bottom: 0.35rem;
   display: flex;
@@ -74,7 +107,7 @@ code, kbd, samp, pre {
 
 .orca-markdown strong {
   font-weight: 600;
-  color: #f8fafc;
+  color: #ffffff;
 }
 
 .orca-markdown ul {
@@ -93,7 +126,7 @@ code, kbd, samp, pre {
   content: "•";
   position: absolute;
   left: 0.15rem;
-  color: #38bdf8;
+  color: #ffffff;
   font-weight: bold;
 }
 
@@ -112,17 +145,17 @@ code, kbd, samp, pre {
 }
 
 .orca-markdown code {
-  background-color: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(51, 65, 85, 0.6);
+  background-color: #18181b;
+  border: 1px solid #27272a;
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.75rem;
-  color: #38bdf8;
+  color: #ffffff;
 }
 
 .orca-markdown blockquote {
   border-left: 3px solid #f43f5e;
-  background-color: rgba(244, 63, 94, 0.1);
+  background-color: rgba(244, 63, 94, 0.08);
   padding: 0.5rem 0.75rem;
   border-radius: 0 0.5rem 0.5rem 0;
   margin: 0.5rem 0;
