@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { ScatterplotLayer, GeoJsonLayer, ArcLayer, LineLayer, PathLayer } from "@deck.gl/layers";
+import { ScatterplotLayer, GeoJsonLayer, LineLayer, PathLayer } from "@deck.gl/layers";
 import Map from "react-map-gl/maplibre";
 import * as maplibregl from "maplibre-gl";
 import { v4 as uuidv4 } from "uuid";
@@ -48,6 +48,7 @@ import {
   Droplets,
   Gauge,
   Sliders,
+  Sparkles,
 } from "lucide-react";
 
 import CommandPortalLayout, { PortalTab } from "@/components/CommandPortalLayout";
@@ -64,12 +65,13 @@ import {
   VesselType,
 } from "@/lib/aisStream";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants & Authentic Geographic Data ─────────────────────────────────────
 const CARTO_API_KEY =
   process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const AIS_API_KEY = process.env.NEXT_PUBLIC_AIS_API_KEY || "";
 
+// Major Indian Maritime Ports (Real coastal positions)
 const INDIA_PORTS: { name: string; pos: [number, number] }[] = [
   { name: "Kandla",    pos: [70.22, 23.00] },
   { name: "Veraval",   pos: [70.37, 20.90] },
@@ -82,6 +84,47 @@ const INDIA_PORTS: { name: string; pos: [number, number] }[] = [
   { name: "Vizag",     pos: [83.22, 17.69] },
   { name: "Paradip",   pos: [86.69, 20.26] },
   { name: "Kolkata",   pos: [88.37, 22.56] },
+];
+
+// ── REALISTIC WATER-FOLLOWING COASTAL SHIPPING CORRIDORS (No land crossing) ──
+const WEST_COAST_CORRIDOR: [number, number][] = [
+  [69.60, 22.60], // Gulf of Kutch Outer
+  [68.90, 22.10], // Okha Head
+  [69.40, 21.20], // Porbandar Offshore
+  [70.20, 20.50], // Veraval Offshore
+  [71.50, 19.80], // Gulf of Khambhat Standoff
+  [72.20, 18.80], // Mumbai High Shipping Lane
+  [72.80, 17.50], // Ratnagiri Offshore
+  [73.30, 15.80], // Goa Maritime Approach
+  [74.20, 13.80], // Karwar / Mangalore Lane
+  [75.20, 11.50], // Malabar Corridor
+  [75.90, 9.80],  // Kochi Approach
+  [76.80, 8.20],  // Trivandrum Waters
+  [77.40, 7.60],  // Cape Comorin Southern Rounding
+];
+
+const EAST_COAST_CORRIDOR: [number, number][] = [
+  [77.40, 7.60],  // Cape Comorin
+  [78.40, 8.40],  // Tuticorin Outer Lane
+  [79.60, 9.00],  // Gulf of Mannar Deep Channel
+  [80.60, 10.80], // Nagapattinam Offshore
+  [80.80, 13.20], // Chennai Anchorage Lane
+  [81.80, 15.50], // Krishna-Godavari Basin Corridor
+  [83.80, 17.60], // Visakhapatnam Deep Approach
+  [86.20, 19.80], // Odisha / Paradip Corridor
+  [87.80, 21.00], // Dhamra / Sandheads Approaches
+  [88.20, 21.60], // Hooghly Estuary Entrance
+];
+
+const INTERNATIONAL_TSS_LANE: [number, number][] = [
+  [58.00, 21.50], // Gulf of Oman Outer
+  [64.00, 16.50], // Arabian Sea Deep Trunk
+  [70.00, 12.00], // Lakshadweep Deep TSS
+  [76.00, 6.80],  // South of Kanyakumari
+  [80.50, 5.50],  // South of Dondra Head (Sri Lanka)
+  [85.00, 5.20],  // Bay of Bengal Equatorial Highway
+  [90.00, 5.50],  // Great Channel Entrance
+  [95.00, 5.80],  // Malacca Strait Western Gateway
 ];
 
 const IMBL_PAKISTAN: [number, number][] = [
@@ -312,8 +355,8 @@ function DashboardContent() {
     longitude: 70.368,
     latitude: 20.902,
     zoom: 6.2,
-    pitch: 50,
-    bearing: 15,
+    pitch: 45,
+    bearing: 10,
   });
 
   // Live ocean data
@@ -368,7 +411,6 @@ function DashboardContent() {
     recognition.continuous = false;
     recognition.interimResults = false;
 
-    // Support Indian accents & regional languages
     const langMap: Record<string, string> = {
       EN: "en-IN",
       HI: "hi-IN",
@@ -477,7 +519,6 @@ function DashboardContent() {
       const coords: [number, number] = [+lon.toFixed(4), +lat.toFixed(4)];
       setSelectedCoordinates(coords);
 
-      // Dynamically calculate contextual telemetry at this point
       const sstVal = +(27.0 + Math.sin(lat) * 2.5).toFixed(1);
       const chlaVal = +(0.8 + Math.cos(lon) * 0.7).toFixed(2);
       const swhVal = +(1.2 + Math.sin(lon * 0.5) * 0.6).toFixed(2);
@@ -494,19 +535,19 @@ function DashboardContent() {
   };
 
   const handleResetView = () =>
-    setViewState({ longitude: 70.368, latitude: 20.902, zoom: 6.2, pitch: 50, bearing: 15 });
+    setViewState({ longitude: 70.368, latitude: 20.902, zoom: 6.2, pitch: 45, bearing: 10 });
 
   const handleTogglePerspective = () =>
     setViewState((prev) => ({
       ...prev,
-      pitch: prev.pitch > 20 ? 0 : 50,
-      bearing: prev.pitch > 20 ? 0 : 15,
+      pitch: prev.pitch > 20 ? 0 : 45,
+      bearing: prev.pitch > 20 ? 0 : 10,
     }));
 
   const handlePresetClick = (query: string, coords: [number, number]) => {
     setInputMessage(query);
     setSelectedCoordinates(coords);
-    setViewState({ longitude: coords[0], latitude: coords[1], zoom: 7.0, pitch: 50, bearing: 15 });
+    setViewState({ longitude: coords[0], latitude: coords[1], zoom: 7.0, pitch: 45, bearing: 10 });
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -593,34 +634,29 @@ function DashboardContent() {
 
   // ─── DeckGL Layer Building ─────────────────────────────────────────────────
   const oceanPoints = realOceanData?.weatherPoints ?? [];
-  const currentArcs = realOceanData?.currentVectors ?? [];
-  const pfzPoints   = realOceanData?.pfzPoints ?? [];
+  const currentVectors = realOceanData?.currentVectors ?? [];
+  const pfzPoints = realOceanData?.pfzPoints ?? [];
 
   const sstColor = (sst: number): [number, number, number, number] => {
     const t = Math.max(0, Math.min(1, (sst - 22) / 10));
-    return [Math.round(56 + t * 199), Math.round(189 - t * 126), Math.round(248 - t * 248), 190];
+    return [Math.round(40 + t * 215), Math.round(160 - t * 100), Math.round(240 - t * 200), 160];
   };
 
-  const portArcs = INDIA_PORTS.slice(0, -1).map((p, i) => ({
-    source: p.pos,
-    target: INDIA_PORTS[i + 1].pos,
-    name: `${p.name} → ${INDIA_PORTS[i + 1].name}`,
+  // IMBL line segments
+  const imblPakLines = IMBL_PAKISTAN.slice(0, -1).map((pos, i) => ({
+    source: pos,
+    target: IMBL_PAKISTAN[i + 1],
   }));
-
-  const allImblPoints = [
-    ...IMBL_PAKISTAN.map((pos) => ({ position: pos, zone: "Pakistan IMBL" })),
-    ...IMBL_SRILANKA.map((pos) => ({ position: pos, zone: "Sri Lanka IMBL" })),
-  ];
-  const imblArcs = [
-    ...IMBL_PAKISTAN.slice(0, -1).map((pos, i) => ({ source: pos, target: IMBL_PAKISTAN[i + 1] })),
-    ...IMBL_SRILANKA.slice(0, -1).map((pos, i) => ({ source: pos, target: IMBL_SRILANKA[i + 1] })),
-  ];
+  const imblSlLines = IMBL_SRILANKA.slice(0, -1).map((pos, i) => ({
+    source: pos,
+    target: IMBL_SRILANKA[i + 1],
+  }));
 
   const vesselHeadingPaths = vessels
     .filter((v) => v.sog > 0.5)
     .map((v) => {
       const rad = ((v.cog - 90) * Math.PI) / 180;
-      const len = Math.max(0.06, v.sog * 0.009);
+      const len = Math.max(0.05, v.sog * 0.008);
       const endLon = v.lon + len * Math.cos(rad);
       const endLat = v.lat + len * Math.sin(rad);
       return {
@@ -631,7 +667,7 @@ function DashboardContent() {
 
   const deckLayers: any[] = [];
 
-  // GRATICULE MESH
+  // ━━━ 1. TACTICAL GRATICULE MESH ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   deckLayers.push(
     new LineLayer({
       id: "layer-graticule",
@@ -647,7 +683,7 @@ function DashboardContent() {
     })
   );
 
-  // ① WEATHER (SST Heatmap)
+  // ━━━ 2. WEATHER (SST Thermal Heatmap Surface) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (layerVisibility.weather && oceanPoints.length > 0) {
     deckLayers.push(
       new ScatterplotLayer({
@@ -655,116 +691,228 @@ function DashboardContent() {
         data: oceanPoints,
         getPosition: (d: any) => d.position,
         getFillColor: (d: any) => sstColor(d.sst),
-        getLineColor: [200, 230, 255, 60],
-        getRadius: (d: any) => 22000 + d.waveHeight * 7000,
+        getLineColor: [200, 230, 255, 40],
+        getRadius: (d: any) => 26000 + d.waveHeight * 8000,
         radiusUnits: "meters",
         stroked: false,
         filled: true,
-        opacity: 0.55,
+        opacity: 0.45,
         pickable: true,
       })
     );
   }
 
-  // ② CURRENTS (Vectors)
-  if (layerVisibility.currents && currentArcs.length > 0) {
+  // ━━━ 3. OCEAN CURRENTS (Sleek Surface Hydrodynamic Flow Vectors) ━━━━━━━━━
+  // Rendered directly on the sea plane (No giant flying 3D arcs)
+  if (layerVisibility.currents && currentVectors.length > 0) {
+    // Vector lines on water
     deckLayers.push(
-      new ArcLayer({
-        id: "layer-currents",
-        data: currentArcs,
+      new LineLayer({
+        id: "layer-current-vectors-lines",
+        data: currentVectors,
         getSourcePosition: (d: any) => d.source,
         getTargetPosition: (d: any) => d.target,
-        getSourceColor: [103, 232, 249, 200],
-        getTargetColor: (d: any) => (d.velocity > 1.0 ? [147, 197, 253, 240] : [6, 182, 212, 200]),
-        getWidth: (d: any) => Math.max(1.5, d.velocity * 3.5),
+        getColor: (d: any) => (d.velocity > 1.0 ? [147, 197, 253, 240] : [6, 182, 212, 220]),
+        getWidth: (d: any) => Math.max(1.8, d.velocity * 3.2),
         widthUnits: "pixels",
-        opacity: 0.85,
+        opacity: 0.9,
+        pickable: false,
+      })
+    );
+    // Arrowhead pips at vector ends
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-current-vectors-heads",
+        data: currentVectors,
+        getPosition: (d: any) => d.target,
+        getFillColor: [103, 232, 249, 240],
+        getRadius: 3000,
+        radiusUnits: "meters",
+        radiusMinPixels: 2.5,
+        stroked: false,
+        filled: true,
+        opacity: 0.95,
         pickable: false,
       })
     );
   }
 
-  // ③ RESOURCES
+  // ━━━ 4. RESOURCES (200m Shelf Break Contours) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (layerVisibility.resources) {
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-shelf",
         data: SHELF_BREAK,
         getPosition: (d: any) => d.position,
-        getFillColor: [251, 191, 36, 160],
+        getFillColor: [251, 191, 36, 140],
         getLineColor: [253, 230, 138, 200],
-        getRadius: 18000,
+        getRadius: 16000,
         radiusUnits: "meters",
         stroked: true,
         lineWidthMinPixels: 1,
-        opacity: 0.7,
+        opacity: 0.65,
         pickable: true,
       })
     );
   }
 
-  // ④ FISHING ZONES (PFZ Clusters)
+  // ━━━ 5. AUTHENTIC POTENTIAL FISHING ZONES (Thermal & Chl-a Aggregations) ──
+  // Multi-tier realistic visual: diffuse thermal aura + dense chlorophyll core + tactical reticle
   if (layerVisibility.fishingZones && pfzPoints.length > 0) {
+    // 5A: Diffuse Thermal Front Glow (Outer Radiant Aura)
     deckLayers.push(
       new ScatterplotLayer({
-        id: "layer-pfz",
+        id: "layer-pfz-aura",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: (d: any) => [52, 211, 153, Math.round(120 + d.confidence * 0.7)],
-        getLineColor: [167, 243, 208, 180],
-        getRadius: (d: any) => 14000 + d.confidence * 200,
+        getFillColor: [52, 211, 153, 35],
+        getRadius: (d: any) => 30000 + d.confidence * 250,
+        radiusUnits: "meters",
+        stroked: false,
+        filled: true,
+        opacity: 0.8,
+        pickable: false,
+      })
+    );
+
+    // 5B: High-Chlorophyll Aggregation Core
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-pfz-core",
+        data: pfzPoints,
+        getPosition: (d: any) => d.position,
+        getFillColor: (d: any) => [16, 185, 129, Math.round(110 + d.confidence * 0.8)],
+        getLineColor: [167, 243, 208, 200],
+        getRadius: (d: any) => 12000 + d.confidence * 90,
         radiusUnits: "meters",
         stroked: true,
-        lineWidthMinPixels: 1,
-        opacity: 0.85,
+        lineWidthMinPixels: 1.5,
+        opacity: 0.9,
         pickable: true,
+      })
+    );
+
+    // 5C: Tactical Center Reticle Pip
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-pfz-center-reticle",
+        data: pfzPoints,
+        getPosition: (d: any) => d.position,
+        getFillColor: [255, 255, 255, 240],
+        getRadius: 2500,
+        radiusUnits: "meters",
+        radiusMinPixels: 3,
+        stroked: false,
+        filled: true,
+        opacity: 1,
+        pickable: false,
       })
     );
   }
 
-  // ⑤ TRANSPORT
+  // ━━━ 6. REALISTIC WATER-FOLLOWING COASTAL SHIPPING CORRIDORS ━━━━━━━━━━━━━
+  // Clean nautical corridors that stay on the sea surface (No flying arcs over land)
   if (layerVisibility.transport) {
+    // West Coast Corridor Path
+    deckLayers.push(
+      new PathLayer({
+        id: "layer-transport-west-corridor",
+        data: [{ path: WEST_COAST_CORRIDOR }],
+        getPath: (d: any) => d.path,
+        getColor: [255, 255, 255, 180],
+        getWidth: 2.5,
+        widthUnits: "pixels",
+        opacity: 0.85,
+        pickable: false,
+      })
+    );
+
+    // East Coast Corridor Path
+    deckLayers.push(
+      new PathLayer({
+        id: "layer-transport-east-corridor",
+        data: [{ path: EAST_COAST_CORRIDOR }],
+        getPath: (d: any) => d.path,
+        getColor: [255, 255, 255, 180],
+        getWidth: 2.5,
+        widthUnits: "pixels",
+        opacity: 0.85,
+        pickable: false,
+      })
+    );
+
+    // International Deep TSS Corridor
+    deckLayers.push(
+      new PathLayer({
+        id: "layer-transport-tss-lane",
+        data: [{ path: INTERNATIONAL_TSS_LANE }],
+        getPath: (d: any) => d.path,
+        getColor: [147, 197, 253, 140],
+        getWidth: 1.8,
+        widthUnits: "pixels",
+        opacity: 0.7,
+        pickable: false,
+      })
+    );
+
+    // Major Harbor Port Nodes
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-ports",
         data: INDIA_PORTS,
         getPosition: (d: any) => d.pos,
-        getFillColor: [255, 255, 255, 220],
-        getLineColor: [180, 180, 180, 180],
-        getRadius: 7000,
+        getFillColor: [255, 255, 255, 240],
+        getLineColor: [100, 116, 139, 200],
+        getRadius: 6500,
         radiusUnits: "meters",
+        radiusMinPixels: 4,
         stroked: true,
         lineWidthMinPixels: 1.5,
         opacity: 0.95,
         pickable: true,
       })
     );
-    deckLayers.push(
-      new ArcLayer({
-        id: "layer-shipping-lanes",
-        data: portArcs,
-        getSourcePosition: (d: any) => d.source,
-        getTargetPosition: (d: any) => d.target,
-        getSourceColor: [255, 255, 255, 180],
-        getTargetColor: [160, 160, 160, 140],
-        getWidth: 2,
-        widthUnits: "pixels",
-        opacity: 0.7,
-        pickable: false,
-      })
-    );
   }
 
-  // ⑥ MILITARY (IMBL)
+  // ━━━ 7. MILITARY / DEFENSE IMBL (Sovereignty Boundaries on Water) ━━━━━━━━
   if (layerVisibility.military && isDefenseUser) {
+    // Pakistan IMBL Line on Water
+    deckLayers.push(
+      new LineLayer({
+        id: "layer-imbl-pak-lines",
+        data: imblPakLines,
+        getSourcePosition: (d: any) => d.source,
+        getTargetPosition: (d: any) => d.target,
+        getColor: [244, 63, 94, 255],
+        getWidth: 3.5,
+        widthUnits: "pixels",
+        opacity: 0.95,
+      })
+    );
+
+    // Sri Lanka IMBL Line on Water
+    deckLayers.push(
+      new LineLayer({
+        id: "layer-imbl-sl-lines",
+        data: imblSlLines,
+        getSourcePosition: (d: any) => d.source,
+        getTargetPosition: (d: any) => d.target,
+        getColor: [244, 63, 94, 255],
+        getWidth: 3.5,
+        widthUnits: "pixels",
+        opacity: 0.95,
+      })
+    );
+
+    // IMBL Node Markers
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-imbl-nodes",
-        data: allImblPoints,
-        getPosition: (d: any) => d.position,
-        getFillColor: [244, 63, 94, 200],
-        getLineColor: [255, 180, 180, 255],
-        getRadius: 24000,
+        data: [...IMBL_PAKISTAN, ...IMBL_SRILANKA].map((p) => ({ pos: p })),
+        getPosition: (d: any) => d.pos,
+        getFillColor: [244, 63, 94, 220],
+        getLineColor: [255, 200, 200, 255],
+        getRadius: 18000,
         radiusUnits: "meters",
         stroked: true,
         lineWidthMinPixels: 2,
@@ -772,22 +920,9 @@ function DashboardContent() {
         pickable: true,
       })
     );
-    deckLayers.push(
-      new ArcLayer({
-        id: "layer-imbl-arc",
-        data: imblArcs,
-        getSourcePosition: (d: any) => d.source,
-        getTargetPosition: (d: any) => d.target,
-        getSourceColor: [244, 63, 94, 220],
-        getTargetColor: [244, 63, 94, 220],
-        getWidth: 4,
-        widthUnits: "pixels",
-        opacity: 0.9,
-      })
-    );
   }
 
-  // ⑦ SHIPS
+  // ━━━ 8. LIVE AIS SHIP TRANSPONDERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (showVessels && vessels.length > 0) {
     deckLayers.push(
       new ScatterplotLayer({
@@ -795,13 +930,13 @@ function DashboardContent() {
         data: vessels,
         getPosition: (d: any) => [d.lon, d.lat],
         getFillColor: (d: any) => VESSEL_COLORS[d.type as VesselType] ?? [200, 200, 200, 200],
-        getLineColor: [0, 0, 0, 100],
-        getRadius: 4500,
+        getLineColor: [0, 0, 0, 120],
+        getRadius: 4000,
         radiusUnits: "meters",
         stroked: true,
         lineWidthMinPixels: 1,
         radiusMinPixels: 3,
-        radiusMaxPixels: 10,
+        radiusMaxPixels: 9,
         opacity: 1,
         pickable: true,
         onClick: (info: any) => {
@@ -825,7 +960,7 @@ function DashboardContent() {
     }
   }
 
-  // ⑧ API GeoJSON overlay
+  // ━━━ 9. API GEOJSON FROM CHAT ADVISORIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (activeGeojson?.features) {
     deckLayers.push(
       new GeoJsonLayer({
@@ -842,22 +977,22 @@ function DashboardContent() {
           if (f.properties?.target_species) return [52, 211, 153, 200];
           return [244, 63, 94, 120];
         },
-        getPointRadius: 12000,
+        getPointRadius: 10000,
         pointRadiusMinPixels: 5,
       })
     );
   }
 
-  // ⑨ Target cursor
+  // ━━━ 10. TARGET RETICLE CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (selectedCoordinates) {
     deckLayers.push(
       new ScatterplotLayer({
-        id: "layer-target",
+        id: "layer-target-cursor",
         data: [{ position: selectedCoordinates }],
         getPosition: (d: any) => d.position,
-        getFillColor: [255, 255, 255, 200],
+        getFillColor: [255, 255, 255, 220],
         getLineColor: [255, 255, 255, 255],
-        getRadius: 10000,
+        getRadius: 8000,
         radiusUnits: "meters",
         stroked: true,
         filled: true,
@@ -870,7 +1005,7 @@ function DashboardContent() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-black text-white font-mono">
         <Compass className="h-8 w-8 animate-spin mr-3" />
-        <span>Loading Project ORCA Sovereign Deck...</span>
+        <span>Loading Project ORCA Sovereign Command Deck...</span>
       </div>
     );
   }
@@ -891,72 +1026,74 @@ function DashboardContent() {
         <div className="relative flex h-full w-full overflow-hidden">
           {/* LEFT: RETRACTABLE AGENT CHAT (35%) */}
           <div
-            className={`relative z-20 flex flex-col border-r border-white/10 bg-black/95 backdrop-blur-2xl transition-all duration-300 ${
+            className={`relative z-20 flex flex-col border-r border-white/10 bg-zinc-950/95 backdrop-blur-2xl transition-all duration-300 ${
               isChatOpen ? "w-full md:w-[410px] lg:w-[460px]" : "w-0 overflow-hidden border-r-0"
             }`}
           >
             {/* Target Coordinate HUD */}
-            <div className="p-3 bg-zinc-950/90 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-white text-black font-bold">
-                  <MapPin className="h-3.5 w-3.5 animate-pulse" />
+            <div className="p-3 bg-black/80 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-xl bg-white text-black font-black shadow-md shadow-white/10">
+                  <MapPin className="h-4 w-4 animate-pulse" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-mono text-zinc-400 block uppercase tracking-wider">Sector Target Lock</span>
-                  <div className="text-xs font-mono font-bold text-white">
+                  <span className="text-[9px] font-mono text-zinc-400 block uppercase tracking-widest font-bold">
+                    Sector Target Lock
+                  </span>
+                  <div className="text-xs font-mono font-bold text-white tracking-wide">
                     {selectedCoordinates ? `${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E` : "Click map to lock"}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="p-1.5 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white cursor-pointer"
-                  title="Collapse panel for 3D fullscreen"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="p-1.5 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
+                title="Collapse for fullscreen 3D map"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Synthesized Action Card */}
-            <div className="p-3 bg-zinc-900/60 border-b border-white/10 space-y-2">
+            <div className="p-3.5 bg-zinc-900/60 border-b border-white/10 space-y-2">
               <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                <span className="font-bold text-white flex items-center gap-1">
-                  <Activity className="h-3 w-3 text-emerald-400" />
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-emerald-400" />
                   <span>Synthesized Action Card</span>
                 </span>
-                <span className="text-emerald-400 font-bold">Confidence: {actionCardData.confidence}%</span>
+                <span className="text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                  {actionCardData.confidence}% PFZ
+                </span>
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
-                <div className="p-2 rounded-xl bg-black border border-white/10">
-                  <span className="text-zinc-500 block text-[8px]">SPECIES CONF.</span>
-                  <span className="text-emerald-400 font-bold">{actionCardData.confidence}% PFZ</span>
+                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Target Species</span>
+                  <span className="text-emerald-400 font-bold text-[11px] block mt-0.5">Y-Fin Tuna</span>
                 </div>
-                <div className="p-2 rounded-xl bg-black border border-white/10">
-                  <span className="text-zinc-500 block text-[8px]">FUEL SAVINGS</span>
-                  <span className="text-white font-bold">-{actionCardData.fuelSavings}% Delta</span>
+                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Fuel Delta</span>
+                  <span className="text-white font-bold text-[11px] block mt-0.5">-{actionCardData.fuelSavings}%</span>
                 </div>
-                <div className="p-2 rounded-xl bg-black border border-white/10">
-                  <span className="text-zinc-500 block text-[8px]">IMBL STANDOFF</span>
-                  <span className="text-sky-400 font-bold">{actionCardData.imblStandoffKm} km</span>
+                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">IMBL Standoff</span>
+                  <span className="text-sky-400 font-bold text-[11px] block mt-0.5">{actionCardData.imblStandoffKm} km</span>
                 </div>
               </div>
             </div>
 
             {/* Multi-Agent Thought Stream Accordion */}
-            <div className="border-b border-white/10 bg-black/60">
+            <div className="border-b border-white/10 bg-black/40">
               <button
                 onClick={() => setShowThoughtStream(!showThoughtStream)}
-                className="flex items-center justify-between w-full px-3 py-2 text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer"
+                className="flex items-center justify-between w-full px-3.5 py-2 text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer"
               >
                 <div className="flex items-center gap-1.5 font-bold text-zinc-300">
-                  <Cpu className="h-3 w-3 text-sky-400" />
+                  <Cpu className="h-3.5 w-3.5 text-sky-400" />
                   <span>Multi-Agent Thought Stream (Supervisor → Workers)</span>
                 </div>
-                {showThoughtStream ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {showThoughtStream ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
 
               <AnimatePresence>
@@ -965,7 +1102,7 @@ function DashboardContent() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="px-3 pb-3 space-y-1 text-[10px] font-mono text-zinc-400 border-t border-white/5 pt-2 max-h-32 overflow-y-auto"
+                    className="px-3.5 pb-3 space-y-1 text-[10px] font-mono text-zinc-400 border-t border-white/5 pt-2 max-h-32 overflow-y-auto"
                   >
                     {currentThoughts.length > 0 ? (
                       currentThoughts.map((t, idx) => <div key={idx} className="text-emerald-300">{t}</div>)
@@ -982,12 +1119,38 @@ function DashboardContent() {
               </AnimatePresence>
             </div>
 
-            {/* Chat Messages */}
+            {/* Quick Preset Queries */}
+            <div className="p-2.5 bg-black/60 border-b border-white/10 space-y-1.5">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 px-1">
+                ⚡ Quick Scenarios
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { label: "Veraval Tuna PFZ", sub: "Thermal Front", icon: Fish, color: "text-emerald-400", query: "Tuna fishing potential off Veraval Gujarat?", coords: [70.37, 20.90] as [number, number] },
+                  { label: "IMBL Border Alert", sub: "Sovereignty Check", icon: Shield, color: "text-rose-400", query: "Am I crossing the Sri Lanka IMBL boundary?", coords: [79.315, 9.285] as [number, number] },
+                  { label: "Mumbai → Kochi", sub: "A* Current Routing", icon: Navigation, color: "text-white", query: "Optimal fuel route Mumbai to Kochi currents?", coords: [72.83, 18.92] as [number, number] },
+                  { label: "Lakshadweep SST", sub: "Weather Telemetry", icon: Waves, color: "text-sky-400", query: "Wave height and SST in Lakshadweep sea?", coords: [73.0, 10.5] as [number, number] },
+                ].map(({ label, sub, icon: Icon, color, query, coords }) => (
+                  <button
+                    key={label}
+                    onClick={() => handlePresetClick(query, coords)}
+                    className="p-2 rounded-xl border border-white/10 bg-zinc-950/70 hover:bg-zinc-900 text-left text-[11px] transition cursor-pointer"
+                  >
+                    <div className={`font-bold flex items-center gap-1 ${color}`}>
+                      <Icon className="h-3 w-3" /><span>{label}</span>
+                    </div>
+                    <span className="text-[9px] text-zinc-500 block">{sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat Messages History */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && (
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-900 border border-white/10 text-white">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-900 border border-white/10 text-white shadow-sm">
                       <Bot className="h-4 w-4" />
                     </div>
                   )}
@@ -1005,10 +1168,10 @@ function DashboardContent() {
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     )}
-                    <div className="mt-1.5 text-[9px] text-zinc-500 text-right">{msg.timestamp}</div>
+                    <div className="mt-1.5 text-[9px] text-zinc-500 text-right font-mono">{msg.timestamp}</div>
                   </div>
                   {msg.role === "user" && (
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300">
                       <User className="h-4 w-4" />
                     </div>
                   )}
@@ -1030,7 +1193,7 @@ function DashboardContent() {
                       : "Type query or click map to lock..."
                   }
                   disabled={isStreaming}
-                  className="flex-1 rounded-xl border border-white/15 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-white focus:outline-none"
+                  className="flex-1 rounded-xl border border-white/15 bg-zinc-950 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-white focus:outline-none"
                 />
 
                 {/* Voice Mic Button */}
@@ -1177,9 +1340,9 @@ function DashboardContent() {
               </div>
               <div className="space-y-1">
                 {layerVisibility.weather && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" /><span>SST Thermal</span></div>}
-                {layerVisibility.currents && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-cyan-300" /><span>Currents</span></div>}
-                {layerVisibility.fishingZones && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span>PFZ Clusters</span></div>}
-                {layerVisibility.transport && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-white" /><span>Shipping Lanes</span></div>}
+                {layerVisibility.currents && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-cyan-300" /><span>Current Vectors</span></div>}
+                {layerVisibility.fishingZones && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span>PFZ Aggregations</span></div>}
+                {layerVisibility.transport && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-white" /><span>Coastal Shipping Lanes</span></div>}
                 {layerVisibility.military && isDefenseUser && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-rose-500" /><span>IMBL Boundary</span></div>}
                 {showVessels && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-400" /><span>AIS Ships ({vessels.length})</span></div>}
               </div>
