@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🐬 Project ORCA — Frontend Tactical Command Portal
 
-## Getting Started
+> **Next.js 16 (Turbopack) + Deck.GL 2.5D Bathymetric Marine Radar**
+> Comprehensive 4-view command portal for Smart India Hackathon (SIH-26176).
 
-First, run the development server:
+---
 
+## 🚀 Getting Started
+
+### 1. Install Dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure Environment Variables (`.env.local`)
+Create or verify `.env.local` in the `orca-frontend` folder:
+```env
+NEXT_PUBLIC_API_BASE=http://localhost:8000
+NEXT_PUBLIC_CARTO_API_KEY=cb1_2dhp_1_9403bbcac732699b29121f7e
+NEXT_PUBLIC_AIS_API_KEY=
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Run Development Server
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open **[http://localhost:3000/dashboard](http://localhost:3000/dashboard)** in your browser.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🏛️ 4 Core Portal Views
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **🧭 Tactical Command (`/dashboard`)**: 2.5D Deck.GL Tactical Map, Target HUD, Thought Stream, Synthesized Action Card, Voice Mic, and Contextual Bottom Telemetry Strip.
+2. **🕸️ Agent Swarm Mesh (`/dashboard` $\rightarrow$ Agent Swarm Mesh)**: 3Blue1Brown-inspired Synaptic Neural Flow Graph with dense cubic Bézier filaments, deterministic triggering, and node inspection drawer.
+3. **🛰️ Earth Observation Data Hub (`/dashboard` $\rightarrow$ Data Hub)**: 7-layer dataset provenance catalog and 72-hour temporal timeline scrubber.
+4. **⚖️ Regulatory Policy Vault (`/dashboard` $\rightarrow$ Regulatory Vault)**: 61-day Monsoon Trawl Ban matrix, pgvector semantic search, and Coast Guard MRCC emergency directory.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For full multi-agent architecture and backend setup, see the **[Master README.md](../README.md)** in the repository root.
