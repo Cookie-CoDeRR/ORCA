@@ -35,6 +35,30 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import LayerControlPanel, { LayerVisibility } from "@/components/LayerControlPanel";
+import { fetchOceanData, OceanDataResult } from "@/lib/oceanDataService";
+
+// Known Indian port positions for transport route display
+const INDIA_PORTS: { name: string; pos: [number, number] }[] = [
+  { name: "Veraval",   pos: [70.37, 20.90] },
+  { name: "Mumbai",    pos: [72.83, 18.92] },
+  { name: "Goa",       pos: [73.80, 15.40] },
+  { name: "Mangalore", pos: [74.85, 12.87] },
+  { name: "Kochi",     pos: [76.26, 9.93]  },
+  { name: "Tuticorin", pos: [78.15, 8.80]  },
+  { name: "Chennai",   pos: [80.28, 13.08] },
+  { name: "Vizag",     pos: [83.22, 17.69] },
+];
+
+// Approx India-Pakistan IMBL (1974 agreement) and India-Sri Lanka IMBL (1976/1976)
+const IMBL_PAKISTAN: [number, number][] = [
+  [61.32, 22.35], [62.70, 22.65], [63.90, 22.85],
+  [65.30, 22.90], [66.50, 23.08], [67.80, 22.76],
+  [68.17, 23.50],
+];
+const IMBL_SRILANKA: [number, number][] = [
+  [79.42, 9.76], [80.00, 9.52], [80.50, 9.18],
+  [80.80, 8.83], [81.10, 8.48],
+];
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
@@ -48,67 +72,7 @@ const TERRAIN_DEM_SOURCE = {
   maxzoom: 15,
 };
 
-// ─── Static sample data for visual layers (used when no API response yet) ────
-// These give instant visual feedback showing all layers are wired correctly.
 
-/** Weather: 4 representative Arabian Sea SST hotspot nodes */
-const WEATHER_SAMPLE_POINTS = [
-  { position: [70.5, 20.8], sst: 28.4, label: "SST 28.4°C" },
-  { position: [72.8, 18.9], sst: 29.1, label: "SST 29.1°C" },
-  { position: [76.3, 10.2], sst: 27.8, label: "SST 27.8°C" },
-  { position: [80.3, 13.1], sst: 28.9, label: "SST 28.9°C" },
-  { position: [83.2, 17.7], sst: 28.2, label: "SST 28.2°C" },
-];
-
-/** Currents: arrow source→target pairs showing Eulerian surface vectors */
-const CURRENT_VECTOR_ARCS = [
-  { source: [68.0, 22.0], target: [70.5, 21.2], velocity: 1.4 },
-  { source: [70.5, 21.2], target: [72.0, 20.1], velocity: 1.6 },
-  { source: [72.0, 20.1], target: [73.5, 19.5], velocity: 1.3 },
-  { source: [76.0, 11.0], target: [78.2, 10.4], velocity: 0.9 },
-  { source: [78.2, 10.4], target: [80.1, 9.8], velocity: 1.1 },
-  { source: [80.1, 9.8], target: [81.5, 9.3], velocity: 1.2 },
-  { source: [68.5, 14.0], target: [70.0, 13.5], velocity: 1.0 },
-];
-
-/** Resources: continental shelf break depth contour markers */
-const RESOURCE_SAMPLE_POINTS = [
-  { position: [69.2, 21.5], depth: 200, type: "Shelf Break" },
-  { position: [71.0, 19.8], depth: 350, type: "Deep Channel" },
-  { position: [75.8, 11.8], depth: 180, type: "Reef System" },
-  { position: [79.5, 11.2], depth: 220, type: "Shelf Break" },
-  { position: [82.0, 15.0], depth: 400, type: "Submarine Canyon" },
-  { position: [85.0, 14.2], depth: 280, type: "Seamount" },
-];
-
-/** Fishing Zones: PFZ aggregation cluster points */
-const PFZ_SAMPLE_POINTS = [
-  { position: [70.37, 20.90], species: "Yellowfin Tuna", confidence: 88 },
-  { position: [70.65, 20.75], species: "Indian Mackerel", confidence: 92 },
-  { position: [71.20, 20.50], species: "Ribbonfish", confidence: 78 },
-  { position: [75.5, 11.4], species: "Sardines", confidence: 85 },
-  { position: [80.1, 9.85], species: "Skipjack Tuna", confidence: 74 },
-];
-
-/** Transport: demo A* optimised route segments */
-const TRANSPORT_ROUTE = [
-  [70.368, 20.902],
-  [70.52, 20.75],
-  [70.65, 20.63],
-  [70.71, 20.52],
-  [70.65, 20.30],
-  [70.55, 20.12],
-  [70.35, 19.95],
-];
-
-/** Military: IMBL boundary reference points (simplified) */
-const MILITARY_IMBL_POINTS = [
-  { position: [66.5, 23.2], type: "Pakistan IMBL Node", danger: true },
-  { position: [67.8, 22.8], type: "Pakistan IMBL Node", danger: true },
-  { position: [68.9, 22.1], type: "Pakistan IMBL Node", danger: true },
-  { position: [79.0, 9.1], type: "Sri Lanka IMBL Node", danger: true },
-  { position: [80.5, 8.6], type: "Sri Lanka IMBL Node", danger: true },
-];
 
 // ─── Map Style Builder ────────────────────────────────────────────────────────
 function buildMapStyle(mode: "dark" | "voyager" | "satellite", enable3D: boolean, exaggeration = 2.0): any {
@@ -205,6 +169,9 @@ function DashboardContent() {
   const [currentThoughts, setCurrentThoughts] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGeojson, setActiveGeojson] = useState<any>(null);
+  const [realOceanData, setRealOceanData] = useState<OceanDataResult | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Layer visibility state
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({
@@ -269,6 +236,21 @@ function DashboardContent() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentThoughts]);
+
+  // ── Fetch real ocean data from Open-Meteo Marine API on mount ──────────────
+  useEffect(() => {
+    setIsLoadingData(true);
+    fetchOceanData()
+      .then((data) => {
+        setRealOceanData(data);
+        setIsLoadingData(false);
+      })
+      .catch((err) => {
+        console.error("Ocean data fetch error:", err);
+        setDataError("Ocean API unavailable — using fallback display.");
+        setIsLoadingData(false);
+      });
+  }, []);
 
   const handleLayerToggle = (id: keyof LayerVisibility) => {
     if (id === "military" && !isDefenseUser) return;
@@ -394,135 +376,190 @@ function DashboardContent() {
     }
   };
 
-  // ─── Build DeckGL Layers based on visibility toggles ─────────────────────
+  // ─── Build DeckGL Layers based on visibility toggles & live API data ────────
+  // SST colour mapping: 22°C (cold blue) → 30°C (hot red) — real spectral gradient
+  const sstColor = (sst: number): [number, number, number, number] => {
+    const t = Math.max(0, Math.min(1, (sst - 22) / 10)); // normalise 22-32°C → 0-1
+    return [
+      Math.round(56 + t * 199),     // R: sky-blue → rose
+      Math.round(189 - t * 126),    // G: decreasing
+      Math.round(248 - t * 248),    // B: blue → 0
+      200,
+    ];
+  };
+
+  const oceanPoints = realOceanData?.weatherPoints ?? [];
+  const currentArcs = realOceanData?.currentVectors ?? [];
+  const pfzPoints   = realOceanData?.pfzPoints ?? [];
+
+  // Shelf break points derived from GEBCO 200m isobath known coordinates
+  const SHELF_BREAK_NODES = [
+    { position: [68.8, 22.7], depth: 200, type: "Shelf Break" },
+    { position: [70.2, 21.8], depth: 200, type: "Shelf Break" },
+    { position: [72.0, 20.5], depth: 200, type: "Shelf Break" },
+    { position: [73.0, 18.5], depth: 200, type: "Shelf Break" },
+    { position: [74.8, 15.2], depth: 200, type: "Shelf Break" },
+    { position: [76.0, 12.0], depth: 180, type: "Reef / Shoal" },
+    { position: [80.5, 12.0], depth: 200, type: "Shelf Break" },
+    { position: [81.5, 13.5], depth: 250, type: "Canyon Head" },
+    { position: [82.5, 15.5], depth: 200, type: "Shelf Break" },
+    { position: [84.5, 18.0], depth: 200, type: "Shelf Break" },
+    { position: [87.0, 20.0], depth: 200, type: "Shelf Break" },
+  ];
+
+  // Transport: Indian Coastal Shipping Network ports as a route
+  const portArcs = INDIA_PORTS.slice(0, -1).map((p, i) => ({
+    source: p.pos,
+    target: INDIA_PORTS[i + 1].pos,
+    name: `${p.name} → ${INDIA_PORTS[i + 1].name}`,
+  }));
+
+  // Military IMBL nodes from treaty references
+  const allImblPoints = [
+    ...IMBL_PAKISTAN.map((pos) => ({ position: pos, zone: "Pakistan IMBL" })),
+    ...IMBL_SRILANKA.map((pos) => ({ position: pos, zone: "Sri Lanka IMBL" })),
+  ];
+  const imblArcs = [
+    ...IMBL_PAKISTAN.slice(0, -1).map((pos, i) => ({ source: pos, target: IMBL_PAKISTAN[i + 1] })),
+    ...IMBL_SRILANKA.slice(0, -1).map((pos, i) => ({ source: pos, target: IMBL_SRILANKA[i + 1] })),
+  ];
+
   const deckLayers: any[] = [];
 
-  // ① WEATHER LAYER — SST thermal markers (sky blue)
-  if (layerVisibility.weather) {
+  // ① WEATHER LAYER — Real SST from Open-Meteo (coloured by actual temperature)
+  if (layerVisibility.weather && oceanPoints.length > 0) {
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-weather-sst",
-        data: WEATHER_SAMPLE_POINTS,
+        data: oceanPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [56, 189, 248, 180],       // sky-400
-        getLineColor: [186, 230, 253, 255],       // sky-200
-        getRadius: 28000,
+        getFillColor: (d: any) => sstColor(d.sst),
+        getLineColor: [186, 230, 253, 180],
+        getRadius: (d: any) => 25000 + Math.max(0, d.waveHeight * 8000),
+        radiusUnits: "meters",
+        stroked: true,
+        filled: true,
+        lineWidthMinPixels: 1,
+        opacity: 0.82,
+        pickable: true,
+        updateTriggers: { getFillColor: [realOceanData?.fetchedAt] },
+      })
+    );
+  }
+
+  // ② CURRENTS LAYER — Real ocean current vectors from Open-Meteo
+  if (layerVisibility.currents && currentArcs.length > 0) {
+    deckLayers.push(
+      new ArcLayer({
+        id: "layer-currents-vectors",
+        data: currentArcs,
+        getSourcePosition: (d: any) => d.source,
+        getTargetPosition: (d: any) => d.target,
+        getSourceColor: [103, 232, 249, 220],
+        getTargetColor: (d: any) => {
+          const v = d.velocity;
+          // Slow: cyan | Fast: blue-white
+          return v > 1.0 ? [147, 197, 253, 255] : [6, 182, 212, 230];
+        },
+        getWidth: (d: any) => Math.max(2.5, d.velocity * 4),
+        widthUnits: "pixels",
+        opacity: 0.92,
+        pickable: true,
+        updateTriggers: { getWidth: [realOceanData?.fetchedAt] },
+      })
+    );
+  }
+
+  // ③ RESOURCES LAYER — GEBCO shelf break isobath 200m nodes (amber)
+  if (layerVisibility.resources) {
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-resources-shelf",
+        data: SHELF_BREAK_NODES,
+        getPosition: (d: any) => d.position,
+        getFillColor: [251, 191, 36, 200],
+        getLineColor: [253, 230, 138, 255],
+        getRadius: 20000,
         radiusUnits: "meters",
         stroked: true,
         filled: true,
         lineWidthMinPixels: 1.5,
+        opacity: 0.78,
+        pickable: true,
+      })
+    );
+  }
+
+  // ④ FISHING ZONES (PFZ) — Real data: derived from Open-Meteo SST + wave height
+  if (layerVisibility.fishingZones && pfzPoints.length > 0) {
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-fishing-pfz",
+        data: pfzPoints,
+        getPosition: (d: any) => d.position,
+        getFillColor: (d: any) => {
+          const alpha = Math.round(140 + d.confidence * 0.6);
+          return [52, 211, 153, alpha];
+        },
+        getLineColor: [167, 243, 208, 255],
+        getRadius: (d: any) => 16000 + d.confidence * 180,
+        radiusUnits: "meters",
+        stroked: true,
+        filled: true,
+        lineWidthMinPixels: 1.5,
+        opacity: 0.9,
+        pickable: true,
+        updateTriggers: { getFillColor: [realOceanData?.fetchedAt], getRadius: [realOceanData?.fetchedAt] },
+      })
+    );
+  }
+
+  // ⑤ TRANSPORT LAYER — Indian Coastal Shipping Network (major ports + routes)
+  if (layerVisibility.transport) {
+    // Port nodes
+    deckLayers.push(
+      new ScatterplotLayer({
+        id: "layer-transport-ports",
+        data: INDIA_PORTS,
+        getPosition: (d: any) => d.pos,
+        getFillColor: [255, 255, 255, 240],
+        getLineColor: [200, 200, 200, 200],
+        getRadius: 9000,
+        radiusUnits: "meters",
+        stroked: true,
+        filled: true,
+        lineWidthMinPixels: 2,
+        opacity: 0.95,
+        pickable: true,
+      })
+    );
+    // Shipping lane arcs
+    deckLayers.push(
+      new ArcLayer({
+        id: "layer-transport-lanes",
+        data: portArcs,
+        getSourcePosition: (d: any) => d.source,
+        getTargetPosition: (d: any) => d.target,
+        getSourceColor: [255, 255, 255, 220],
+        getTargetColor: [180, 180, 180, 200],
+        getWidth: 3,
+        widthUnits: "pixels",
         opacity: 0.85,
         pickable: true,
       })
     );
   }
 
-  // ② CURRENTS LAYER — ArcLayer arrows (cyan)
-  if (layerVisibility.currents) {
-    deckLayers.push(
-      new ArcLayer({
-        id: "layer-currents-vectors",
-        data: CURRENT_VECTOR_ARCS,
-        getSourcePosition: (d: any) => d.source,
-        getTargetPosition: (d: any) => d.target,
-        getSourceColor: [103, 232, 249, 200],    // cyan-300
-        getTargetColor: [6, 182, 212, 240],       // cyan-500
-        getWidth: (d: any) => Math.max(2, d.velocity * 2.5),
-        widthUnits: "pixels",
-        opacity: 0.9,
-        pickable: true,
-      })
-    );
-  }
-
-  // ③ RESOURCES LAYER — shelf break & depth markers (amber)
-  if (layerVisibility.resources) {
-    deckLayers.push(
-      new ScatterplotLayer({
-        id: "layer-resources-bathymetry",
-        data: RESOURCE_SAMPLE_POINTS,
-        getPosition: (d: any) => d.position,
-        getFillColor: [251, 191, 36, 200],       // amber-400
-        getLineColor: [253, 230, 138, 255],       // amber-200
-        getRadius: 22000,
-        radiusUnits: "meters",
-        stroked: true,
-        filled: true,
-        lineWidthMinPixels: 1.5,
-        opacity: 0.75,
-        pickable: true,
-      })
-    );
-  }
-
-  // ④ FISHING ZONES (PFZ) — aggregation hotspot circles (emerald)
-  if (layerVisibility.fishingZones) {
-    deckLayers.push(
-      new ScatterplotLayer({
-        id: "layer-fishing-pfz",
-        data: PFZ_SAMPLE_POINTS,
-        getPosition: (d: any) => d.position,
-        getFillColor: [52, 211, 153, 200],       // emerald-400
-        getLineColor: [167, 243, 208, 255],       // emerald-200
-        getRadius: (d: any) => 18000 + d.confidence * 100,
-        radiusUnits: "meters",
-        stroked: true,
-        filled: true,
-        lineWidthMinPixels: 2,
-        opacity: 0.9,
-        pickable: true,
-      })
-    );
-  }
-
-  // ⑤ TRANSPORT LAYER — A* optimal route polyline (white)
-  if (layerVisibility.transport) {
-    const routeFeature: any = {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: TRANSPORT_ROUTE },
-      properties: { name: "Fuel-Optimal A* Route" },
-    };
-    deckLayers.push(
-      new GeoJsonLayer({
-        id: "layer-transport-route",
-        data: { type: "FeatureCollection", features: [routeFeature] } as any,
-        stroked: true,
-        filled: false,
-        getLineColor: [255, 255, 255, 255],
-        getLineWidth: 5,
-        lineWidthUnits: "pixels",
-        lineWidthMinPixels: 3,
-        opacity: 0.95,
-        pickable: true,
-      })
-    );
-    // Waypoint nodes
-    deckLayers.push(
-      new ScatterplotLayer({
-        id: "layer-transport-waypoints",
-        data: TRANSPORT_ROUTE.map((pos) => ({ position: pos })),
-        getPosition: (d: any) => d.position,
-        getFillColor: [255, 255, 255, 230],
-        getLineColor: [200, 200, 200, 255],
-        getRadius: 6000,
-        radiusUnits: "meters",
-        stroked: true,
-        lineWidthMinPixels: 1,
-        opacity: 0.9,
-      })
-    );
-  }
-
-  // ⑥ MILITARY LAYER — IMBL border nodes (rose/red) — defense only
+  // ⑥ MILITARY LAYER — Treaty-based IMBL coordinates (defense-gated)
   if (layerVisibility.military && isDefenseUser) {
     deckLayers.push(
       new ScatterplotLayer({
-        id: "layer-military-imbl",
-        data: MILITARY_IMBL_POINTS,
+        id: "layer-military-imbl-nodes",
+        data: allImblPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [244, 63, 94, 220],        // rose-500
+        getFillColor: [244, 63, 94, 220],
         getLineColor: [255, 200, 200, 255],
-        getRadius: 30000,
+        getRadius: 28000,
         radiusUnits: "meters",
         stroked: true,
         filled: true,
@@ -531,27 +568,22 @@ function DashboardContent() {
         pickable: true,
       })
     );
-    // IMBL boundary arc connecting nodes
-    const imblArcs = MILITARY_IMBL_POINTS.slice(0, -1).map((p, i) => ({
-      source: p.position,
-      target: MILITARY_IMBL_POINTS[i + 1].position,
-    }));
     deckLayers.push(
       new ArcLayer({
         id: "layer-military-imbl-arc",
         data: imblArcs,
         getSourcePosition: (d: any) => d.source,
         getTargetPosition: (d: any) => d.target,
-        getSourceColor: [244, 63, 94, 200],
-        getTargetColor: [244, 63, 94, 200],
-        getWidth: 4,
+        getSourceColor: [244, 63, 94, 220],
+        getTargetColor: [244, 63, 94, 220],
+        getWidth: 5,
         widthUnits: "pixels",
         opacity: 0.95,
       })
     );
   }
 
-  // ⑦ API GeoJSON from chat responses (on top of everything)
+  // ⑦ API GeoJSON overlay from chat responses
   if (activeGeojson?.features) {
     deckLayers.push(
       new GeoJsonLayer({
@@ -878,33 +910,68 @@ function DashboardContent() {
           <div className="font-bold text-white flex items-center gap-1.5 mb-0.5">
             <Layers className="h-3.5 w-3.5" />
             <span>Active Layers</span>
+            {isLoadingData && (
+              <RefreshCw className="h-3 w-3 animate-spin text-zinc-400 ml-auto" />
+            )}
           </div>
           {layerVisibility.weather && (
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" /><span>Weather / SST</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
+              <span>Weather / SST{realOceanData ? " (Live)" : " (Loading…)"}</span>
+            </div>
           )}
           {layerVisibility.currents && (
-            <div className="flex items-center gap-2"><span className="h-1 w-5 rounded bg-cyan-300" /><span>Water Currents</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-1 w-5 rounded bg-cyan-300" />
+              <span>Currents{realOceanData ? " (Live)" : " (Loading…)"}</span>
+            </div>
           )}
           {layerVisibility.resources && (
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /><span>Ocean Resources</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+              <span>Shelf / Bathymetry</span>
+            </div>
           )}
           {layerVisibility.fishingZones && (
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span>Fishing Zones (PFZ)</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span>PFZ{realOceanData ? ` (${pfzPoints.length} zones)` : " (Loading…)"}</span>
+            </div>
           )}
           {layerVisibility.transport && (
-            <div className="flex items-center gap-2"><span className="h-1 w-5 rounded bg-white" /><span>Transport Route</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-1 w-5 rounded bg-white" />
+              <span>Coastal Shipping Lanes</span>
+            </div>
           )}
           {layerVisibility.military && isDefenseUser && (
-            <div className="flex items-center gap-2"><span className="h-1 w-5 rounded bg-rose-500" /><span>Military IMBL</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-1 w-5 rounded bg-rose-500" />
+              <span>IMBL Treaty Boundary</span>
+            </div>
           )}
           {selectedCoordinates && (
-            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-white ring-2 ring-zinc-700" /><span>Target Lock</span></div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-white ring-2 ring-zinc-700" />
+              <span>Target Lock</span>
+            </div>
           )}
           {!layerVisibility.weather && !layerVisibility.currents && !layerVisibility.resources &&
            !layerVisibility.fishingZones && !layerVisibility.transport && !layerVisibility.military && (
             <span className="text-zinc-500 italic">No layers active</span>
           )}
+          {realOceanData && (
+            <div className="mt-1 pt-1 border-t border-white/10 text-[9px] text-zinc-500 font-mono">
+              Open-Meteo Marine · {new Date(realOceanData.fetchedAt).toLocaleTimeString()}
+            </div>
+          )}
+          {dataError && (
+            <div className="mt-1 pt-1 border-t border-white/10 text-[9px] text-amber-500 font-mono">
+              ⚠ {dataError}
+            </div>
+          )}
         </div>
+
 
         {/* Defense Mode indicator badge */}
         {isDefenseUser && (
