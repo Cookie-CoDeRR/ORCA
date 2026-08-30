@@ -1,0 +1,467 @@
+"use client";
+
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Cpu,
+  Waves,
+  ShieldAlert,
+  Compass,
+  BookOpen,
+  FileCheck,
+  Play,
+  RotateCcw,
+  CheckCircle2,
+  AlertTriangle,
+  Terminal,
+  Activity,
+  Zap,
+  Code2,
+  Database,
+  Layers,
+  ArrowRight,
+  Clock,
+  Check,
+  Info,
+  X,
+} from "lucide-react";
+
+interface AgentNode {
+  id: string;
+  name: string;
+  category: "LLM Orchestrator" | "Deterministic Raster" | "Spatial Engine" | "Kinematics" | "Vector RAG" | "Synthesis";
+  modelCore: string;
+  icon: any;
+  status: "idle" | "running" | "completed" | "error";
+  latencyMs: number;
+  inputPayload: any;
+  outputPayload: any;
+  toolQueryLog: string;
+  description: string;
+  formula?: string;
+}
+
+const NODES_DATA: AgentNode[] = [
+  {
+    id: "supervisor",
+    name: "1. Supervisor Orchestrator",
+    category: "LLM Orchestrator",
+    modelCore: "Qwen 2.5 7B-Instruct (GGUF Q5_K_M)",
+    icon: Cpu,
+    status: "completed",
+    latencyMs: 240,
+    inputPayload: {
+      user_query: "Can 4 mechanized boats fish 30km off Veraval for Tuna tomorrow morning?",
+      session_thread: "thread_f829a1b0",
+      target_basin: "Arabian Sea",
+    },
+    outputPayload: {
+      origin_coords: [20.902, 70.368],
+      target_coords: [20.652, 70.118],
+      intent_summary: "Fishery feasibility & IMBL safety check for Veraval pelagic fleet",
+      tasks_to_trigger: ["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"],
+    },
+    toolQueryLog: `[Supervisor] Parsing query with StructuredOutput(SubTaskPlan)...
+[Supervisor] Matched Indian Coastal Gazetteer: 'Veraval' -> [20.902, 70.368]
+[Supervisor] Emitted 4 parallel asynchronous task dispatches.`,
+    description: "Decomposes unstructured natural language into structured Pydantic task graphs and normalizes vernacular coastal port names.",
+  },
+  {
+    id: "ocean_analytics",
+    name: "2. Ocean Analytics Node",
+    category: "Deterministic Raster",
+    modelCore: "xarray + NetCDF4 / Open-Meteo API",
+    icon: Waves,
+    status: "completed",
+    latencyMs: 16,
+    inputPayload: {
+      bbox: [20.50, 70.00, 21.00, 70.50],
+      variables: ["sea_surface_temperature", "chlorophyll_a", "significant_wave_height"],
+      time_slice: "2026-08-31T06:00:00Z",
+    },
+    outputPayload: {
+      sst_celsius: 28.4,
+      chlorophyll_a_mg_m3: 1.26,
+      wave_height_m: 1.61,
+      pfz_detected: true,
+      species_candidates: [
+        { name: "Yellowfin Tuna", confidence: 88, sst_optimal: 28.7 },
+        { name: "Indian Mackerel", confidence: 92, sst_optimal: 28.7 },
+      ],
+      diurnal_feeding_window: "Dawn (04:30 - 07:30 IST)",
+    },
+    toolQueryLog: `[OceanAnalytics] Invoking Open-Meteo Marine API @ [20.90, 70.37]
+[OceanAnalytics] Ingesting Copernicus SST (OSTIA 0.083°) & Sentinel-3 OLCI Chlorophyll
+[OceanAnalytics] Thermal gradient detected: ∇SST = 0.82°C/km -> PFZ CONFIRMED (Confidence: 88%)`,
+    description: "High-speed numerical pipeline running multidimensional array slicing over SST and chlorophyll raster grids to isolate Potential Fishing Zones (PFZs).",
+    formula: "PFZ_{conf} = \\sigma(\\alpha \\cdot \\nabla SST + \\beta \\cdot [Chl\\text{-}a] - \\gamma \\cdot SWH)",
+  },
+  {
+    id: "risk_geofencing",
+    name: "3. Risk & Geofencing Node",
+    category: "Spatial Engine",
+    modelCore: "PostgreSQL 16 / PostGIS 3.4 (ST_Distance)",
+    icon: ShieldAlert,
+    status: "completed",
+    latencyMs: 8,
+    inputPayload: {
+      vessel_location: [20.652, 70.118],
+      target_trajectory: "LineString(70.368 20.902, 70.118 20.652)",
+      hazard_buffer_km: 15.0,
+    },
+    outputPayload: {
+      imbl_proximity_km: 45.0,
+      imbl_standoff_status: "GREEN_CLEAR",
+      mpa_violation: false,
+      active_cyclonic_alert: false,
+      overall_risk_level: "LOW_OPERABLE",
+    },
+    toolQueryLog: `SELECT ST_DistanceSpheroid(
+  ST_SetSRID(ST_Point(70.118, 20.652), 4326),
+  geom_imbl
+) / 1000.0 AS dist_km
+FROM sovereign_imbl_boundaries WHERE zone = 'pakistan_imbl';
+-> Result: 45.02 km (Status: GREEN_SAFE)`,
+    description: "Calculates sub-meter spherical geodesic distances to international maritime boundaries (IMBL) and Marine Protected Areas (MPAs).",
+    formula: "D_{IMBL} = \\min_{p \\in \\partial IMBL} \\text{ST\\_DistanceSpheroid}(V_{pos}, p)",
+  },
+  {
+    id: "navigation",
+    name: "4. Vector Navigation Engine",
+    category: "Kinematics",
+    modelCore: "Continuous Eulerian A* Solver (uo, vo, u10)",
+    icon: Compass,
+    status: "completed",
+    latencyMs: 22,
+    inputPayload: {
+      origin: [70.368, 20.902],
+      destination: [70.118, 20.652],
+      cruising_speed_knots: 11.3,
+      current_vectors: { uo: 0.42, vo: -0.21 },
+    },
+    outputPayload: {
+      nautical_distance_nm: 18.0,
+      estimated_transit_hours: 1.59,
+      fuel_savings_percentage: 22.0,
+      effective_sog_knots: 11.32,
+      optimal_heading_deg: 221.4,
+      geojson_waypoints_count: 14,
+    },
+    toolQueryLog: `[Navigation] Initializing A* Heuristic Grid over Eulerian Field...
+[Navigation] Integrated current vector: [uo=0.42 m/s, vo=-0.21 m/s]
+[Navigation] SOG Adjusted: 11.32 kts | Fuel Delta: -22.0% (Assisting Current Stream)`,
+    description: "Evaluates surface current drift vectors to compute continuous fuel-optimal paths between harbor origins and fishing zones.",
+    formula: "\\vec{V}_{ground} = \\vec{V}_{ship} + \\vec{V}_{current} + K_{wind} \\cdot \\vec{V}_{wind}",
+  },
+  {
+    id: "policy_rag",
+    name: "5. Sovereign Policy RAG",
+    category: "Vector RAG",
+    modelCore: "BGE-M3 (1024-dim) + pgvector HNSW",
+    icon: BookOpen,
+    status: "completed",
+    latencyMs: 34,
+    inputPayload: {
+      query: "Monsoon fishing ban and mesh size regulations for Gujarat coast Veraval",
+      top_k: 3,
+      state_jurisdiction: "Gujarat",
+    },
+    outputPayload: {
+      monsoon_ban_active: false,
+      ban_schedule: "West Coast 61-day ban: June 1 to July 31 (Currently Inactive)",
+      mandatory_safety_sop: "VHF Channel 16 continuous watch + BIS-approved life jackets",
+      source_citation: "Gujarat Fisheries Act Gaz. Notif. GJR-2026-FSH",
+    },
+    toolQueryLog: `SELECT doc_id, chunk_text, 1 - (embedding <=> query_vec) AS similarity
+FROM maritime_regulatory_vault
+WHERE state = 'Gujarat' ORDER BY similarity DESC LIMIT 3;
+-> Matched Clause: 'Uniform Seasonal Fishing Ban 2026' (Score: 0.91)`,
+    description: "Retrieves statutory fisheries gazettes, seasonal trawl bans, and Coast Guard safety bulletins using semantic dense retrieval.",
+  },
+  {
+    id: "synthesizer",
+    name: "6. Multilingual Synthesizer",
+    category: "Synthesis",
+    modelCore: "Qwen 2.5 Multi-Modal Markdown + Indic Translation",
+    icon: FileCheck,
+    status: "completed",
+    latencyMs: 510,
+    inputPayload: {
+      telemetry_state: "SST 28.4°C, Chl-a 1.26 mg/m³, SWH 1.61m",
+      risk_state: "IMBL 45.0 km, Safe",
+      route_state: "18 NM, 1.59 hrs, -22% Fuel",
+      policy_state: "Ban Inactive, VHF 16 Mandatory",
+      language_target: "EN",
+    },
+    outputPayload: {
+      advisory_markdown: "Advisory generated with 5-section executive format.",
+      deckgl_geojson_layers: ["pfz_hexagons", "current_arcs", "imbl_line", "a_star_path"],
+      confidence_score: 0.94,
+    },
+    toolQueryLog: `[Synthesizer] Compiling multi-agent state into structured advisory...
+[Synthesizer] Stripped LLM markdown artifacts (*** -> clean headers)
+[Synthesizer] Generated deck.gl FeatureCollection with 3 active geospatial layers.`,
+    description: "Cross-correlates findings from all 5 workers, verifies consistency, formats executive advisories, and generates GeoJSON map layers.",
+  },
+];
+
+export default function AgentMeshView() {
+  const [selectedNode, setSelectedNode] = useState<AgentNode>(NODES_DATA[0]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [activeStep, setActiveStep] = useState<number>(5);
+
+  const handleRunSimulation = () => {
+    setIsSimulating(true);
+    setActiveStep(0);
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      if (step < 6) {
+        setActiveStep(step);
+        setSelectedNode(NODES_DATA[step]);
+      } else {
+        clearInterval(interval);
+        setIsSimulating(false);
+        setActiveStep(5);
+      }
+    }, 900);
+  };
+
+  return (
+    <div className="flex h-full w-full overflow-hidden bg-black text-white">
+      {/* LEFT: VISUAL EXECUTION GRAPH (DAG) */}
+      <div className="flex-1 flex flex-col h-full border-r border-white/10 overflow-y-auto p-6 space-y-6">
+        {/* Header & Controls */}
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-1">
+              <Activity className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Multi-Agent Swarm Inspector</span>
+            </div>
+            <h3 className="text-xl font-bold text-white tracking-tight">
+              Live LangGraph Execution DAG & State Machine
+            </h3>
+          </div>
+
+          <button
+            onClick={handleRunSimulation}
+            disabled={isSimulating}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition cursor-pointer shadow-lg shadow-white/10 disabled:opacity-50"
+          >
+            {isSimulating ? (
+              <>
+                <RotateCcw className="h-3.5 w-3.5 animate-spin" />
+                <span>Simulating Graph Dispatch...</span>
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5 fill-black" />
+                <span>Simulate Turn Execution</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Visual DAG Node Flow */}
+        <div className="space-y-4">
+          {/* Layer 1: Ingress & Supervisor */}
+          <div className="flex justify-center">
+            <div
+              onClick={() => setSelectedNode(NODES_DATA[0])}
+              className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedNode.id === "supervisor"
+                  ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
+                  : "bg-zinc-950/80 border-white/15 hover:border-white/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-white text-black font-bold">
+                    <Cpu className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">Agent 1: Supervisor Orchestrator</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
+                        LLM Planner
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400">Zero-Shot Intent Extraction & Pydantic Task Decomposition</p>
+                  </div>
+                </div>
+                <div className="text-right font-mono text-[10px] text-zinc-400">
+                  <span className="text-emerald-400 font-bold">● 240ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Connection Vector Downwards */}
+          <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
+            <span>↓ Parallel Async Fan-Out Dispatch (4 Specialized Workers)</span>
+          </div>
+
+          {/* Layer 2: 4 Parallel Workers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {NODES_DATA.slice(1, 5).map((node, idx) => {
+              const Icon = node.icon;
+              const isSelected = selectedNode.id === node.id;
+              return (
+                <div
+                  key={node.id}
+                  onClick={() => setSelectedNode(node)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-zinc-900 border-white shadow-lg shadow-white/10"
+                      : "bg-zinc-950/70 border-white/15 hover:border-white/30"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-white">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">{node.name}</h4>
+                        <span className="text-[9px] font-mono text-zinc-400">{node.category}</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">{node.latencyMs}ms</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-zinc-400 line-clamp-2 leading-relaxed">
+                    {node.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Connection Vector Downwards */}
+          <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
+            <span>↓ State Aggregation & CoT Cross-Correlation</span>
+          </div>
+
+          {/* Layer 3: Synthesizer */}
+          <div className="flex justify-center">
+            <div
+              onClick={() => setSelectedNode(NODES_DATA[5])}
+              className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
+                selectedNode.id === "synthesizer"
+                  ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
+                  : "bg-zinc-950/80 border-white/15 hover:border-white/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-white text-black font-bold">
+                    <FileCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">Agent 6: Multilingual Synthesizer</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
+                        Synthesis + DeckGL
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400">Reconciliation, Indic Regional Translation & GeoJSON Layer Dispatch</p>
+                  </div>
+                </div>
+                <div className="text-right font-mono text-[10px] text-zinc-400">
+                  <span className="text-emerald-400 font-bold">● 510ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Latency Waterfall Bar */}
+        <div className="p-4 rounded-2xl border border-white/10 bg-zinc-950/60 space-y-2.5">
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+            <span className="font-bold text-white flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> End-to-End Latency Waterfall
+            </span>
+            <span className="text-emerald-400 font-bold">Total Turn: 832ms</span>
+          </div>
+          <div className="flex h-3 w-full rounded-full overflow-hidden bg-zinc-900 border border-white/10">
+            <div style={{ width: "29%" }} className="bg-sky-400" title="Supervisor (240ms)" />
+            <div style={{ width: "2%" }} className="bg-emerald-400" title="Ocean Analytics (16ms)" />
+            <div style={{ width: "1%" }} className="bg-rose-400" title="Risk Geofencing (8ms)" />
+            <div style={{ width: "3%" }} className="bg-amber-400" title="Navigation (22ms)" />
+            <div style={{ width: "4%" }} className="bg-purple-400" title="Policy RAG (34ms)" />
+            <div style={{ width: "61%" }} className="bg-white" title="Synthesizer (510ms)" />
+          </div>
+          <div className="flex justify-between text-[9px] font-mono text-zinc-500">
+            <span>Supervisor 29%</span>
+            <span>Deterministic Workers 10% (Parallel)</span>
+            <span>Synthesizer 61%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT: NODE DEEP-DIVE INSPECTION DRAWER */}
+      <div className="w-full md:w-[420px] lg:w-[480px] h-full flex flex-col bg-zinc-950 p-6 overflow-y-auto space-y-6">
+        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-white text-black font-bold">
+              {React.createElement(selectedNode.icon, { className: "h-5 w-5" })}
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">{selectedNode.name}</h3>
+              <p className="text-[10px] font-mono text-zinc-400">{selectedNode.modelCore}</p>
+            </div>
+          </div>
+          <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+            ● {selectedNode.status.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Math / Physics Formula if applicable */}
+        {selectedNode.formula && (
+          <div className="p-3.5 rounded-xl border border-white/10 bg-black/60 space-y-1">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Mathematical Formulation</span>
+            <div className="text-xs font-mono text-white p-2 rounded bg-zinc-900 overflow-x-auto">
+              {selectedNode.formula}
+            </div>
+          </div>
+        )}
+
+        {/* Input Payload Schema */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+            <span className="font-semibold text-white flex items-center gap-1.5">
+              <Code2 className="h-3.5 w-3.5 text-sky-400" /> Input Payload (Pydantic Schema)
+            </span>
+          </div>
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-48 leading-relaxed">
+            {JSON.stringify(selectedNode.inputPayload, null, 2)}
+          </pre>
+        </div>
+
+        {/* Tool Execution Logs */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+            <span className="font-semibold text-white flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-amber-400" /> Native Tool Execution Logs
+            </span>
+          </div>
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-44 leading-relaxed whitespace-pre-wrap">
+            {selectedNode.toolQueryLog}
+          </pre>
+        </div>
+
+        {/* Output Payload Schema */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+            <span className="font-semibold text-white flex items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 text-emerald-400" /> Output State Dispatched
+            </span>
+          </div>
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-48 leading-relaxed">
+            {JSON.stringify(selectedNode.outputPayload, null, 2)}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
