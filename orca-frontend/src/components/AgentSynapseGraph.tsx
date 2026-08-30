@@ -183,8 +183,24 @@ export default function AgentSynapseGraph({
 }: AgentSynapseGraphProps) {
   const [selectedScenario, setSelectedScenario] = useState(TEST_SCENARIOS[0]);
   const [hoveredNode, setHoveredNode] = useState<SynapseNode | null>(null);
-  const [activeStep, setActiveStep] = useState<number>(4); // 0 to 4 (default completed)
+  const [activeStep, setActiveStep] = useState<number>(4); // 0 to 4 (4 = completed wave)
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
+  const [backendLive, setBackendLive] = useState<boolean>(false);
+
+  // Ping backend port 8000 to detect live vs standby state
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/", { method: "GET", mode: "cors" });
+        setBackendLive(res.ok);
+      } catch {
+        setBackendLive(false);
+      }
+    };
+    checkBackend();
+    const interval = setInterval(checkBackend, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Trigger deterministic turn simulation
   const handleRunExecution = () => {
@@ -203,10 +219,10 @@ export default function AgentSynapseGraph({
     }, 700); // 700ms per stage = 3.5s complete cycle
   };
 
-  // Reset to static completed state
+  // Reset to standby state
   const handleReset = () => {
     setIsExecuting(false);
-    setActiveStep(4);
+    setActiveStep(-1); // -1 = full standby
   };
 
   // Compute node coordinates and synaptic connections
@@ -304,8 +320,14 @@ export default function AgentSynapseGraph({
             <h3 className="text-sm font-bold text-white tracking-wide">
               Deterministic Multi-Agent Synaptic Graph
             </h3>
-            <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              NO RANDOM BLINKING · TRIGGERED ROUTING
+            <span
+              className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                backendLive
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+              }`}
+            >
+              {backendLive ? "● FASTAPI LIVE :8000" : "● STANDBY (Backend Offline - Client Simulation Active)"}
             </span>
           </div>
           <p className="text-[10px] text-zinc-400 font-mono mt-0.5">
@@ -315,6 +337,17 @@ export default function AgentSynapseGraph({
 
         {/* Scenario Selection Buttons */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={handleReset}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono transition cursor-pointer ${
+              activeStep === -1
+                ? "bg-zinc-800 text-white border-white/40 font-bold"
+                : "bg-zinc-950 text-zinc-400 border-white/10 hover:text-white"
+            }`}
+            title="Reset to resting standby state"
+          >
+            Standby
+          </button>
           {TEST_SCENARIOS.map((sc) => {
             const isSelected = selectedScenario.id === sc.id;
             return (
