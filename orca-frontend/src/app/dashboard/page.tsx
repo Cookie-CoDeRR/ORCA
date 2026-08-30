@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
 import { ScatterplotLayer, GeoJsonLayer } from "@deck.gl/layers";
@@ -28,12 +29,15 @@ import {
   RotateCcw,
   Eye,
   ArrowLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sliders,
+  Sparkles,
 } from "lucide-react";
 
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_2dhp_1_9403bbcac732699b29121f7e";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
-// AWS Open Data Global DEM & Ocean Bathymetry Terrarium Tiles
 const TERRAIN_DEM_SOURCE = {
   type: "raster-dem",
   tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
@@ -42,7 +46,6 @@ const TERRAIN_DEM_SOURCE = {
   maxzoom: 15,
 };
 
-// Builder function for Dynamic 3D Terrain & Hillshade Basemap Styles
 function buildMapStyle(mode: "dark" | "voyager" | "satellite", enable3D: boolean, exaggeration: number = 2.0): any {
   const sources: any = {
     "terrain-dem": TERRAIN_DEM_SOURCE,
@@ -117,8 +120,8 @@ function buildMapStyle(mode: "dark" | "voyager" | "satellite", enable3D: boolean
       maxzoom: 18,
       paint: {
         "hillshade-shadow-color": "#020617",
-        "hillshade-highlight-color": mode === "satellite" ? "#ffffff" : "#38bdf8",
-        "hillshade-accent-color": mode === "satellite" ? "#475569" : "#0284c7",
+        "hillshade-highlight-color": mode === "satellite" ? "#ffffff" : "#ffffff",
+        "hillshade-accent-color": mode === "satellite" ? "#475569" : "#52525b",
         "hillshade-exaggeration": 0.85,
       },
     });
@@ -150,27 +153,37 @@ interface Message {
   timestamp: string;
 }
 
-export default function OrcaDashboardPage() {
+function sanitizeLlmContent(text: string): string {
+  if (!text) return "";
+  // Remove unwanted triple asterisks and clean formatting
+  return text.replace(/\*\*\*/g, "**").trim();
+}
+
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role") || "visitor";
+
   const [mounted, setMounted] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
   const [threadId, setThreadId] = useState<string>("");
-  const [selectedCoordinates, setSelectedCoordinates] = useState<[number, number] | null>(null); // [lon, lat]
+  const [selectedCoordinates, setSelectedCoordinates] = useState<[number, number] | null>(null);
   const [inputMessage, setInputMessage] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [currentThoughts, setCurrentThoughts] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGeojson, setActiveGeojson] = useState<any>(null);
-  
+
   // Basemap & 3D Terrain State
   const [activeMapMode, setActiveMapMode] = useState<"dark" | "voyager" | "satellite">("dark");
   const [enable3DTerrain, setEnable3DTerrain] = useState<boolean>(true);
   const [terrainExaggeration, setTerrainExaggeration] = useState<number>(2.2);
 
-  // Initial 2.5D / 3D ViewState centered over Arabian Sea & Indian EEZ
+  // Initial 3D ViewState centered over Arabian Sea
   const [viewState, setViewState] = useState({
     longitude: 70.368,
     latitude: 20.902,
     zoom: 5.8,
-    pitch: 55, // 55° pitch for high-impact 3D terrain elevation
+    pitch: 55,
     bearing: 15,
   });
 
@@ -182,26 +195,30 @@ export default function OrcaDashboardPage() {
     localStorage.setItem("orca_thread_id", savedThread);
     setThreadId(savedThread);
 
+    let greetingRole = "Mission Operator";
+    if (roleParam === "researcher") greetingRole = "Marine Researcher";
+    if (roleParam === "learner") greetingRole = "Oceanography Student";
+    if (roleParam === "navigator") greetingRole = "Fleet Navigator";
+
     setMessages([
       {
         id: "msg_welcome",
         role: "assistant",
-        content: `### 🐬 Welcome to Project ORCA (SIH26176)
-**India's Sovereign Multi-Agent Marine Intelligence & Fuel-Optimal Navigation Engine.**
+        content: `### 🐬 Welcome, ${greetingRole} — Project ORCA (SIH26176)
+**India's Sovereign Multi-Agent Marine Intelligence & Navigation Platform.**
 
-1. Click anywhere on the **3D Bathymetry & Elevation Radar** to lock a target coordinate.
-2. Ask any fishing, boundary risk, monsoon regulation, or fuel routing inquiry below.
-3. Watch the local **Qwen 2.5 7B & BGE-M3** multi-agent swarm execute in real time.`,
+- Click anywhere on the **3D Elevation & Bathymetry Radar** to lock target coordinates.
+- Multi-scale telemetry active: **SST, Wave Spectrum, Chlorophyll Fronts, A* Vector Pathing & IMBL Geofencing**.
+- Local **Qwen 2.5 7B & BGE-M3** swarm running 100% on-premise.`,
         timestamp: new Date().toLocaleTimeString(),
       },
     ]);
-  }, []);
+  }, [roleParam]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentThoughts]);
 
-  // Map Click to Lock Target Coordinates
   const handleMapClick = (info: any) => {
     if (info && info.coordinate) {
       const [lon, lat] = info.coordinate;
@@ -209,7 +226,6 @@ export default function OrcaDashboardPage() {
     }
   };
 
-  // Reset Camera View
   const handleResetView = () => {
     setViewState({
       longitude: 70.368,
@@ -220,7 +236,6 @@ export default function OrcaDashboardPage() {
     });
   };
 
-  // Toggle 2D Flat vs 3D Perspective Pitch
   const handleTogglePerspective = () => {
     setViewState((prev) => ({
       ...prev,
@@ -229,7 +244,6 @@ export default function OrcaDashboardPage() {
     }));
   };
 
-  // Preset Scenario Inquiries
   const handlePresetClick = (query: string, coords: [number, number]) => {
     setInputMessage(query);
     setSelectedCoordinates(coords);
@@ -242,13 +256,11 @@ export default function OrcaDashboardPage() {
     });
   };
 
-  // Submit Chat Query
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const query = inputMessage.trim();
     if (!query || isStreaming) return;
 
-    // Convert [lon, lat] to [lat, lon] for backend API schema
     const targetCoords = selectedCoordinates
       ? [selectedCoordinates[1], selectedCoordinates[0]]
       : null;
@@ -279,9 +291,7 @@ export default function OrcaDashboardPage() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -307,14 +317,14 @@ export default function OrcaDashboardPage() {
                   setMessages((prev) => {
                     const existing = prev.find((m) => m.id === assistantMsgId);
                     if (existing) {
-                      return prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulatedContent } : m));
+                      return prev.map((m) => (m.id === assistantMsgId ? { ...m, content: sanitizeLlmContent(accumulatedContent) } : m));
                     } else {
                       return [
                         ...prev,
                         {
                           id: assistantMsgId,
                           role: "assistant",
-                          content: accumulatedContent,
+                          content: sanitizeLlmContent(accumulatedContent),
                           timestamp: new Date().toLocaleTimeString(),
                         },
                       ];
@@ -326,14 +336,13 @@ export default function OrcaDashboardPage() {
                   }
                 }
               } catch (parseErr) {
-                console.error("SSE JSON Parse Error", parseErr);
+                console.error("SSE Parse Error", parseErr);
               }
             }
           }
         }
       }
     } catch (err: any) {
-      console.warn("Falling back to standard chat API:", err);
       try {
         const res = await fetch(`${API_BASE}/api/v1/agent/chat`, {
           method: "POST",
@@ -346,11 +355,9 @@ export default function OrcaDashboardPage() {
         });
         const data = await res.json();
         const responsePayload = data.response || {};
-        accumulatedContent = responsePayload.markdown_advisory || "Advisory generated successfully.";
+        accumulatedContent = sanitizeLlmContent(responsePayload.markdown_advisory || "Advisory generated successfully.");
         const geojsonPayload = responsePayload.geojson_payload;
-        if (geojsonPayload) {
-          setActiveGeojson(geojsonPayload);
-        }
+        if (geojsonPayload) setActiveGeojson(geojsonPayload);
         setMessages((prev) => [
           ...prev,
           {
@@ -378,19 +385,15 @@ export default function OrcaDashboardPage() {
     }
   };
 
-  // ============================================================================
-  // DECK.GL LAYERS
-  // ============================================================================
   const layers: any[] = [];
 
-  // 1. Target Locked Cursor Glow Layer
   if (selectedCoordinates) {
     layers.push(
       new ScatterplotLayer({
         id: "selected-target-layer",
         data: [{ position: selectedCoordinates }],
         getPosition: (d: any) => d.position,
-        getFillColor: [0, 240, 255, 240], // Electric Cyan
+        getFillColor: [255, 255, 255, 240], // Pure White Indicator
         getLineColor: [255, 255, 255, 255],
         getRadius: 16000,
         stroked: true,
@@ -400,7 +403,6 @@ export default function OrcaDashboardPage() {
     );
   }
 
-  // 2. Active AI GeoJSON Layer (PFZ Points, Optimal Routes, Sanctuary Polygons)
   if (activeGeojson && activeGeojson.features) {
     layers.push(
       new GeoJsonLayer({
@@ -413,13 +415,13 @@ export default function OrcaDashboardPage() {
         lineWidthMinPixels: 4,
         getLineColor: (f: any) => {
           if (f.geometry?.type === "LineString") {
-            return [34, 197, 94, 255]; // Fuel-optimal route green
+            return [255, 255, 255, 255]; // High-contrast White / Cyan route
           }
-          return [244, 63, 94, 255]; // Border/Risk red
+          return [244, 63, 94, 255]; // Border Red
         },
         getFillColor: (f: any) => {
-          if (f.properties?.type === "origin_node") return [56, 189, 248, 255];
-          if (f.properties?.target_species) return [16, 185, 129, 220]; // PFZ Green
+          if (f.properties?.type === "origin_node") return [255, 255, 255, 255];
+          if (f.properties?.target_species) return [52, 211, 153, 220]; // PFZ Green
           return [244, 63, 94, 120];
         },
         getPointRadius: (f: any) => (f.properties?.target_species ? 14000 : 8000),
@@ -430,53 +432,61 @@ export default function OrcaDashboardPage() {
 
   if (!mounted) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#060913] text-sky-400 font-mono">
+      <div className="flex h-screen w-screen items-center justify-center bg-black text-white font-mono">
         <Compass className="h-8 w-8 animate-spin" />
         <span className="ml-3">Loading Project ORCA 3D Marine Radar...</span>
       </div>
     );
   }
 
-  // Generate the active MapLibre Style Specification
   const currentMapStyle = buildMapStyle(activeMapMode, enable3DTerrain, terrainExaggeration);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#060913] text-slate-100 font-sans">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-white font-sans">
       {/* ===================================================================== */}
-      {/* LEFT PANEL: THE CHAT & MULTI-AGENT ADVISORY INTERFACE (30% Width)     */}
+      {/* RETRACTABLE LEFT PANEL: CHAT & MULTI-AGENT ADVISORY INTERFACE        */}
       {/* ===================================================================== */}
-      <div className="flex w-full md:w-[380px] lg:w-[440px] flex-col border-r border-slate-800/80 bg-[#090d16]/95 backdrop-blur-md z-10">
+      <div
+        className={`relative z-20 flex flex-col border-r border-white/10 bg-zinc-950/95 backdrop-blur-2xl transition-all duration-300 ${
+          isChatOpen ? "w-full md:w-[400px] lg:w-[450px]" : "w-0 overflow-hidden border-r-0"
+        }`}
+      >
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3 bg-[#0d1424]">
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 bg-zinc-900/60">
           <div className="flex items-center gap-2.5">
             <Link
               href="/"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-sky-400 transition"
+              className="p-1.5 rounded-lg bg-black border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
               title="Return to Mission Overview"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-400 shadow-md shadow-sky-950">
-              <Compass className="h-5 w-5 animate-spin-slow" />
+            <div className="p-1.5 rounded-lg bg-white text-black font-bold">
+              <Compass className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-bold tracking-wide text-sky-400">PROJECT ORCA</h1>
-                <span className="text-[9px] uppercase font-mono px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30">SIH26176</span>
+                <h1 className="text-sm font-bold tracking-wide text-white">PROJECT ORCA</h1>
+                <span className="text-[9px] uppercase font-mono px-1 py-0.2 rounded bg-white/10 text-zinc-300 border border-white/20">
+                  SIH26176
+                </span>
               </div>
-              <p className="text-[10px] text-slate-400">Multi-Agent Marine Swarm</p>
+              <p className="text-[10px] text-zinc-400 font-mono">Multi-Agent Marine Swarm</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-[10px] font-bold text-emerald-400 tracking-wider">AIR-GAPPED</span>
-          </div>
+          <button
+            onClick={() => setIsChatOpen(false)}
+            className="p-1.5 rounded-lg bg-black border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
+            title="Collapse Panel for Fullscreen 3D View"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Preset Query Quick Actions */}
-        <div className="border-b border-slate-800/60 p-2.5 bg-[#080d1a] space-y-1.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
+        <div className="border-b border-white/10 p-2.5 bg-black/60 space-y-1.5">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-1">
             ⚡ Quick Tactical Scenarios
           </div>
           <div className="grid grid-cols-2 gap-1.5">
@@ -487,10 +497,13 @@ export default function OrcaDashboardPage() {
                   [70.368, 20.902]
                 )
               }
-              className="flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-950/40 px-2.5 py-1.5 text-left text-[11px] text-sky-300 hover:bg-sky-900/60 transition cursor-pointer"
+              className="p-2 rounded-xl border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-left text-[11px] text-zinc-200 transition cursor-pointer"
             >
-              <Fish className="h-3.5 w-3.5 shrink-0 text-sky-400" />
-              <span className="truncate">Veraval Tuna PFZ</span>
+              <div className="font-bold flex items-center gap-1">
+                <Fish className="h-3 w-3 text-white" />
+                <span>Veraval Tuna</span>
+              </div>
+              <span className="text-[9px] text-zinc-500 truncate block">PFZ Thermal Front</span>
             </button>
 
             <button
@@ -500,10 +513,13 @@ export default function OrcaDashboardPage() {
                   [79.315, 9.285]
                 )
               }
-              className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-950/40 px-2.5 py-1.5 text-left text-[11px] text-rose-300 hover:bg-rose-900/60 transition cursor-pointer"
+              className="p-2 rounded-xl border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-left text-[11px] text-zinc-200 transition cursor-pointer"
             >
-              <Shield className="h-3.5 w-3.5 shrink-0 text-rose-400" />
-              <span className="truncate">IMBL Border Alert</span>
+              <div className="font-bold flex items-center gap-1">
+                <Shield className="h-3 w-3 text-rose-400" />
+                <span>IMBL Alert</span>
+              </div>
+              <span className="text-[9px] text-zinc-500 truncate block">Border Standoff</span>
             </button>
           </div>
         </div>
@@ -516,20 +532,20 @@ export default function OrcaDashboardPage() {
               className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role !== "user" && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-900 border border-white/10 text-white text-xs">
                   <Bot className="h-4 w-4" />
                 </div>
               )}
 
               <div
-                className={`max-w-[88%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-sky-600 text-white rounded-br-none shadow-md shadow-sky-900/30"
-                    : "bg-[#0f172a]/95 text-slate-200 border border-slate-800/90 rounded-bl-none shadow-md"
+                    ? "bg-white text-black rounded-br-none font-medium shadow-md shadow-white/10"
+                    : "bg-zinc-900/90 text-zinc-200 border border-white/10 rounded-bl-none shadow-md"
                 }`}
               >
                 {msg.role === "user" ? (
-                  <div className="whitespace-pre-wrap font-medium">{msg.content}</div>
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
                 ) : (
                   <div className="orca-markdown">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -537,27 +553,26 @@ export default function OrcaDashboardPage() {
                     </ReactMarkdown>
                   </div>
                 )}
-                <div className="mt-1.5 text-[9px] text-slate-400/80 text-right">{msg.timestamp}</div>
+                <div className="mt-1.5 text-[9px] text-zinc-500 text-right">{msg.timestamp}</div>
               </div>
 
               {msg.role === "user" && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-700 text-slate-300 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300 text-xs">
                   <User className="h-4 w-4" />
                 </div>
               )}
             </div>
           ))}
 
-          {/* Real-time Thought Process Streaming Badge */}
           {isStreaming && (
-            <div className="flex flex-col gap-1.5 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3 text-xs text-sky-300">
-              <div className="flex items-center gap-2 font-semibold text-sky-400">
+            <div className="p-3 rounded-xl border border-white/15 bg-zinc-900/60 text-xs text-zinc-300 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-white">
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 <span>Multi-Agent Thought Stream</span>
               </div>
-              <div className="space-y-1 pl-5 border-l border-sky-500/20">
+              <div className="space-y-1 pl-4 border-l border-white/20">
                 {currentThoughts.map((t, idx) => (
-                  <p key={idx} className="text-[11px] font-mono text-slate-300 leading-tight">
+                  <p key={idx} className="text-[11px] font-mono text-zinc-400">
                     {t}
                   </p>
                 ))}
@@ -568,20 +583,17 @@ export default function OrcaDashboardPage() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Input Bar & Coordinate Badge */}
-        <div className="border-t border-slate-800/80 bg-[#0c1220] p-3">
-          {/* Target Locked Pill */}
+        {/* Input Bar */}
+        <div className="border-t border-white/10 bg-black p-3">
           {selectedCoordinates && (
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-cyan-500/40 bg-cyan-950/40 px-2.5 py-1 text-[11px] text-cyan-300 shadow-sm">
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-white/20 bg-zinc-900/80 px-2.5 py-1 text-[11px] text-white">
               <div className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-cyan-400 animate-bounce" />
-                <span>
-                  Target Locked: <strong>[{selectedCoordinates[1]}, {selectedCoordinates[0]}]</strong>
-                </span>
+                <MapPin className="h-3.5 w-3.5 text-white animate-bounce" />
+                <span>Target Locked: <strong>[{selectedCoordinates[1]}, {selectedCoordinates[0]}]</strong></span>
               </div>
               <button
                 onClick={() => setSelectedCoordinates(null)}
-                className="text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                className="text-zinc-500 hover:text-rose-400 transition cursor-pointer"
                 title="Clear locked coordinate"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -600,12 +612,12 @@ export default function OrcaDashboardPage() {
                   : "Click on map to lock coordinates or type query..."
               }
               disabled={isStreaming}
-              className="flex-1 rounded-lg border border-slate-700/80 bg-[#050811] px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="flex-1 rounded-xl border border-white/15 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-white focus:outline-none"
             />
             <button
               type="submit"
               disabled={!inputMessage.trim() || isStreaming}
-              className="flex items-center justify-center rounded-lg bg-sky-600 px-3.5 py-2 text-white hover:bg-sky-500 disabled:opacity-40 transition font-medium shadow-md shadow-sky-900/30 cursor-pointer"
+              className="p-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black transition disabled:opacity-40 font-medium cursor-pointer shadow-lg shadow-white/10"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -613,34 +625,37 @@ export default function OrcaDashboardPage() {
         </div>
       </div>
 
-      {/* ===================================================================== */}
-      {/* RIGHT PANEL: THE INTERACTIVE DECK.GL 2.5D / 3D MAP (70% Width)        */}
-      {/* ===================================================================== */}
-      <div className="relative flex-1 h-full w-full bg-[#060913]">
-        {/* Floating Top Controls */}
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-2.5">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#0d1424]/90 px-3.5 py-2 shadow-xl backdrop-blur-md">
-            <Waves className="h-4 w-4 text-sky-400" />
-            <span className="text-xs font-bold text-slate-200">
-              Indian Ocean 3D Radar
-            </span>
-          </div>
+      {/* Floating Toggle when Left Panel is Closed */}
+      {!isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="absolute top-4 left-4 z-30 flex items-center gap-2 p-2.5 rounded-xl bg-zinc-950/90 border border-white/20 text-white shadow-2xl backdrop-blur-md transition cursor-pointer hover:bg-zinc-900"
+          title="Expand Tactical Advisory Panel"
+        >
+          <PanelLeftOpen className="h-5 w-5" />
+          <span className="text-xs font-bold font-mono">TACTICAL PANEL</span>
+        </button>
+      )}
 
+      {/* ===================================================================== */}
+      {/* 3D RADAR MAP CANVAS (FULLSCREEN / RESPONSIVE)                          */}
+      {/* ===================================================================== */}
+      <div className="relative flex-1 h-full w-full bg-black">
+        {/* Floating Top Controls */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2.5">
           {selectedCoordinates && (
-            <div className="flex items-center gap-2 rounded-xl border border-cyan-500/50 bg-cyan-950/80 px-3 py-2 shadow-xl backdrop-blur-md text-cyan-300 text-xs font-mono font-semibold">
-              <MapPin className="h-4 w-4 text-cyan-400" />
-              <span>
-                {selectedCoordinates[1]}°N, {selectedCoordinates[0]}°E
-              </span>
+            <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-zinc-950/90 px-3 py-1.5 shadow-xl backdrop-blur-md text-white text-xs font-mono font-semibold">
+              <MapPin className="h-4 w-4" />
+              <span>{selectedCoordinates[1]}°N, {selectedCoordinates[0]}°E</span>
             </div>
           )}
 
           {/* Style Mode Switcher */}
-          <div className="flex rounded-xl border border-slate-800 bg-[#0d1424]/90 p-1 shadow-xl backdrop-blur-md">
+          <div className="flex rounded-xl border border-white/15 bg-zinc-950/90 p-1 shadow-xl backdrop-blur-md">
             <button
               onClick={() => setActiveMapMode("dark")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                activeMapMode === "dark" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                activeMapMode === "dark" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
               }`}
             >
               <Navigation className="h-3 w-3" />
@@ -649,16 +664,16 @@ export default function OrcaDashboardPage() {
             <button
               onClick={() => setActiveMapMode("voyager")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                activeMapMode === "voyager" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                activeMapMode === "voyager" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
               }`}
             >
               <Compass className="h-3 w-3" />
-              <span>Voyager Chart</span>
+              <span>Voyager</span>
             </button>
             <button
               onClick={() => setActiveMapMode("satellite")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                activeMapMode === "satellite" ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                activeMapMode === "satellite" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
               }`}
             >
               <Globe className="h-3 w-3" />
@@ -669,19 +684,18 @@ export default function OrcaDashboardPage() {
           {/* 3D Terrain Toggle */}
           <button
             onClick={() => setEnable3DTerrain(!enable3DTerrain)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-800 bg-[#0d1424]/90 text-[11px] font-semibold shadow-xl backdrop-blur-md transition cursor-pointer ${
-              enable3DTerrain ? "text-cyan-300 border-cyan-500/50 bg-cyan-950/60" : "text-slate-400 hover:text-slate-200"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-950/90 text-[11px] font-semibold shadow-xl backdrop-blur-md transition cursor-pointer ${
+              enable3DTerrain ? "text-white border-white/40 bg-zinc-900" : "text-zinc-400 hover:text-white"
             }`}
-            title="Toggle 3D Terrain Elevation"
           >
-            <Mountain className="h-3.5 w-3.5 text-cyan-400" />
+            <Mountain className="h-3.5 w-3.5" />
             <span>3D Terrain {enable3DTerrain ? "ON" : "OFF"}</span>
           </button>
 
           {/* 2D / 3D Perspective Tilt Switcher */}
           <button
             onClick={handleTogglePerspective}
-            className="flex items-center justify-center h-8 w-8 rounded-xl border border-slate-800 bg-[#0d1424]/90 text-slate-400 hover:text-sky-400 shadow-xl backdrop-blur-md transition cursor-pointer"
+            className="flex items-center justify-center h-8 w-8 rounded-xl border border-white/15 bg-zinc-950/90 text-zinc-400 hover:text-white shadow-xl backdrop-blur-md transition cursor-pointer"
             title="Toggle 2D Flat / 3D Perspective Tilt"
           >
             <Eye className="h-4 w-4" />
@@ -690,25 +704,25 @@ export default function OrcaDashboardPage() {
           {/* Reset Camera */}
           <button
             onClick={handleResetView}
-            className="flex items-center justify-center h-8 w-8 rounded-xl border border-slate-800 bg-[#0d1424]/90 text-slate-400 hover:text-sky-400 shadow-xl backdrop-blur-md transition cursor-pointer"
+            className="flex items-center justify-center h-8 w-8 rounded-xl border border-white/15 bg-zinc-950/90 text-zinc-400 hover:text-white shadow-xl backdrop-blur-md transition cursor-pointer"
             title="Reset View"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Legend Card */}
-        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-1.5 rounded-xl border border-slate-800 bg-[#0d1424]/90 p-3.5 shadow-2xl backdrop-blur-md text-[11px] text-slate-300">
-          <div className="font-bold text-sky-400 flex items-center gap-1.5 mb-1">
+        {/* Legend */}
+        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-1.5 rounded-2xl border border-white/10 bg-zinc-950/90 p-3.5 shadow-2xl backdrop-blur-md text-[11px] text-zinc-300">
+          <div className="font-bold text-white flex items-center gap-1.5 mb-1">
             <Layers className="h-3.5 w-3.5" />
             <span>Map Layers Legend</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-950"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-950"></span>
             <span>Potential Fishing Zones (PFZ)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-5 rounded bg-emerald-400"></span>
+            <span className="h-1.5 w-5 rounded bg-white"></span>
             <span>Fuel-Optimal Current Route</span>
           </div>
           <div className="flex items-center gap-2">
@@ -716,12 +730,11 @@ export default function OrcaDashboardPage() {
             <span>IMBL Sovereign Border (Red)</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 ring-2 ring-white"></span>
+            <span className="h-2.5 w-2.5 rounded-full bg-white ring-2 ring-zinc-700"></span>
             <span>Target Mesh Lock</span>
           </div>
         </div>
 
-        {/* DeckGL & MapLibre Canvas with 3D Terrain */}
         <DeckGL
           viewState={viewState}
           onViewStateChange={(e: any) => setViewState(e.viewState)}
@@ -745,5 +758,20 @@ export default function OrcaDashboardPage() {
         </DeckGL>
       </div>
     </div>
+  );
+}
+
+export default function OrcaDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-screen items-center justify-center bg-black text-white font-mono">
+          <Compass className="h-8 w-8 animate-spin" />
+          <span className="ml-3">Loading Project ORCA Tactical Deck...</span>
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }
