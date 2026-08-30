@@ -24,7 +24,10 @@ import {
   Check,
   Info,
   X,
+  Network,
+  GitBranch,
 } from "lucide-react";
+import AgentSynapseGraph from "@/components/AgentSynapseGraph";
 
 interface AgentNode {
   id: string;
@@ -207,183 +210,181 @@ WHERE state = 'Gujarat' ORDER BY similarity DESC LIMIT 3;
 
 export default function AgentMeshView() {
   const [selectedNode, setSelectedNode] = useState<AgentNode>(NODES_DATA[0]);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [activeStep, setActiveStep] = useState<number>(5);
+  const [viewMode, setViewMode] = useState<"synapse" | "dag">("synapse");
 
-  const handleRunSimulation = () => {
-    setIsSimulating(true);
-    setActiveStep(0);
-
-    let step = 0;
-    const interval = setInterval(() => {
-      step++;
-      if (step < 6) {
-        setActiveStep(step);
-        setSelectedNode(NODES_DATA[step]);
-      } else {
-        clearInterval(interval);
-        setIsSimulating(false);
-        setActiveStep(5);
-      }
-    }, 900);
+  const handleSynapseNodeSelect = (nodeId: string, agentRef?: string) => {
+    if (agentRef) {
+      const match = NODES_DATA.find((n) => n.id === agentRef);
+      if (match) setSelectedNode(match);
+    }
   };
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-black text-white">
-      {/* LEFT: VISUAL EXECUTION GRAPH (DAG) */}
-      <div className="flex-1 flex flex-col h-full border-r border-white/10 overflow-y-auto p-6 space-y-6">
-        {/* Header & Controls */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+      {/* LEFT: GRAPH CANVAS (SYNAPSE OR DAG) */}
+      <div className="flex-1 flex flex-col h-full border-r border-white/10 overflow-y-auto p-4 md:p-6 space-y-4">
+        {/* Header with View Mode Switcher */}
+        <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-1">
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-0.5">
               <Activity className="h-3.5 w-3.5 text-emerald-400" />
               <span>Multi-Agent Swarm Inspector</span>
             </div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Live LangGraph Execution DAG & State Machine
+            <h3 className="text-lg md:text-xl font-bold text-white tracking-tight">
+              Agentic Reasoning Mesh & Execution Architecture
             </h3>
           </div>
 
-          <button
-            onClick={handleRunSimulation}
-            disabled={isSimulating}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-black font-bold text-xs hover:bg-zinc-200 transition cursor-pointer shadow-lg shadow-white/10 disabled:opacity-50"
-          >
-            {isSimulating ? (
-              <>
-                <RotateCcw className="h-3.5 w-3.5 animate-spin" />
-                <span>Simulating Graph Dispatch...</span>
-              </>
-            ) : (
-              <>
-                <Play className="h-3.5 w-3.5 fill-black" />
-                <span>Simulate Turn Execution</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Visual DAG Node Flow */}
-        <div className="space-y-4">
-          {/* Layer 1: Ingress & Supervisor */}
-          <div className="flex justify-center">
-            <div
-              onClick={() => setSelectedNode(NODES_DATA[0])}
-              className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
-                selectedNode.id === "supervisor"
-                  ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
-                  : "bg-zinc-950/80 border-white/15 hover:border-white/40"
+          {/* View Mode Toggle Switch */}
+          <div className="flex rounded-xl border border-white/15 bg-zinc-950 p-1 shadow-xl">
+            <button
+              onClick={() => setViewMode("synapse")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                viewMode === "synapse" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-white text-black font-bold">
-                    <Cpu className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white">Agent 1: Supervisor Orchestrator</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
-                        LLM Planner
-                      </span>
+              <Network className="h-3.5 w-3.5" />
+              <span>Synaptic Neural Flow</span>
+            </button>
+            <button
+              onClick={() => setViewMode("dag")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                viewMode === "dag" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              <span>Modular Swarm DAG</span>
+            </button>
+          </div>
+        </div>
+
+        {/* VIEW 1: SYNAPTIC NEURAL FLOW GRAPH */}
+        {viewMode === "synapse" && (
+          <div className="flex-1 w-full min-h-[540px]">
+            <AgentSynapseGraph
+              onNodeSelect={handleSynapseNodeSelect}
+              selectedAgentRef={selectedNode.id}
+            />
+          </div>
+        )}
+
+        {/* VIEW 2: MODULAR ARCHITECTURE DAG */}
+        {viewMode === "dag" && (
+          <div className="space-y-4">
+            {/* Layer 1: Ingress & Supervisor */}
+            <div className="flex justify-center">
+              <div
+                onClick={() => setSelectedNode(NODES_DATA[0])}
+                className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
+                  selectedNode.id === "supervisor"
+                    ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
+                    : "bg-zinc-950/80 border-white/15 hover:border-white/40"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-white text-black font-bold">
+                      <Cpu className="h-5 w-5" />
                     </div>
-                    <p className="text-[11px] text-zinc-400">Zero-Shot Intent Extraction & Pydantic Task Decomposition</p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">Agent 1: Supervisor Orchestrator</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
+                          LLM Planner
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400">Zero-Shot Intent Extraction & Pydantic Task Decomposition</p>
+                    </div>
                   </div>
+                  <span className="text-emerald-400 font-mono text-[10px] font-bold">● 240ms</span>
                 </div>
-                <div className="text-right font-mono text-[10px] text-zinc-400">
-                  <span className="text-emerald-400 font-bold">● 240ms</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center text-xs font-mono text-zinc-600">
+              <span>↓ Parallel Async Fan-Out Dispatch (4 Specialized Workers)</span>
+            </div>
+
+            {/* Layer 2: 4 Parallel Workers */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {NODES_DATA.slice(1, 5).map((node) => {
+                const Icon = node.icon;
+                const isSelected = selectedNode.id === node.id;
+                return (
+                  <div
+                    key={node.id}
+                    onClick={() => setSelectedNode(node)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-zinc-900 border-white shadow-lg shadow-white/10"
+                        : "bg-zinc-950/70 border-white/15 hover:border-white/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-white">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-white">{node.name}</h4>
+                          <span className="text-[9px] font-mono text-zinc-400">{node.category}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">{node.latencyMs}ms</span>
+                    </div>
+                    <p className="mt-2 text-[10px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {node.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-center text-xs font-mono text-zinc-600">
+              <span>↓ State Aggregation & CoT Cross-Correlation</span>
+            </div>
+
+            {/* Layer 3: Synthesizer */}
+            <div className="flex justify-center">
+              <div
+                onClick={() => setSelectedNode(NODES_DATA[5])}
+                className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
+                  selectedNode.id === "synthesizer"
+                    ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
+                    : "bg-zinc-950/80 border-white/15 hover:border-white/40"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-white text-black font-bold">
+                      <FileCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">Agent 6: Multilingual Synthesizer</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
+                          Synthesis + DeckGL
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400">Reconciliation, Indic Regional Translation & GeoJSON Layer Dispatch</p>
+                    </div>
+                  </div>
+                  <span className="text-emerald-400 font-mono text-[10px] font-bold">● 510ms</span>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Connection Vector Downwards */}
-          <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
-            <span>↓ Parallel Async Fan-Out Dispatch (4 Specialized Workers)</span>
-          </div>
-
-          {/* Layer 2: 4 Parallel Workers */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {NODES_DATA.slice(1, 5).map((node, idx) => {
-              const Icon = node.icon;
-              const isSelected = selectedNode.id === node.id;
-              return (
-                <div
-                  key={node.id}
-                  onClick={() => setSelectedNode(node)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-zinc-900 border-white shadow-lg shadow-white/10"
-                      : "bg-zinc-950/70 border-white/15 hover:border-white/30"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-white">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-white">{node.name}</h4>
-                        <span className="text-[9px] font-mono text-zinc-400">{node.category}</span>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">{node.latencyMs}ms</span>
-                  </div>
-                  <p className="mt-2 text-[10px] text-zinc-400 line-clamp-2 leading-relaxed">
-                    {node.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Connection Vector Downwards */}
-          <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
-            <span>↓ State Aggregation & CoT Cross-Correlation</span>
-          </div>
-
-          {/* Layer 3: Synthesizer */}
-          <div className="flex justify-center">
-            <div
-              onClick={() => setSelectedNode(NODES_DATA[5])}
-              className={`w-full max-w-xl p-4 rounded-2xl border transition-all cursor-pointer ${
-                selectedNode.id === "synthesizer"
-                  ? "bg-zinc-900 border-white shadow-xl shadow-white/10"
-                  : "bg-zinc-950/80 border-white/15 hover:border-white/40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-white text-black font-bold">
-                    <FileCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white">Agent 6: Multilingual Synthesizer</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
-                        Synthesis + DeckGL
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400">Reconciliation, Indic Regional Translation & GeoJSON Layer Dispatch</p>
-                  </div>
-                </div>
-                <div className="text-right font-mono text-[10px] text-zinc-400">
-                  <span className="text-emerald-400 font-bold">● 510ms</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Latency Waterfall Bar */}
-        <div className="p-4 rounded-2xl border border-white/10 bg-zinc-950/60 space-y-2.5">
+        <div className="p-3.5 rounded-2xl border border-white/10 bg-zinc-950/60 space-y-2">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
             <span className="font-bold text-white flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> End-to-End Latency Waterfall
             </span>
             <span className="text-emerald-400 font-bold">Total Turn: 832ms</span>
           </div>
-          <div className="flex h-3 w-full rounded-full overflow-hidden bg-zinc-900 border border-white/10">
+          <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-zinc-900 border border-white/10">
             <div style={{ width: "29%" }} className="bg-sky-400" title="Supervisor (240ms)" />
             <div style={{ width: "2%" }} className="bg-emerald-400" title="Ocean Analytics (16ms)" />
             <div style={{ width: "1%" }} className="bg-rose-400" title="Risk Geofencing (8ms)" />
@@ -391,7 +392,7 @@ export default function AgentMeshView() {
             <div style={{ width: "4%" }} className="bg-purple-400" title="Policy RAG (34ms)" />
             <div style={{ width: "61%" }} className="bg-white" title="Synthesizer (510ms)" />
           </div>
-          <div className="flex justify-between text-[9px] font-mono text-zinc-500">
+          <div className="flex justify-between text-[8px] font-mono text-zinc-500">
             <span>Supervisor 29%</span>
             <span>Deterministic Workers 10% (Parallel)</span>
             <span>Synthesizer 61%</span>
@@ -400,8 +401,8 @@ export default function AgentMeshView() {
       </div>
 
       {/* RIGHT: NODE DEEP-DIVE INSPECTION DRAWER */}
-      <div className="w-full md:w-[420px] lg:w-[480px] h-full flex flex-col bg-zinc-950 p-6 overflow-y-auto space-y-6">
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+      <div className="w-full md:w-[410px] lg:w-[460px] h-full flex flex-col bg-zinc-950 p-6 overflow-y-auto space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-white text-black font-bold">
               {React.createElement(selectedNode.icon, { className: "h-5 w-5" })}
@@ -416,10 +417,10 @@ export default function AgentMeshView() {
           </span>
         </div>
 
-        {/* Math / Physics Formula if applicable */}
+        {/* Mathematical Formulation */}
         {selectedNode.formula && (
-          <div className="p-3.5 rounded-xl border border-white/10 bg-black/60 space-y-1">
-            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Mathematical Formulation</span>
+          <div className="p-3 rounded-xl border border-white/10 bg-black/60 space-y-1">
+            <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest font-bold">Mathematical Formulation</span>
             <div className="text-xs font-mono text-white p-2 rounded bg-zinc-900 overflow-x-auto">
               {selectedNode.formula}
             </div>
@@ -427,37 +428,37 @@ export default function AgentMeshView() {
         )}
 
         {/* Input Payload Schema */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
             <span className="font-semibold text-white flex items-center gap-1.5">
               <Code2 className="h-3.5 w-3.5 text-sky-400" /> Input Payload (Pydantic Schema)
             </span>
           </div>
-          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-48 leading-relaxed">
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-40 leading-relaxed">
             {JSON.stringify(selectedNode.inputPayload, null, 2)}
           </pre>
         </div>
 
         {/* Tool Execution Logs */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
             <span className="font-semibold text-white flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5 text-amber-400" /> Native Tool Execution Logs
             </span>
           </div>
-          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-44 leading-relaxed whitespace-pre-wrap">
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-36 leading-relaxed whitespace-pre-wrap">
             {selectedNode.toolQueryLog}
           </pre>
         </div>
 
         {/* Output Payload Schema */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
             <span className="font-semibold text-white flex items-center gap-1.5">
               <Database className="h-3.5 w-3.5 text-emerald-400" /> Output State Dispatched
             </span>
           </div>
-          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-48 leading-relaxed">
+          <pre className="p-3 rounded-xl bg-black border border-white/10 text-[11px] font-mono text-zinc-300 overflow-x-auto max-h-40 leading-relaxed">
             {JSON.stringify(selectedNode.outputPayload, null, 2)}
           </pre>
         </div>
