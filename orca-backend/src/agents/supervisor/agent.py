@@ -69,8 +69,14 @@ async def supervisor_agent_node(state: AgentState) -> dict[str, Any]:
 
     # 2. Deterministic Fallback if LLM daemon is offline
     if plan is None:
-        text_lower = user_query.lower()
+        text_lower = user_query.lower().strip()
         
+        # Check for conversational greetings / help
+        is_greeting = any(
+            text_lower == w or text_lower.startswith(w + " ") or text_lower.endswith(" " + w)
+            for w in ["hi", "hello", "hey", "namaste", "vanakkam", "halo", "help", "who are you", "what can you do", "morning", "good morning", "good evening"]
+        )
+
         # Resolve coordinates from text
         origin_coords = [20.902, 70.368] # Default: Veraval
         for name, coords in GAZETTEER.items():
@@ -86,25 +92,45 @@ async def supervisor_agent_node(state: AgentState) -> dict[str, Any]:
             target_coords = [round(origin_coords[0] - 0.25, 3), round(origin_coords[1] - 0.25, 3)]
 
         tasks = []
-        if any(w in text_lower for w in ["fish", "pfz", "tuna", "mackerel", "catch", "ocean", "sea", "temp", "chlorophyll"]):
+        if any(w in text_lower for w in ["fish", "pfz", "tuna", "mackerel", "catch", "chlorophyll", "species", "feeding"]):
             tasks.append("ocean_analytics")
-        if any(w in text_lower for w in ["border", "imbl", "safe", "danger", "risk", "warning", "sri lanka", "pakistan"]):
+        if any(w in text_lower for w in ["weather", "sea", "wave", "swh", "temp", "sst", "wind", "cyclone", "storm"]):
+            if "ocean_analytics" not in tasks:
+                tasks.append("ocean_analytics")
+        if any(w in text_lower for w in ["border", "imbl", "safe", "danger", "risk", "warning", "sri lanka", "pakistan", "mpa", "sanctuary"]):
             tasks.append("risk_geofencing")
-        if any(w in text_lower for w in ["route", "path", "fuel", "navigate", "distance", "heading", "optimal"]):
+        if any(w in text_lower for w in ["route", "path", "fuel", "navigate", "distance", "heading", "optimal", "transit"]):
             tasks.append("navigation")
-        if any(w in text_lower for w in ["ban", "rule", "law", "trawl", "monsoon", "policy", "permit", "license"]):
+        if any(w in text_lower for w in ["ban", "rule", "law", "trawl", "monsoon", "policy", "permit", "license", "vhf", "1554"]):
             tasks.append("policy_rag")
 
-        if not tasks:
+        # If it's a greeting and no explicit maritime task was requested, don't trigger workers
+        if is_greeting and not tasks:
+            plan = SubTaskPlan(
+                intent_summary="Conversational greeting & capabilities inquiry",
+                tasks_to_trigger=[],
+                origin_coordinates=origin_coords,
+                target_coordinates=target_coords,
+                reasoning="Conversational interaction without domain calculation requirements."
+            )
+        elif not tasks:
+            # Fallback for general sector inquiries
             tasks = ["ocean_analytics", "risk_geofencing", "policy_rag"]
-
-        plan = SubTaskPlan(
-            intent_summary=f"Maritime query for {user_query[:60]}",
-            tasks_to_trigger=tasks,
-            origin_coordinates=origin_coords,
-            target_coordinates=target_coords,
-            reasoning="Deterministic gazetteer & keyword routing."
-        )
+            plan = SubTaskPlan(
+                intent_summary=f"General maritime sector evaluation for {user_query[:60]}",
+                tasks_to_trigger=tasks,
+                origin_coordinates=origin_coords,
+                target_coordinates=target_coords,
+                reasoning="Broad sector feasibility check."
+            )
+        else:
+            plan = SubTaskPlan(
+                intent_summary=f"Domain query for {user_query[:60]}",
+                tasks_to_trigger=tasks,
+                origin_coordinates=origin_coords,
+                target_coordinates=target_coords,
+                reasoning="Targeted domain routing."
+            )
 
     return {
         "user_query": user_query,
