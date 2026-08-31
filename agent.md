@@ -33,13 +33,13 @@ Using an LLM for geometric calculations or raw array parsing causes hallucinatio
                      ┌──────────────────────────────┐
                      │  Agent 1: Supervisor (LLM)   │
                      └──────┬───────────────┬───────┘
-                            │ (Parallel)    │
+                            │ (Parallel)    │                 goa 15 km fishes information
             ┌───────────────┴────────┐      └────────────────────────┐
             ▼                        ▼                               ▼
   ┌─────────────────────┐ ┌─────────────────────────┐ ┌────────────────────────┐
-  │ Agent 2: Analytics  │ │ Agent 3: Risk & Geo     │ │ Agent 4: Policy RAG    │
+  │ Agent 2: Analytics  │ │ Agent 3: Risk & Geo     │ │ Agent 4: Policy RAG    │ Retrival argumented generation
   │ (Pure Python/NetCDF)│ │ (Pure PostGIS / SQL)    │ │ (Vector Search + LLM)  │
-  └─────────┬───────────┘ └──────────┬──────────────┘ └──────────┬─────────────┘
+  └─────────┬───────────┘ └──────────┬──────────────┘ └──────────┬─────────────┘godaddy ya google
             │                        │                           │
             └────────────────────────┼───────────────────────────┘
                                      ▼
