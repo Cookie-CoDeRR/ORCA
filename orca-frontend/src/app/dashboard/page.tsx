@@ -64,6 +64,7 @@ import {
   tickSimVessels,
   Vessel,
   VesselType,
+  computeClientColregs,
 } from "@/lib/aisStream";
 
 // ─── Constants & Authentic Geographic Data ─────────────────────────────────────
@@ -79,12 +80,13 @@ const INDIA_PORTS: { name: string; pos: [number, number] }[] = [
   { name: "Mumbai",    pos: [72.83, 18.92] },
   { name: "Goa",       pos: [73.80, 15.40] },
   { name: "Mangalore", pos: [74.85, 12.87] },
-  { name: "Kochi",     pos: [76.26, 9.93]  },
-  { name: "Tuticorin", pos: [78.15, 8.80]  },
-  { name: "Chennai",   pos: [80.28, 13.08] },
-  { name: "Vizag",     pos: [83.22, 17.69] },
-  { name: "Paradip",   pos: [86.69, 20.26] },
-  { name: "Kolkata",   pos: [88.37, 22.56] },
+  { name: "Kochi",     pos: [76.26, 9.93] },
+  { name: "Tuticorin", pos: [78.13, 8.76] },
+  { name: "Chennai",   pos: [80.27, 13.08] },
+  { name: "Vizag",     pos: [83.21, 17.68] },
+  { name: "Paradip",   pos: [86.60, 20.26] },
+  { name: "Kolkata",   pos: [88.36, 22.57] },
+  { name: "Port Blair", pos: [92.74, 11.62] },
 ];
 
 // ── REALISTIC WATER-FOLLOWING COASTAL SHIPPING CORRIDORS (No land crossing) ──
@@ -246,33 +248,81 @@ function sanitizeLlmContent(text: string): string {
   return text ? text.replace(/\*\*\*/g, "**").trim() : "";
 }
 
-function VesselTooltip({ vessel, onClose }: { vessel: Vessel; onClose: () => void }) {
+function VesselTooltip({
+  vessel,
+  onClose,
+  ownShipCoords,
+}: {
+  vessel: Vessel;
+  onClose: () => void;
+  ownShipCoords: [number, number] | null;
+}) {
   const typeLabel: Record<VesselType, string> = {
     cargo: "Cargo Vessel",
     tanker: "Oil/Gas Tanker",
     fishing: "Fishing Vessel",
-    military: "Naval / Military",
+    military: "Naval / Patrol",
     passenger: "Passenger Ferry",
     sailing: "Sailing Vessel",
     tug: "Tugboat",
     unknown: "Unknown Vessel",
   };
 
-  const color = VESSEL_COLORS[vessel.type];
+  const colregs = ownShipCoords
+    ? computeClientColregs(ownShipCoords[1], ownShipCoords[0], 10.0, 0.0, vessel)
+    : null;
+
+  const isCritical =
+    vessel.risk_level === "CRITICAL_RISK" ||
+    (colregs && colregs.risk_level === "CRITICAL_RISK");
+  const isCaution =
+    vessel.risk_level === "CAUTION" ||
+    (colregs && colregs.risk_level === "CAUTION");
+
+  const color = isCritical
+    ? [239, 68, 68]
+    : isCaution
+    ? [245, 158, 11]
+    : VESSEL_COLORS[vessel.type] || [200, 200, 200];
   const cssColor = `rgb(${color[0]},${color[1]},${color[2]})`;
 
   return (
-    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-72 rounded-2xl border border-white/15 bg-zinc-950/98 shadow-2xl backdrop-blur-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-80 rounded-2xl border border-white/20 bg-zinc-950/98 shadow-2xl backdrop-blur-2xl overflow-hidden font-mono">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/60">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cssColor }} />
-          <span className="text-xs font-bold text-white truncate">{vessel.name || "Unknown"}</span>
+          <span
+            className={`h-3 w-3 rounded-full ${isCritical ? "animate-ping" : ""}`}
+            style={{ backgroundColor: cssColor }}
+          />
+          <span className="text-xs font-bold text-white truncate">
+            {vessel.name || "Unknown Vessel"}
+          </span>
         </div>
         <button onClick={onClose} className="text-zinc-400 hover:text-white cursor-pointer">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+
+      {/* Collision Risk Indicator Bar */}
+      {(isCritical || isCaution) && (
+        <div
+          className={`px-4 py-2 border-b flex items-center justify-between text-[10px] font-bold ${
+            isCritical
+              ? "bg-rose-950/80 border-rose-500/40 text-rose-300"
+              : "bg-amber-950/80 border-amber-500/40 text-amber-300"
+          }`}
+        >
+          <div className="flex items-center gap-1.5">
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <span>{isCritical ? "CRITICAL COLLISION RISK" : "CAUTION CONVERGING"}</span>
+          </div>
+          <span>
+            CRI: {vessel.collision_risk_index ?? colregs?.collision_risk_index ?? 0.82}
+          </span>
+        </div>
+      )}
+
+      <div className="px-4 py-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
         <div className="text-zinc-400">Type</div>
         <div className="text-white font-semibold">{typeLabel[vessel.type]}</div>
         <div className="text-zinc-400">MMSI</div>
@@ -284,10 +334,37 @@ function VesselTooltip({ vessel, onClose }: { vessel: Vessel; onClose: () => voi
         <div className="text-zinc-400">Position</div>
         <div className="text-white font-mono">{vessel.lat}°N {vessel.lon}°E</div>
         <div className="text-zinc-400">Flag</div>
-        <div className="text-white">{vessel.flag ?? "—"}</div>
+        <div className="text-white">{vessel.flag ?? "IND"}</div>
+
+        {/* CPA / TCPA Metrics */}
+        <div className="text-zinc-400">CPA Distance</div>
+        <div className={`font-bold ${isCritical ? "text-rose-400 font-black" : "text-sky-300"}`}>
+          {vessel.cpa_nm ?? colregs?.cpa_nm ?? "—"} NM
+        </div>
+        <div className="text-zinc-400">Time to CPA</div>
+        <div className="text-white font-semibold">
+          {vessel.tcpa_minutes ?? colregs?.tcpa_minutes ?? "—"} min
+        </div>
       </div>
-      <div className="px-4 py-2 border-t border-white/10 text-[9px] font-mono text-zinc-500">
-        AIS · aisstream.io
+
+      {/* IMO COLREGs Rule & Recommended Action */}
+      <div className="px-4 py-2.5 border-t border-white/10 bg-zinc-900/80 text-[10px] space-y-1.5">
+        <div className="flex items-center justify-between text-zinc-400">
+          <span className="font-bold text-zinc-300">COLREGs Rule:</span>
+          <span className="font-bold text-sky-400">
+            {vessel.colregs_rule ?? colregs?.colregs_rule ?? "Rule 8 Safe Clearance"}
+          </span>
+        </div>
+        <div className="p-2 rounded-lg bg-black/70 border border-white/10 text-zinc-200 text-[10px] leading-relaxed">
+          {vessel.recommended_action ??
+            colregs?.recommended_action ??
+            "Maintain navigational watch. Clear water ahead."}
+        </div>
+      </div>
+
+      <div className="px-4 py-2 border-t border-white/10 text-[9px] font-mono text-zinc-500 flex justify-between">
+        <span>AIS · AISStream.io</span>
+        <span>Auto-COLREGs Engine</span>
       </div>
     </div>
   );
@@ -695,6 +772,21 @@ function DashboardContent() {
       const w2Lon = endLon + (wingLen * Math.sin(wingAngle2)) / latCos;
       const w2Lat = endLat + wingLen * Math.cos(wingAngle2);
 
+      const isCriticalRisk =
+        v.risk_level === "CRITICAL_RISK" ||
+        (selectedCoordinates &&
+          computeClientColregs(selectedCoordinates[1], selectedCoordinates[0], 10.0, 0.0, v).risk_level === "CRITICAL_RISK");
+      const isCaution =
+        v.risk_level === "CAUTION" ||
+        (selectedCoordinates &&
+          computeClientColregs(selectedCoordinates[1], selectedCoordinates[0], 10.0, 0.0, v).risk_level === "CAUTION");
+
+      const headingColor = isCriticalRisk
+        ? [239, 68, 68, 255]
+        : isCaution
+        ? [245, 158, 11, 230]
+        : VESSEL_COLORS[v.type] || [255, 255, 255, 220];
+
       return {
         path: [
           [v.lon, v.lat],
@@ -703,7 +795,7 @@ function DashboardContent() {
           [endLon, endLat],
           [w2Lon, w2Lat],
         ] as [number, number][],
-        color: VESSEL_COLORS[v.type] || [255, 255, 255, 220],
+        color: headingColor,
       };
     });
 
@@ -964,21 +1056,58 @@ function DashboardContent() {
     );
   }
 
-  // ━━━ 8. LIVE AIS SHIP TRANSPONDERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ 8. LIVE AIS SHIP TRANSPONDERS & COLREGS RADAR ━━━━━━━━━━━━━━━━━━━━━━━
   if (showVessels && vessels.length > 0) {
+    // 8A. Collision Hazard Domains (Pulsing Red Outer Danger Ring)
+    const riskVessels = vessels.filter((v) => {
+      if (v.risk_level === "CRITICAL_RISK") return true;
+      if (selectedCoordinates) {
+        const c = computeClientColregs(selectedCoordinates[1], selectedCoordinates[0], 10.0, 0.0, v);
+        return c.risk_level === "CRITICAL_RISK";
+      }
+      return false;
+    });
+
+    if (riskVessels.length > 0) {
+      deckLayers.push(
+        new ScatterplotLayer({
+          id: "layer-ais-risk-halos",
+          data: riskVessels,
+          getPosition: (d: any) => [d.lon, d.lat],
+          getFillColor: [239, 68, 68, 45],
+          getLineColor: [239, 68, 68, 240],
+          getRadius: 18000,
+          radiusUnits: "meters",
+          stroked: true,
+          lineWidthMinPixels: 2,
+          opacity: 0.9,
+          pickable: false,
+        })
+      );
+    }
+
+    // 8B. Core Vessel Hull Glyphs
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-ais-vessels",
         data: vessels,
         getPosition: (d: any) => [d.lon, d.lat],
-        getFillColor: (d: any) => VESSEL_COLORS[d.type as VesselType] ?? [200, 200, 200, 200],
-        getLineColor: [0, 0, 0, 120],
-        getRadius: 4000,
+        getFillColor: (d: any) => {
+          if (d.risk_level === "CRITICAL_RISK") return [239, 68, 68, 255];
+          if (selectedCoordinates) {
+            const c = computeClientColregs(selectedCoordinates[1], selectedCoordinates[0], 10.0, 0.0, d);
+            if (c.risk_level === "CRITICAL_RISK") return [239, 68, 68, 255];
+            if (c.risk_level === "CAUTION") return [245, 158, 11, 240];
+          }
+          return VESSEL_COLORS[d.type as VesselType] ?? [200, 200, 200, 200];
+        },
+        getLineColor: [0, 0, 0, 160],
+        getRadius: 4500,
         radiusUnits: "meters",
         stroked: true,
-        lineWidthMinPixels: 1,
-        radiusMinPixels: 3,
-        radiusMaxPixels: 9,
+        lineWidthMinPixels: 1.5,
+        radiusMinPixels: 4,
+        radiusMaxPixels: 10,
         opacity: 1,
         pickable: true,
         onClick: (info: any) => {
@@ -986,6 +1115,8 @@ function DashboardContent() {
         },
       })
     );
+
+    // 8C. Directional COG Course Vectors & Chevron Wings
     if (vesselHeadingPaths.length > 0) {
       deckLayers.push(
         new PathLayer({
@@ -993,9 +1124,9 @@ function DashboardContent() {
           data: vesselHeadingPaths,
           getPath: (d: any) => d.path,
           getColor: (d: any) => d.color,
-          getWidth: 1.5,
+          getWidth: 2.0,
           widthUnits: "pixels",
-          opacity: 0.7,
+          opacity: 0.9,
           pickable: false,
         })
       );
@@ -1366,7 +1497,11 @@ function DashboardContent() {
           {/* RIGHT: 2.5D DECK.GL TACTICAL MAP (65%) */}
           <div className="relative flex-1 h-full w-full bg-black">
             {selectedVessel && (
-              <VesselTooltip vessel={selectedVessel} onClose={() => setSelectedVessel(null)} />
+              <VesselTooltip
+                vessel={selectedVessel}
+                onClose={() => setSelectedVessel(null)}
+                ownShipCoords={selectedCoordinates}
+              />
             )}
 
             {/* Top Floating Controls */}

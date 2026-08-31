@@ -23,6 +23,10 @@ from .agents.graph import run_orca_multi_agent
 from .agents.ocean_analytics.tools import get_sst_and_chlorophyll, find_nearby_pfz_clusters
 from .agents.risk_geofencing.tools import check_imbl_proximity, check_protected_area_intersection, check_active_cyclone_warnings
 from .navigation.router import compute_optimal_marine_route
+from .navigation.colregs import evaluate_colregs_for_traffic, ColregsEvaluation, RiskLevel
+from .navigation.dynamic_router import dynamic_router
+from .traffic.traffic_cache import traffic_cache, VesselState
+from .traffic.ais_client import ais_client
 
 # Configure logging
 logging.basicConfig(
@@ -41,7 +45,7 @@ async def lifespan(app: FastAPI):
     """
     Application Lifespan Manager:
     Initializes PostgreSQL connection pool, applies PostGIS & pgvector schema,
-    and provisions LangGraph memory checkpointer.
+    provisions LangGraph checkpointer, and launches real-time AIS traffic ingestion.
     """
     logger.info("🌊 Starting Project ORCA Backend Gateway (SIH26176)...")
 
@@ -64,11 +68,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MinIO client init warning: {e}")
 
+    # 4. Launch AIS Traffic Ingestion (AISStream.io with Mock Replay Failover)
+    try:
+        ais_client.start()
+        logger.info("📡 AIS Traffic Ingestion Service successfully launched.")
+    except Exception as e:
+        logger.warning(f"AIS traffic ingestion startup warning: {e}")
+
     logger.info("🚀 Project ORCA Backend successfully initialized and ready for requests.")
     yield
 
     # Teardown
     logger.info("Shutting down Project ORCA Backend Gateway...")
+    try:
+        ais_client.stop()
+    except Exception:
+        pass
     await close_db_pool()
 
 
@@ -124,6 +139,24 @@ class RAGSearchRequest(BaseModel):
     """Query payload for pgvector semantic search."""
     query: str = Field(..., description="Search phrase (e.g. 'monsoon trawl ban penalty')")
     top_k: int = Field(3, description="Number of results to retrieve")
+
+
+class ColregsEvalRequest(BaseModel):
+    """Request payload for COLREGs collision risk assessment against live vessel traffic."""
+    own_lat: float = Field(..., description="Own-ship latitude in decimal degrees")
+    own_lon: float = Field(..., description="Own-ship longitude in decimal degrees")
+    own_sog: float = Field(10.0, description="Own-ship Speed Over Ground (knots)")
+    own_cog: float = Field(0.0, description="Own-ship Course Over Ground (degrees 0-360)")
+    target_mmsi: Optional[int] = Field(None, description="Optional target MMSI to filter")
+    search_radius_nm: float = Field(30.0, description="Search radius around own ship in Nautical Miles")
+
+
+class DynamicRouteRequest(BaseModel):
+    """Input parameters for COLREGs-compliant dynamic A* path solver."""
+    start: list[float] = Field(..., description="Starting coordinates [lat, lon]")
+    destination: list[float] = Field(..., description="Destination coordinates [lat, lon]")
+    speed_knots: float = Field(10.0, description="Cruising speed in knots")
+    avoid_traffic: bool = Field(True, description="Whether to avoid moving AIS vessel domains")
 
 
 # ==============================================================================
@@ -316,3 +349,163 @@ async def check_geospatial_risk(lat: float = Query(..., ge=0.0, le=25.0), lon: f
     except Exception as e:
         logger.error(f"Risk geofencing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================================================================
+# 3. AIS VESSEL TRAFFIC & COLREGS COLLISION AVOIDANCE ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/v1/traffic/vessels", tags=["Maritime Traffic"])
+async def get_active_traffic_vessels(
+    lat: Optional[float] = Query(None, description="Optional own-ship latitude for relative CPA calculation"),
+    lon: Optional[float] = Query(None, description="Optional own-ship longitude"),
+    radius_nm: float = Query(50.0, description="Radial search distance in NM"),
+    own_sog: float = Query(10.0, description="Own-ship Speed Over Ground (knots)"),
+    own_cog: float = Query(0.0, description="Own-ship Course Over Ground (degrees)")
+):
+    """
+    Returns GeoJSON FeatureCollection of all currently tracked ships with speed, heading, name,
+    and optional dynamic CPA/TCPA and COLREGs Rule 13/14/15 annotations relative to own-ship.
+    """
+    try:
+        if lat is not None and lon is not None:
+            vessels = traffic_cache.get_active_vessels_in_radius(lat, lon, radius_nm=radius_nm)
+            # Evaluate COLREGs for this fleet
+            evals = {e.target_mmsi: e for e in evaluate_colregs_for_traffic(lat, lon, own_sog, own_cog, vessels)}
+        else:
+            vessels = traffic_cache.get_all_vessels()
+            evals = {}
+
+        features = []
+        for v in vessels:
+            colregs_info = evals.get(v.mmsi)
+            feat = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [v.lon, v.lat]
+                },
+                "properties": {
+                    "mmsi": v.mmsi,
+                    "name": v.name,
+                    "ship_type": v.ship_type,
+                    "ship_category": v.ship_category,
+                    "sog_knots": v.sog_knots,
+                    "cog_deg": v.cog_deg,
+                    "heading": v.heading,
+                    "timestamp": v.timestamp,
+                    "destination": v.destination,
+                    "flag": v.flag,
+                    "length": v.length,
+                    "width": v.width,
+                    "cpa_nm": colregs_info.cpa_nm if colregs_info else None,
+                    "tcpa_minutes": colregs_info.tcpa_minutes if colregs_info else None,
+                    "collision_risk_index": colregs_info.collision_risk_index if colregs_info else 0.0,
+                    "risk_level": colregs_info.risk_level.value if colregs_info else "SAFE",
+                    "colregs_encounter": colregs_info.encounter_type.value if colregs_info else "SAFE_SEPARATION",
+                    "colregs_rule": colregs_info.rule_applied if colregs_info else None,
+                    "obligation": colregs_info.obligation if colregs_info else "NONE",
+                    "recommended_action": colregs_info.recommended_action if colregs_info else None,
+                    "recommended_heading_delta_deg": colregs_info.recommended_heading_delta_deg if colregs_info else 0.0
+                }
+            }
+            features.append(feat)
+
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+            "metadata": {
+                "count": len(features),
+                "is_live_stream": ais_client.is_connected,
+                "is_synthetic_fallback": ais_client.is_fallback
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching traffic vessels: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch vessel traffic: {str(e)}")
+
+
+@app.get("/api/v1/traffic/stream", tags=["Maritime Traffic"])
+async def stream_live_vessel_traffic():
+    """
+    Server-Sent Events (SSE) streaming real-time GeoJSON vessel traffic updates
+    directly to deck.gl frontends at 2-second intervals.
+    """
+    import asyncio
+
+    async def event_generator():
+        while True:
+            geojson = traffic_cache.to_geojson()
+            geojson["metadata"]["is_live_stream"] = ais_client.is_connected
+            geojson["metadata"]["is_synthetic_fallback"] = ais_client.is_fallback
+            payload = json.dumps(geojson)
+            yield f"event: traffic\ndata: {payload}\n\n"
+            await asyncio.sleep(2.0)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/v1/navigation/colregs-eval", tags=["Navigation & COLREGs"])
+async def evaluate_colregs_risk(req: ColregsEvalRequest):
+    """
+    Evaluates dynamic CPA, TCPA, and IMO COLREGs compliance (Rules 13, 14, 15, 17)
+    for own-ship against active surrounding maritime traffic.
+    """
+    try:
+        nearby_vessels = traffic_cache.get_active_vessels_in_radius(
+            req.own_lat, req.own_lon, radius_nm=req.search_radius_nm
+        )
+
+        if req.target_mmsi:
+            nearby_vessels = [v for v in nearby_vessels if v.mmsi == req.target_mmsi]
+
+        evaluations = evaluate_colregs_for_traffic(
+            req.own_lat, req.own_lon, req.own_sog, req.own_cog, nearby_vessels
+        )
+
+        critical_count = sum(1 for e in evaluations if e.risk_level == RiskLevel.CRITICAL_RISK)
+        caution_count = sum(1 for e in evaluations if e.risk_level == RiskLevel.CAUTION)
+
+        top_advisory = evaluations[0].recommended_action if evaluations else "No traffic in search radius. Safe passage."
+
+        return {
+            "own_ship": {
+                "lat": req.own_lat,
+                "lon": req.own_lon,
+                "sog_knots": req.own_sog,
+                "cog_deg": req.own_cog
+            },
+            "evaluations_count": len(evaluations),
+            "critical_risks_count": critical_count,
+            "caution_risks_count": caution_count,
+            "overall_safety_status": "CRITICAL" if critical_count > 0 else ("CAUTION" if caution_count > 0 else "SAFE"),
+            "primary_advisory": top_advisory,
+            "evaluations": [e.to_dict() for e in evaluations]
+        }
+    except Exception as e:
+        logger.error(f"COLREGs evaluation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"COLREGs evaluation failure: {str(e)}")
+
+
+@app.post("/api/v1/navigation/dynamic-route", tags=["Navigation & COLREGs"])
+async def calculate_colregs_dynamic_route(req: DynamicRouteRequest):
+    """
+    Calculates a spatio-temporal, COLREGs-compliant route factoring in both
+    hydrodynamic vector fields and dynamic moving vessel domains.
+    """
+    try:
+        route_geojson = dynamic_router.calculate_dynamic_route(
+            start_lat=req.start[0],
+            start_lon=req.start[1],
+            end_lat=req.destination[0],
+            end_lon=req.destination[1],
+            vessel_speed_knots=req.speed_knots
+        )
+        if "error" in route_geojson:
+            raise HTTPException(status_code=400, detail=route_geojson["error"])
+        return route_geojson
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dynamic COLREGs routing error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Dynamic routing failure: {str(e)}")
