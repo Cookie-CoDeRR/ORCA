@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Database,
   Satellite,
@@ -9,19 +8,16 @@ import {
   Clock,
   HardDrive,
   CheckCircle2,
-  AlertCircle,
   RefreshCw,
-  Play,
-  Pause,
   Layers,
   Search,
   ExternalLink,
-  Sliders,
   Activity,
-  Info,
   Waves,
-  Mountain,
-  Fish,
+  Filter,
+  Eye,
+  Sliders,
+  Table,
 } from "lucide-react";
 
 interface EODataset {
@@ -37,6 +33,7 @@ interface EODataset {
   cacheSize: string;
   variables: string[];
   description: string;
+  dimensions: string;
 }
 
 const EO_CATALOG: EODataset[] = [
@@ -44,35 +41,37 @@ const EO_CATALOG: EODataset[] = [
     id: "sst",
     name: "Sea Surface Temperature (SST)",
     sourceEntity: "MOSDAC / Copernicus Marine (OSTIA)",
-    ingestionFrequency: "Daily (24-Hour Sync)",
+    ingestionFrequency: "Daily (24h)",
     nativeResolution: "0.083° (~9 km)",
-    coverage: "Full Indian Ocean EEZ (4°N - 28°N)",
+    coverage: "Indian Ocean EEZ (4°N - 28°N)",
     dataType: "Raster NetCDF",
     status: "ONLINE",
     lastSync: "Today, 04:30 UTC",
     cacheSize: "1.4 GB",
     variables: ["analysed_sst", "sst_anomaly", "sea_ice_fraction"],
     description: "High-resolution foundational temperature grid derived from satellite infrared and microwave radiometers for thermal front detection.",
+    dimensions: "time: 1, lat: 288, lon: 480 (float32)",
   },
   {
     id: "chlorophyll",
     name: "Chlorophyll-a Biomass Concentration",
     sourceEntity: "Sentinel-3 / MOSDAC OLCI",
-    ingestionFrequency: "1-Day Composite",
-    nativeResolution: "300 m / 0.083° Grid",
-    coverage: "Coastal & Offshore Continental Shelf",
+    ingestionFrequency: "Daily (24h)",
+    nativeResolution: "300 m / 0.083°",
+    coverage: "Continental Shelf & Offshore",
     dataType: "Raster NetCDF",
     status: "ONLINE",
     lastSync: "Today, 06:15 UTC",
     cacheSize: "890 MB",
     variables: ["CHL", "Kd490", "photosynthetically_available_radiation"],
     description: "Ocean color radiometry providing surface phytoplankton pigment density to pinpoint biological primary production zones.",
+    dimensions: "time: 1, lat: 288, lon: 480 (float32)",
   },
   {
     id: "currents",
     name: "Zonal & Meridional Current Vectors (uo, vo)",
-    sourceEntity: "INCOIS / Copernicus Global Ocean Physics",
-    ingestionFrequency: "6-Hour Forecast Sync",
+    sourceEntity: "INCOIS / Copernicus Ocean Physics",
+    ingestionFrequency: "6-Hour Sync",
     nativeResolution: "0.083° Vector Grid",
     coverage: "Surface to 10m Depth Layer",
     dataType: "Raster NetCDF",
@@ -81,259 +80,313 @@ const EO_CATALOG: EODataset[] = [
     cacheSize: "2.1 GB",
     variables: ["uo (eastward)", "vo (northward)", "surface_height_above_geoid"],
     description: "Eulerian ocean velocity fields driving hydrodynamic particle advection and fuel-optimal continuous A* routing paths.",
+    dimensions: "time: 4, depth: 1, lat: 288, lon: 480",
   },
   {
     id: "swh",
     name: "Significant Wave Height & Period (SWH)",
-    sourceEntity: "INCOIS ERDDAP / Open-Meteo WaveWatch",
-    ingestionFrequency: "Hourly In-Situ & Model",
+    sourceEntity: "INCOIS ERDDAP / WaveWatch III",
+    ingestionFrequency: "Hourly In-Situ",
     nativeResolution: "0.1° (~11 km)",
-    coverage: "Arabian Sea & Bay of Bengal Basins",
+    coverage: "Arabian Sea & Bay of Bengal",
     dataType: "Point Telemetry",
     status: "ONLINE",
     lastSync: "8 mins ago",
     cacheSize: "340 MB",
     variables: ["VHM0 (wave height)", "VMDR (mean wave dir)", "VTPK (peak period)"],
     description: "Real-time surface wave energy spectrum determining small-craft operational thresholds and seafarer safety warnings.",
+    dimensions: "station_id: 18, time: 24 (hourly)",
   },
   {
     id: "imbl_mpa",
-    name: "Sovereign Maritime Boundaries & MPAs",
-    sourceEntity: "Ministry of Environment / MEA / IHO",
-    ingestionFrequency: "Static Curated Database",
-    nativeResolution: "Sub-Meter Vector Polygons",
-    coverage: "India-Pak & India-SL IMBL, EEZ, Coral Reserves",
+    name: "IMBL Boundaries & Protected Marine Areas",
+    sourceEntity: "Naval Hydrographic Office / MoEFCC",
+    ingestionFrequency: "Static Statutory",
+    nativeResolution: "Sub-meter Geodesic",
+    coverage: "India-Pakistan & India-Sri Lanka",
     dataType: "Vector GeoJSON",
     status: "CACHED",
-    lastSync: "Persistent PostGIS Table",
-    cacheSize: "68 MB",
-    variables: ["geom_polygon", "standoff_buffer_m", "treaty_reference"],
-    description: "Authoritative spatial boundary datasets used for deterministic border standoff warnings and Marine Protected Area enforcement.",
+    lastSync: "Air-Gapped Local",
+    cacheSize: "45 MB",
+    variables: ["sovereignty_treaty_id", "buffer_radius_km", "restriction_tier"],
+    description: "Authenticated maritime boundary coordinates and marine protected biodiversity reserves for real-time geofencing.",
+    dimensions: "features: 14 polygons & treaty lines",
   },
   {
-    id: "biodiversity",
-    name: "Marine Biodiversity Occurrences (IndOBIS)",
-    sourceEntity: "IndOBIS / CMLRE Kochi",
-    ingestionFrequency: "Monthly Batch Archive",
-    nativeResolution: "425,000+ Point Records",
-    coverage: "Exclusive Economic Zone & High Seas",
-    dataType: "Vector GeoJSON",
-    status: "ONLINE",
-    lastSync: "Aug 15, 2026",
-    cacheSize: "512 MB",
-    variables: ["scientific_name", "aphia_id", "depth_m", "occurrence_date"],
-    description: "Authentic biological database cataloging commercial pelagic species, coral habitats, and endangered cetacean sightings.",
-  },
-  {
-    id: "dem_bathymetry",
-    name: "3D Global Bathymetric Relief (Terrarium)",
-    sourceEntity: "AWS Open Data / GEBCO / ETOPO1",
-    ingestionFrequency: "Static 256px Tile Pyramids",
-    nativeResolution: "15-Arc-Second Grid",
-    coverage: "Global Continental Shelf & Ocean Trenches",
+    id: "gebco_bathymetry",
+    name: "GEBCO High-Res Bathymetry & Contours",
+    sourceEntity: "GEBCO 2024 / INCOIS Hydrography",
+    ingestionFrequency: "Annual Baseline",
+    nativeResolution: "15 Arc-Seconds (~450 m)",
+    coverage: "Indian Ocean Basin Bathymetry",
     dataType: "Bathymetric DEM",
     status: "CACHED",
-    lastSync: "Global Cached Raster Tile Pyramid",
+    lastSync: "Air-Gapped Local",
     cacheSize: "4.8 GB",
-    variables: ["elevation_m", "shelf_gradient", "trench_depth"],
-    description: "Three-dimensional underwater elevation map powering MapLibre hillshading, 200m shelf contours, and seamount detection.",
+    variables: ["elevation_meters", "continental_shelf_200m", "slope_gradient"],
+    description: "Digital elevation model of seafloor contours, canyons, and 200m continental shelf break lines for bathymetric upwelling analysis.",
+    dimensions: "elevation: 21600 x 43200 grid (GeoTIFF)",
+  },
+  {
+    id: "ais_traffic",
+    name: "Real-Time AIS Vessel Traffic Stream",
+    sourceEntity: "AISStream.io / Coastal Radar Chain",
+    ingestionFrequency: "Real-Time (2s)",
+    nativeResolution: "Kinematic GPS Pips",
+    coverage: "Indian Ocean Bounding Box",
+    dataType: "Point Telemetry",
+    status: "ONLINE",
+    lastSync: "Live Stream Active",
+    cacheSize: "620 MB",
+    variables: ["mmsi", "sog_knots", "cog_deg", "cpa_nm", "tcpa_min", "colregs_rule"],
+    description: "Live vessel transponder kinematic vectors with automated closest-point-of-approach (CPA/TCPA) collision risk evaluation.",
+    dimensions: "vessels: dynamic in-memory cache",
   },
 ];
 
 export default function DataHubView() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string>("ALL");
   const [selectedDataset, setSelectedDataset] = useState<EODataset>(EO_CATALOG[0]);
-  const [timeOffsetHours, setTimeOffsetHours] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [activeTimeOffset, setActiveTimeOffset] = useState<string>("0h");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handlePlayToggle = () => {
-    setIsPlaying(!isPlaying);
+  const filteredDatasets = EO_CATALOG.filter((d) => {
+    const matchesSearch =
+      d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.sourceEntity.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.variables.some((v) => v.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesFilter = filterType === "ALL" || d.dataType === filterType;
+    return matchesSearch && matchesFilter;
+  });
+
+  const handleRefreshSync = () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-black text-white">
-      {/* LEFT: DATASET PROVENANCE CATALOG TABLE */}
-      <div className="flex-1 flex flex-col h-full border-r border-white/10 overflow-y-auto p-6 space-y-6">
-        {/* Header & Sync Status */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-1">
-              <Satellite className="h-3.5 w-3.5 text-sky-400" />
-              <span>Earth Observation (EO) Data Hub</span>
-            </div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Satellite Raster Catalog & Live Telemetry Ingestion
-            </h3>
+    <div className="flex h-full w-full overflow-hidden bg-[#090d16] text-slate-100 font-sans">
+      {/* ━━━ LEFT (65%): SEARCHABLE STRUCTURED DATASET TABLE ━━━━━━━━━━━━━ */}
+      <div className="flex-1 flex flex-col h-full border-r border-slate-800 overflow-hidden">
+        {/* Top Data Sync Status Banner */}
+        <div className="flex items-center justify-between px-5 py-3 bg-slate-950 border-b border-slate-800 text-xs font-mono select-none">
+          <div className="flex items-center gap-3 text-slate-300">
+            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>7/7 Feeds Synchronized</span>
+            </span>
+            <span className="text-slate-700">|</span>
+            <span>Total Local Cache: <strong className="text-white">10.1 GB / 16.0 GB</strong></span>
+            <span className="text-slate-700">|</span>
+            <span className="text-slate-400">Last Air-Gap Sync: <span className="text-slate-200">Today, 04:30 UTC</span></span>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 text-xs font-mono text-emerald-300">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            <span>7 / 7 DATA FEEDS HEALTHY</span>
+          <button
+            onClick={handleRefreshSync}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer text-xs font-mono"
+            title="Poll upstream MOSDAC / INCOIS data endpoints"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-cyan-400" : ""}`} />
+            <span>{isRefreshing ? "Syncing..." : "Sync Feeds"}</span>
+          </button>
+        </div>
+
+        {/* Filter & Search Bar */}
+        <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-800 bg-slate-950/60">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search datasets by parameter, source, or NetCDF variable..."
+              className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-800 bg-slate-900 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-mono"
+            />
+          </div>
+
+          {/* Type Filter Pills */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs font-mono">
+            {(["ALL", "Raster NetCDF", "Point Telemetry", "Vector GeoJSON"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                  filterType === type
+                    ? "bg-slate-800 text-white font-bold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {type === "ALL" ? "All Formats" : type.replace("Raster ", "").replace("Point ", "")}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Interactive Temporal Scrubber Bar */}
-        <div className="p-4 rounded-2xl border border-white/10 bg-zinc-950/80 space-y-3">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-2 text-white font-bold">
-              <Clock className="h-4 w-4 text-amber-400" />
-              <span>Interactive Temporal Timeline Scrubber</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-400">Current Forecast Frame:</span>
-              <span className={`font-bold px-2 py-0.5 rounded ${timeOffsetHours === 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-sky-500/20 text-sky-300"}`}>
-                {timeOffsetHours === 0 ? "NOW (Live Satellite Observation)" : `${timeOffsetHours > 0 ? "+" : ""}${timeOffsetHours}h (${timeOffsetHours > 0 ? "Forecast" : "Historical Archive"})`}
-              </span>
-            </div>
-          </div>
-
-          {/* Slider */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handlePlayToggle}
-              className="p-2 rounded-xl bg-white text-black hover:bg-zinc-200 transition cursor-pointer"
-              title={isPlaying ? "Pause Timeline" : "Play 72h Forecast Animation"}
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-black" />}
-            </button>
-
-            <div className="flex-1 relative">
-              <input
-                type="range"
-                min={-48}
-                max={72}
-                step={6}
-                value={timeOffsetHours}
-                onChange={(e) => setTimeOffsetHours(Number(e.target.value))}
-                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-white"
-              />
-              <div className="flex justify-between text-[9px] font-mono text-zinc-500 mt-1">
-                <span>-48h (Historical)</span>
-                <span>-24h</span>
-                <span className="text-emerald-400 font-bold">0h (Live Sync)</span>
-                <span>+24h</span>
-                <span>+48h</span>
-                <span>+72h (Forecast)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Datasets Table */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
-            <span className="font-bold text-white">Active Earth Observation Data Feeds ({EO_CATALOG.length})</span>
-            <span>Click any dataset to inspect metadata</span>
-          </div>
-
-          <div className="space-y-2">
-            {EO_CATALOG.map((ds) => {
-              const isSelected = selectedDataset.id === ds.id;
-              return (
-                <div
-                  key={ds.id}
-                  onClick={() => setSelectedDataset(ds)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-zinc-900 border-white shadow-lg shadow-white/10"
-                      : "bg-zinc-950/70 border-white/15 hover:border-white/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-white">
-                        <Database className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">{ds.name}</span>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
-                            {ds.dataType}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-zinc-400">{ds.sourceEntity}</p>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold block">
-                        ● {ds.status}
+        {/* Structured Dataset Table */}
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-left text-xs font-mono border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 bg-slate-950 text-slate-400 text-[11px] select-none">
+                <th className="py-2.5 px-4 font-semibold">Dataset Name</th>
+                <th className="py-2.5 px-4 font-semibold">Source Entity</th>
+                <th className="py-2.5 px-4 font-semibold">Coverage / Region</th>
+                <th className="py-2.5 px-4 font-semibold">Cadence</th>
+                <th className="py-2.5 px-4 font-semibold">Format</th>
+                <th className="py-2.5 px-4 font-semibold text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-850">
+              {filteredDatasets.map((dataset) => {
+                const isSelected = selectedDataset.id === dataset.id;
+                return (
+                  <tr
+                    key={dataset.id}
+                    onClick={() => setSelectedDataset(dataset)}
+                    className={`transition-colors cursor-pointer ${
+                      isSelected
+                        ? "bg-slate-900 text-white font-medium border-l-2 border-l-cyan-400"
+                        : "hover:bg-slate-900/50 text-slate-300"
+                    }`}
+                  >
+                    <td className="py-3 px-4">
+                      <div className="font-sans font-bold text-white text-xs">{dataset.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">{dataset.nativeResolution}</div>
+                    </td>
+                    <td className="py-3 px-4 text-slate-300">{dataset.sourceEntity}</td>
+                    <td className="py-3 px-4 text-slate-400">{dataset.coverage}</td>
+                    <td className="py-3 px-4 text-slate-400">{dataset.ingestionFrequency}</td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">
+                        {dataset.dataType}
                       </span>
-                      <span className="text-[9px] font-mono text-zinc-500">{ds.nativeResolution}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span>{dataset.status}</span>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bottom Time Scrubber Bar */}
+        <div className="flex items-center justify-between p-3.5 bg-slate-950 border-t border-slate-800 text-xs font-mono select-none">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Clock className="h-4 w-4 text-cyan-400" />
+            <span className="font-bold text-white">Temporal Frame:</span>
+            <span className="text-cyan-300 font-semibold">{activeTimeOffset === "0h" ? "Real-Time Live (0h)" : `${activeTimeOffset} Forecast`}</span>
+          </div>
+
+          {/* Scrubber Buttons */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            {["-48h", "-24h", "0h", "+24h", "+48h", "+72h"].map((offset) => (
+              <button
+                key={offset}
+                onClick={() => setActiveTimeOffset(offset)}
+                className={`px-2.5 py-1 rounded-md transition cursor-pointer text-xs ${
+                  activeTimeOffset === offset
+                    ? "bg-cyan-500 text-black font-bold shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {offset === "0h" ? "Live 0h" : offset}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* RIGHT: DATASET INSPECTION DETAIL DRAWER */}
-      <div className="w-full md:w-[420px] lg:w-[460px] h-full flex flex-col bg-zinc-950 p-6 overflow-y-auto space-y-6">
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <div>
-            <h3 className="text-sm font-bold text-white">{selectedDataset.name}</h3>
-            <p className="text-[10px] font-mono text-zinc-400">{selectedDataset.sourceEntity}</p>
+      {/* ━━━ RIGHT (35%): SELECTED DATASET METADATA INSPECTOR ━━━━━━━━━━━━━ */}
+      <div className="w-full md:w-[380px] lg:w-[420px] h-full flex flex-col bg-slate-950 p-5 md:p-6 overflow-y-auto space-y-5">
+        {/* Header */}
+        <div className="pb-3 border-b border-slate-800 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-bold">
+              {selectedDataset.dataType}
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">
+              Cache: {selectedDataset.cacheSize}
+            </span>
           </div>
-          <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-md">
-            {selectedDataset.cacheSize}
-          </span>
+          <h3 className="text-sm md:text-base font-bold text-white leading-tight">
+            {selectedDataset.name}
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed font-sans">
+            {selectedDataset.description}
+          </p>
         </div>
 
-        {/* Description */}
-        <div className="p-3.5 rounded-xl border border-white/10 bg-black/60 text-xs text-zinc-300 leading-relaxed">
-          {selectedDataset.description}
-        </div>
-
-        {/* Telemetry Details Grid */}
-        <div className="grid grid-cols-2 gap-3 text-[11px]">
-          <div className="p-3 rounded-xl border border-white/10 bg-black">
-            <span className="text-zinc-500 block mb-1 font-mono text-[9px]">INGESTION FREQUENCY</span>
-            <span className="text-white font-semibold">{selectedDataset.ingestionFrequency}</span>
+        {/* Key Technical Specs */}
+        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60">
+            <span className="text-[10px] text-slate-500 block uppercase">Source Agency</span>
+            <span className="text-white font-semibold text-[11px] truncate block">{selectedDataset.sourceEntity}</span>
           </div>
-
-          <div className="p-3 rounded-xl border border-white/10 bg-black">
-            <span className="text-zinc-500 block mb-1 font-mono text-[9px]">NATIVE RESOLUTION</span>
-            <span className="text-white font-semibold">{selectedDataset.nativeResolution}</span>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60">
+            <span className="text-[10px] text-slate-500 block uppercase">Spatial Grid</span>
+            <span className="text-white font-semibold text-[11px]">{selectedDataset.nativeResolution}</span>
           </div>
-
-          <div className="p-3 rounded-xl border border-white/10 bg-black">
-            <span className="text-zinc-500 block mb-1 font-mono text-[9px]">GEOSPATIAL COVERAGE</span>
-            <span className="text-white font-semibold">{selectedDataset.coverage}</span>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60">
+            <span className="text-[10px] text-slate-500 block uppercase">Update Cadence</span>
+            <span className="text-white font-semibold text-[11px]">{selectedDataset.ingestionFrequency}</span>
           </div>
-
-          <div className="p-3 rounded-xl border border-white/10 bg-black">
-            <span className="text-zinc-500 block mb-1 font-mono text-[9px]">LAST AIR-GAP SYNC</span>
-            <span className="text-emerald-400 font-semibold">{selectedDataset.lastSync}</span>
+          <div className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60">
+            <span className="text-[10px] text-slate-500 block uppercase">Sync Status</span>
+            <span className="text-emerald-400 font-semibold text-[11px]">{selectedDataset.status}</span>
           </div>
         </div>
 
-        {/* Available Raster Variables */}
+        {/* NetCDF / GeoJSON Exported Variables */}
         <div className="space-y-2">
-          <span className="text-xs font-mono text-zinc-400 font-bold flex items-center gap-1.5">
-            <Sliders className="h-3.5 w-3.5 text-sky-400" /> Exported NetCDF Data Variables
-          </span>
+          <div className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+            <Database className="h-3.5 w-3.5 text-cyan-400" />
+            <span>Exported Numerical Variables (NetCDF4)</span>
+          </div>
           <div className="flex flex-wrap gap-1.5">
-            {selectedDataset.variables.map((v) => (
-              <span key={v} className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-white/10 text-xs font-mono text-zinc-300">
-                {v}
+            {selectedDataset.variables.map((variable) => (
+              <span
+                key={variable}
+                className="px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-[11px] font-mono text-cyan-300"
+              >
+                {variable}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Cache Integrity & Indexing Gauge */}
-        <div className="p-4 rounded-xl border border-white/10 bg-black space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-white font-semibold">Local Storage Allocation</span>
-            <span className="text-zinc-400">{selectedDataset.cacheSize} / 16.0 GB Total Cache</span>
+        {/* Array Dimensions */}
+        <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/40 space-y-1">
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">
+            Array Dimensions & Types
           </div>
-          <div className="h-2 w-full rounded-full bg-zinc-900 overflow-hidden border border-white/10">
-            <div style={{ width: "35%" }} className="h-full bg-emerald-400" />
+          <div className="text-xs font-mono text-slate-200">
+            {selectedDataset.dimensions}
           </div>
-          <span className="text-[10px] text-zinc-500 font-mono block">
-            HNSW pgvector index active · Sub-15ms vector retrieval verified.
-          </span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-2 pt-2 mt-auto">
+          <button
+            onClick={() => alert(`Tile layer for ${selectedDataset.name} is rendered on the Tactical Command Map.`)}
+            className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10"
+          >
+            <Eye className="h-4 w-4" />
+            <span>View Tile Layer in Map</span>
+          </button>
+
+          <button
+            onClick={() => alert(`Raw NetCDF Schema for ${selectedDataset.name}:\nDimensions: ${selectedDataset.dimensions}\nVariables: ${selectedDataset.variables.join(", ")}`)}
+            className="w-full py-2.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-200 font-mono text-xs transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+            <span>Inspect Raw NetCDF Dimensions</span>
+          </button>
         </div>
       </div>
     </div>

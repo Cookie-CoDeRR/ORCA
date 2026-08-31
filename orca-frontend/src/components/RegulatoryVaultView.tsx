@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import {
   BookOpen,
   Search,
   Calendar,
-  PhoneCall,
   Radio,
   ShieldAlert,
   FileText,
@@ -14,10 +12,13 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronRight,
-  Sparkles,
   MapPin,
   Anchor,
   Info,
+  Phone,
+  PhoneCall,
+  Shield,
+  Clock,
 } from "lucide-react";
 
 interface PolicyItem {
@@ -25,6 +26,8 @@ interface PolicyItem {
   title: string;
   category: "Monsoon Ban" | "Border Law" | "Equipment SOP" | "Species Mesh Size";
   citation: string;
+  stateJurisdiction: string;
+  enforcingAuthority: string;
   summary: string;
   excerpt: string;
   similarityScore: number;
@@ -36,6 +39,8 @@ const POLICY_DATABASE: PolicyItem[] = [
     title: "Uniform Seasonal Monsoon Fishing Ban 2026",
     category: "Monsoon Ban",
     citation: "Dept of Fisheries Gazette Notification F.No. 31013/2026-FY",
+    stateJurisdiction: "All Coastal States (West & East Coasts)",
+    enforcingAuthority: "Department of Fisheries / Indian Coast Guard",
     summary: "61-day annual ban on mechanized and motorized fishing vessels in the Indian Exclusive Economic Zone (EEZ) to facilitate breeding and juvenile conservation.",
     excerpt: "West Coast (Gujarat, Maharashtra, Goa, Karnataka, Kerala, Lakshadweep): June 1 to July 31 (inclusive). East Coast (Tamil Nadu, Andhra Pradesh, Odisha, West Bengal, Puducherry): April 15 to June 14 (inclusive). Traditional non-motorized crafts are exempted.",
     similarityScore: 0.94,
@@ -45,6 +50,8 @@ const POLICY_DATABASE: PolicyItem[] = [
     title: "Maritime Zones of India & IMBL Crossing Penalties",
     category: "Border Law",
     citation: "Maritime Zones of India (Regulation of Fishing) Act 1981 / MEA Directives",
+    stateJurisdiction: "Gujarat, Tamil Nadu, Andhra Pradesh, A&N Islands",
+    enforcingAuthority: "Indian Coast Guard / Indian Navy / Coastal Police",
     summary: "Strict prohibition of unauthorized entry into sovereign territorial waters of neighboring states (Pakistan & Sri Lanka) without valid clearance.",
     excerpt: "Crossing the International Maritime Boundary Line (IMBL) into Pakistani or Sri Lankan waters constitutes an offense under Section 10/12. Vessels found breaching the 5 NM standoff zone are subject to immediate Coast Guard interception, impoundment, and legal prosecution.",
     similarityScore: 0.89,
@@ -54,6 +61,8 @@ const POLICY_DATABASE: PolicyItem[] = [
     title: "Mandatory Safety Apparatus & Radio Watch SOP",
     category: "Equipment SOP",
     citation: "Directorate General of Shipping Order No. 04 of 2024",
+    stateJurisdiction: "Pan-India Coastal Waters",
+    enforcingAuthority: "Mercantile Marine Department (MMD) / Coastal Guard",
     summary: "Mandatory installation of automatic distress beacons, life jackets, and continuous VHF Channel 16 monitoring on all mechanized fishing boats.",
     excerpt: "All mechanized vessels operating beyond 12 nautical miles must carry: (1) Distress Alert Transmitters (DAT) / AIS Type-B, (2) One BIS-approved life jacket per crew member, (3) Very High Frequency (VHF) marine transceiver maintained on International Distress Frequency 156.800 MHz (Channel 16).",
     similarityScore: 0.87,
@@ -63,6 +72,8 @@ const POLICY_DATABASE: PolicyItem[] = [
     title: "Minimum Legal Size (MLS) & Diamond Mesh Regulations",
     category: "Species Mesh Size",
     citation: "ICAR-CMFRI Marine Fisheries Management Guidelines 2025",
+    stateJurisdiction: "Gujarat, Maharashtra, Kerala, Tamil Nadu",
+    enforcingAuthority: "State Fisheries Departments / Enforcement Wings",
     summary: "Mandates minimum diamond mesh sizes for trawl cod-ends to prevent juvenile bycatch of commercial finfish and shrimp.",
     excerpt: "Minimum square mesh size for trawl nets: 35 mm for fish trawl, 25 mm for shrimp trawl. Minimum Legal Size (MLS) limits: Yellowfin Tuna (35 cm), Indian Mackerel (14 cm), Oil Sardine (10 cm), Silver Pomfret (15 cm). Possession of undersized catch incurs punitive market confiscation.",
     similarityScore: 0.82,
@@ -70,15 +81,53 @@ const POLICY_DATABASE: PolicyItem[] = [
 ];
 
 const MONSOON_BANS = [
-  { coast: "West Coast", period: "June 1 – July 31", duration: "61 Days", states: "Gujarat, Maharashtra, Goa, Karnataka, Kerala, Lakshadweep", activeNow: false },
-  { coast: "East Coast", period: "April 15 – June 14", duration: "61 Days", states: "Tamil Nadu, Andhra Pradesh, Odisha, West Bengal, Puducherry", activeNow: false },
+  {
+    coast: "West Coast (Arabian Sea)",
+    period: "June 1 – July 31 (61 Days)",
+    states: "Gujarat, Maharashtra, Goa, Karnataka, Kerala, Lakshadweep",
+    status: "OPERABLE (BAN INACTIVE)",
+    isBanActive: false,
+    exemptions: "Traditional non-motorized motorized OBM (<10 HP) permitted within 12 NM",
+  },
+  {
+    coast: "East Coast (Bay of Bengal)",
+    period: "April 15 – June 14 (61 Days)",
+    states: "Tamil Nadu, Andhra Pradesh, Odisha, West Bengal, Puducherry",
+    status: "OPERABLE (BAN INACTIVE)",
+    isBanActive: false,
+    exemptions: "Traditional country craft & fiberglass skiffs exempted",
+  },
 ];
 
-const EMERGENCY_CONTACTS = [
-  { name: "Indian Coast Guard MRCC (Mumbai - West Coast)", freq: "VHF Ch 16 (156.800 MHz)", phone: "+91-22-24388065", tollFree: "1554", zone: "Western Seaboard" },
-  { name: "Indian Coast Guard MRCC (Chennai - East Coast)", freq: "VHF Ch 16 (156.800 MHz)", phone: "+91-44-23460405", tollFree: "1554", zone: "Eastern Seaboard" },
-  { name: "Indian Coast Guard MRCC (Port Blair - Andaman)", freq: "VHF Ch 16 (156.800 MHz)", phone: "+91-3192-245530", tollFree: "1554", zone: "A&N Islands" },
-  { name: "National Cyclone Warning Centre (IMD New Delhi)", freq: "HF/VHF Broadcast", phone: "+91-11-24652484", tollFree: "1070", zone: "Pan-India" },
+const EMERGENCY_DIRECTORY = [
+  {
+    agency: "Indian Coast Guard MRCC (Mumbai)",
+    seaboard: "Western Seaboard",
+    tollFree: "1554",
+    directPhone: "+91-22-24388065",
+    frequency: "VHF Ch 16 (156.800 MHz)",
+  },
+  {
+    agency: "Indian Coast Guard MRCC (Chennai)",
+    seaboard: "Eastern Seaboard",
+    tollFree: "1554",
+    directPhone: "+91-44-23460405",
+    frequency: "VHF Ch 16 (156.800 MHz)",
+  },
+  {
+    agency: "Indian Coast Guard MRCC (Port Blair)",
+    seaboard: "A&N Island Zone",
+    tollFree: "1554",
+    directPhone: "+91-3192-245530",
+    frequency: "VHF Ch 16 (156.800 MHz)",
+  },
+  {
+    agency: "National Cyclone Warning Centre (IMD)",
+    seaboard: "Pan-India Coastal",
+    tollFree: "1070",
+    directPhone: "+91-11-24652484",
+    frequency: "HF/VHF Broadcast Alert",
+  },
 ];
 
 export default function RegulatoryVaultView() {
@@ -89,164 +138,214 @@ export default function RegulatoryVaultView() {
     (p) =>
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase())
+      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.excerpt.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-black text-white">
-      {/* LEFT: POLICY SEARCH & MONSOON BAN MATRIX */}
-      <div className="flex-1 flex flex-col h-full border-r border-white/10 overflow-y-auto p-6 space-y-6">
+    <div className="flex h-full w-full overflow-hidden bg-[#090d16] text-slate-100 font-sans">
+      {/* ━━━ LEFT (60%): MONSOON STATUS & SEARCHABLE POLICY RESULTS ━━━━━━━ */}
+      <div className="flex-1 flex flex-col h-full border-r border-slate-800 overflow-y-auto p-5 md:p-6 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-1">
-              <BookOpen className="h-3.5 w-3.5 text-amber-400" />
-              <span>Fleet Safety & Regulatory Vault</span>
+            <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
+              <BookOpen className="h-3.5 w-3.5 text-cyan-400" />
+              <span>National Maritime Regulatory Vault</span>
             </div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Sovereign Maritime Law & Fisheries Policy RAG
-            </h3>
+            <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">
+              Statutory Gazettes & Seasonal Fishing Directives
+            </h2>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 text-xs font-mono text-zinc-300">
-            <span>BGE-M3 · pgvector HNSW</span>
-          </div>
+          <span className="text-xs font-mono text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
+            pgvector Semantic Index • 4 Acts Loaded
+          </span>
         </div>
 
-        {/* Monsoon Trawl Ban Matrix */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
-            <span className="font-bold text-white flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-sky-400" />
-              <span>Uniform Seasonal Monsoon Fishing Ban Schedule (61 Days)</span>
-            </span>
-            <span className="text-emerald-400 font-semibold">Bans Currently Inactive</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {MONSOON_BANS.map((b) => (
-              <div key={b.coast} className="p-4 rounded-2xl border border-white/10 bg-zinc-950/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">{b.coast}</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    OPERABLE
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-white">{b.period} ({b.duration})</div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">{b.states}</p>
+        {/* ── TOP MONSOON BAN STATUS CARDS ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {MONSOON_BANS.map((ban) => (
+            <div
+              key={ban.coast}
+              className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/70 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">{ban.coast}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span>{ban.status}</span>
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="text-[11px] font-mono text-slate-300 space-y-0.5">
+                <div>Duration: <strong className="text-white">{ban.period}</strong></div>
+                <div className="text-[10px] text-slate-400 truncate">States: {ban.states}</div>
+                <div className="text-[10px] text-slate-500">{ban.exemptions}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Semantic Search Bar */}
-        <div className="space-y-3">
+        {/* ── SEARCH BAR & FILTER TAGS ── */}
+        <div className="space-y-2">
           <div className="relative">
-            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-zinc-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search maritime circulars, IMBL laws, mesh regulations, VHF distress SOPs..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-zinc-950 border border-white/15 text-xs text-white placeholder-zinc-500 focus:border-white focus:outline-none"
+              placeholder="Search maritime gazettes, IMBL coordinates, mesh regulations..."
+              className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-800 bg-slate-900 text-xs text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none font-mono"
             />
           </div>
 
-          {/* Quick Filter Chips */}
-          <div className="flex flex-wrap gap-1.5">
+          {/* Quick Query Tag Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+            <span className="text-[10px] text-slate-500 uppercase font-bold mr-1">Filter Tags:</span>
             {[
-              "Penalty for crossing Sri Lanka IMBL",
-              "Mandatory VHF Channel 16 watch",
-              "Minimum mesh size for trawls",
-              "Exemptions for non-motorized crafts",
-            ].map((chip) => (
+              "Monsoon Ban 2026",
+              "IMBL Sovereignty",
+              "Trawl Mesh Size",
+              "VHF Ch 16 SOP",
+            ].map((tag) => (
               <button
-                key={chip}
-                onClick={() => setSearchQuery(chip)}
-                className="px-2.5 py-1 rounded-lg bg-zinc-900/80 border border-white/10 text-[10px] text-zinc-300 hover:bg-zinc-800 hover:text-white transition cursor-pointer"
+                key={tag}
+                onClick={() => setSearchQuery(searchQuery === tag ? "" : tag)}
+                className={`px-2.5 py-0.5 rounded-md border text-[11px] transition cursor-pointer ${
+                  searchQuery === tag
+                    ? "bg-cyan-500 text-black border-cyan-400 font-bold"
+                    : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                }`}
               >
-                {chip}
+                {tag}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Policy Results List */}
-        <div className="space-y-2">
-          {filteredPolicies.map((policy) => {
-            const isSelected = selectedPolicy.id === policy.id;
+        {/* ── SEARCH RESULTS LIST ── */}
+        <div className="space-y-2.5 flex-1">
+          {filteredPolicies.map((item) => {
+            const isSelected = selectedPolicy.id === item.id;
             return (
               <div
-                key={policy.id}
-                onClick={() => setSelectedPolicy(policy)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                key={item.id}
+                onClick={() => setSelectedPolicy(item)}
+                className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-zinc-900 border-white shadow-lg shadow-white/10"
-                    : "bg-zinc-950/70 border-white/15 hover:border-white/30"
+                    ? "bg-slate-900 border-cyan-500 shadow-md shadow-cyan-500/10"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
                 }`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-white">{policy.title}</span>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">
-                        {policy.category}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono text-zinc-400 block mt-0.5">{policy.citation}</span>
+                    <span className="text-[10px] font-mono text-cyan-400 font-semibold uppercase tracking-wider block mb-0.5">
+                      {item.category}
+                    </span>
+                    <h4 className="text-xs md:text-sm font-bold text-white leading-tight">
+                      {item.title}
+                    </h4>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                    {(policy.similarityScore * 100).toFixed(0)}% MATCH
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700 text-[10px] font-mono shrink-0">
+                    {Math.round(item.similarityScore * 100)}% Match
                   </span>
                 </div>
-                <p className="mt-2 text-[11px] text-zinc-300 leading-relaxed">{policy.summary}</p>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-sans line-clamp-2">
+                  {item.summary}
+                </p>
+
+                <div className="mt-2 text-[10px] font-mono text-slate-500 truncate">
+                  Citation: {item.citation}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* RIGHT: POLICY EXCERPT & EMERGENCY DIRECTORY */}
-      <div className="w-full md:w-[420px] lg:w-[460px] h-full flex flex-col bg-zinc-950 p-6 overflow-y-auto space-y-6">
-        {/* Full Selected Policy Excerpt */}
-        <div className="space-y-3 pb-6 border-b border-white/10">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-zinc-400 font-bold">Authenticated Statutory Excerpt</span>
-            <span className="text-[10px] font-mono text-emerald-400">pgvector Retrieved</span>
+      {/* ━━━ RIGHT (40%): STATUTORY EXCERPT & DISTRESS HOTLINES ━━━━━━━━━━━ */}
+      <div className="w-full md:w-[420px] lg:w-[480px] h-full flex flex-col bg-slate-950 divide-y divide-slate-800 overflow-y-auto">
+        {/* TOP HALF: AUTHENTICATED STATUTORY EXCERPT */}
+        <div className="p-5 md:p-6 space-y-3.5">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold">
+              Authenticated Statutory Excerpt
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400 font-semibold">
+              ● Official Gazette
+            </span>
           </div>
 
-          <h4 className="text-sm font-bold text-white">{selectedPolicy.title}</h4>
-          <p className="text-[10px] font-mono text-zinc-400">{selectedPolicy.citation}</p>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-white leading-tight">
+              {selectedPolicy.title}
+            </h3>
+            <div className="text-[10px] font-mono text-cyan-400">
+              {selectedPolicy.citation}
+            </div>
+          </div>
 
-          <div className="p-4 rounded-xl border border-white/10 bg-black text-xs text-zinc-200 leading-relaxed font-mono whitespace-pre-wrap">
-            {selectedPolicy.excerpt}
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span className="text-[9px] text-slate-500 block uppercase">Jurisdiction</span>
+              <span className="text-slate-200 text-[10px] truncate block">{selectedPolicy.stateJurisdiction}</span>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span className="text-[9px] text-slate-500 block uppercase">Enforcement</span>
+              <span className="text-slate-200 text-[10px] truncate block">{selectedPolicy.enforcingAuthority}</span>
+            </div>
+          </div>
+
+          {/* Legal Excerpt Box */}
+          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 space-y-1.5">
+            <div className="text-[10px] font-mono text-slate-400 uppercase font-bold">
+              Statutory Text:
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+              "{selectedPolicy.excerpt}"
+            </p>
           </div>
         </div>
 
-        {/* Emergency Search & Coast Guard Rescue Directory */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-mono text-rose-400 font-bold uppercase tracking-wider">
-            <ShieldAlert className="h-4 w-4" />
-            <span>Emergency Distress & MRCC Directory</span>
+        {/* BOTTOM HALF: EMERGENCY DIRECTORY & DISTRESS SOPS */}
+        <div className="p-5 md:p-6 space-y-3.5 flex-1">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-bold flex items-center gap-1.5">
+              <Radio className="h-3.5 w-3.5 text-rose-400" />
+              <span>Maritime Search & Rescue (MRCC) Directory</span>
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">
+              24x7 Guard
+            </span>
           </div>
 
           <div className="space-y-2">
-            {EMERGENCY_CONTACTS.map((c) => (
-              <div key={c.name} className="p-3 rounded-xl border border-white/10 bg-black space-y-1">
+            {EMERGENCY_DIRECTORY.map((contact) => (
+              <div
+                key={contact.agency}
+                className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-xs font-mono space-y-1"
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">{c.name}</span>
-                  <span className="text-[10px] font-mono font-bold text-rose-400">Toll-Free: {c.tollFree}</span>
+                  <span className="font-bold text-white text-[11px] truncate">{contact.agency}</span>
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-950/60 border border-rose-500/30 px-1.5 py-0.2 rounded">
+                    Toll-Free: {contact.tollFree}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                  <span>{c.freq}</span>
-                  <span>{c.phone}</span>
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Phone: <strong className="text-slate-200">{contact.directPhone}</strong></span>
+                  <span className="text-cyan-300">{contact.frequency}</span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-950/30 text-[11px] text-rose-200 leading-relaxed font-mono">
-            <strong>Standard VHF 16 Protocol:</strong> In distress, transmit "MAYDAY, MAYDAY, MAYDAY" followed by vessel name, GPS coordinates, crew count, and nature of emergency on 156.800 MHz.
+          {/* Distress SOP summary */}
+          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/40 text-[10px] font-mono text-slate-400 space-y-0.5 mt-auto">
+            <div className="text-slate-300 font-bold">VHF Ch 16 Emergency Distress Protocol:</div>
+            <div>• MAYDAY call format: 3x "MAYDAY", Vessel MMSI, Coordinates, Nature of Distress.</div>
+            <div>• All coastal stations and naval vessels maintain continuous watch on 156.800 MHz.</div>
           </div>
         </div>
       </div>
