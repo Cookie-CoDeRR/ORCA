@@ -9,6 +9,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from ..state import AgentState
+from ..supervisor.prompts import PERSONA_AGENTS
 
 logger = logging.getLogger("ORCA.SynthesizerAgent")
 
@@ -29,8 +30,13 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
     route = state.get("route_plan") or {}
     policies = state.get("policy_advisories") or []
 
+    agent_meta = PERSONA_AGENTS.get(user_role, PERSONA_AGENTS["navigator"])
+    agent_name = agent_meta["name"]
+    agent_icon = agent_meta["icon"]
+    agent_title = agent_meta["title"]
+
     text_lower = user_query.lower().strip()
-    logger.info(f"✨ [Synthesizer Agent] Formatting response | Role: '{user_role}' | Mode: '{format_mode}' | Active Tasks: {active_tasks}")
+    logger.info(f"✨ [Synthesizer Agent] Formatting response via '{agent_name}' ({user_role}) | Mode: '{format_mode}' | Active Tasks: {active_tasks}")
 
     # 1. Check if user explicitly asked for a report
     is_report_requested = (
@@ -45,22 +51,15 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
     )
 
     if not active_tasks or (is_greeting and len(active_tasks) == 0):
-        role_greeting_intro = {
-            "researcher": "I am configured for **Scientific Marine Research & Oceanographic Analytics**.",
-            "student": "I am configured as your **Oceanography Learning & Educational Assistant**.",
-            "defense": "I am configured for **Naval Security, IMBL Standoff & Maritime Surveillance**.",
-            "navigator": "I am configured for **Commercial Navigation, Sea Safety & Fishery Support**."
-        }.get(user_role, "I am your AI Marine Intelligence Assistant.")
-
         greeting_text = (
-            f"### 🐬 Hello! I am Project ORCA\n"
-            f"**India's Sovereign Marine Intelligence & Conversational Advisory Assistant (SIH26176).**\n\n"
-            f"{role_greeting_intro}\n\n"
+            f"### {agent_icon} Namaste! I am {agent_name}\n"
+            f"**{agent_title} — Project ORCA (SIH26176)**\n\n"
+            f"{agent_meta['role_desc']}\n\n"
             f"How can I assist you right now? You can ask me:\n"
-            f"- **🐟 Fish & PFZ:** *'Which fish species are available near my position?'*\n"
-            f"- **🌊 Wave & Sea State:** *'What is the wave height and is it safe to venture tomorrow?'*\n"
-            f"- **🛡️ Border Distance:** *'What is my standoff distance to the IMBL?'*\n"
-            f"- **🧭 Fuel Path:** *'Find optimal route with current assist.'*\n\n"
+            f"- **🐟 Catch Potential:** *'Which fish species are available near my sector?'*\n"
+            f"- **🌊 Sea Conditions:** *'What is the wave height and is it safe to venture tomorrow?'*\n"
+            f"- **🛡️ Border Distance:** *'What is my standoff distance to the IMBL boundary?'*\n"
+            f"- **🧭 Fuel Route:** *'Find optimal route with current assistance.'*\n\n"
             f"*Click any sector on the map or ask directly!*"
         )
         return {
@@ -91,71 +90,65 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
     # ══════════════════════════════════════════════════════════════════════════
     if not is_report_requested:
         chat_lines = []
+        chat_lines.append(f"### {agent_icon} {agent_name} (`{target[0]}°N, {target[1]}°E`)")
 
-        # 1. Researcher Persona Response
+        # 1. Researcher Persona Response (Samudra-Vigyan)
         if user_role == "researcher":
-            chat_lines.append(f"**Oceanographic Telemetry @ `[{target[0]}°N, {target[1]}°E]`:**")
             if "ocean_analytics" in active_tasks:
-                chat_lines.append(f"• **SST:** `{sst}°C` (Thermal anomaly index: nominal)")
-                chat_lines.append(f"• **Chlorophyll-a:** `{chl} mg/m³` (MODIS/Sentinel-3 optical proxy)")
-                chat_lines.append(f"• **Significant Wave Height (SWH):** `{swh} m` (VHM0 surface spectrum)")
+                chat_lines.append(f"• **Sea Surface Temp (Ts):** `{sst}°C` (OSTIA thermal baseline)")
+                chat_lines.append(f"• **Chlorophyll-a Biomass:** `{chl} mg/m³` (Sentinel-3 OLCI proxy)")
+                chat_lines.append(f"• **Significant Wave Height (Hs):** `{swh} m` (VHM0 spectrum, {sea_state})")
                 if pfz_features:
                     top_pfz = pfz_features[0].get("properties", {})
-                    chat_lines.append(f"• **Thermal Front:** $\\nabla SST = 0.82^\\circ\\text{{C/km}}$ $\\rightarrow$ High pelagic concentration ({top_pfz.get('target_species', 'Pelagics')}, Conf: {int(top_pfz.get('confidence_score', 0.85)*100)}%).")
+                    chat_lines.append(f"• **Thermal Gradient:** $\\nabla SST = 0.82^\\circ\\text{{C/km}}$ $\\rightarrow$ Active pelagic aggregation ({top_pfz.get('target_species', 'Pelagics')}, Conf: {int(top_pfz.get('confidence_score', 0.85)*100)}%).")
             if "risk_geofencing" in active_tasks:
-                chat_lines.append(f"• **Boundary Geodesic:** `{dist_imbl} km` to sovereign IMBL line.")
+                chat_lines.append(f"• **Geodesic IMBL Clearance:** `{dist_imbl} km` to sovereign boundary line.")
             if "navigation" in active_tasks and route and "properties" in route:
                 props = route["properties"]
-                chat_lines.append(f"• **Hydrodynamic Route:** {props.get('distance_nautical_miles', 0)} NM (Est. Fuel Delta: -{props.get('estimated_fuel_savings_percent', 0)}% via current streamline).")
+                chat_lines.append(f"• **Hydrodynamic Drift Route:** {props.get('distance_nautical_miles', 0)} NM (Est. Fuel Delta: -{props.get('estimated_fuel_savings_percent', 0)}% via current streamline).")
 
-        # 2. Student / Learner Persona Response
+        # 2. Student / Learner Persona Response (Jala-Vidya)
         elif user_role == "student":
-            chat_lines.append(f"**Ocean Insights for `[{target[0]}°N, {target[1]}°E]`:**")
             if "ocean_analytics" in active_tasks:
-                chat_lines.append(f"• **Sea Conditions:** The water temperature is **{sst}°C** with a wave height of **{swh} meters** ({sea_state}).")
+                chat_lines.append(f"• **Water Temperature & Waves:** The sea surface is **{sst}°C** with waves at **{swh} meters** ({sea_state}).")
                 if pfz_features:
                     top_pfz = pfz_features[0].get("properties", {})
-                    chat_lines.append(f"• **Why Fish Gather Here:** The meeting of warm and cooler water creates a **thermal front** with high plankton density ({chl} mg/m³). This attracts species like **{top_pfz.get('target_species', 'Yellowfin Tuna')}**.")
+                    chat_lines.append(f"• **Why Marine Life Aggregates Here:** The collision of warm surface water and cooler deep water creates a **thermal front** with high plankton density ({chl} mg/m³). This forms the base of the food web for **{top_pfz.get('target_species', 'Yellowfin Tuna')}**.")
             if "risk_geofencing" in active_tasks:
-                chat_lines.append(f"• **Sovereign Boundaries:** You are currently **{dist_imbl} km** from the International Maritime Boundary Line (IMBL).")
+                chat_lines.append(f"• **Sovereignty Boundary:** Your position is **{dist_imbl} km** safely inside the Indian Exclusive Economic Zone (EEZ).")
 
-        # 3. Defense / Coast Guard Persona Response
+        # 3. Defense / Coast Guard Persona Response (Sagar-Rakshak)
         elif user_role == "defense":
-            chat_lines.append(f"**Tactical Sector Intelligence @ `[{target[0]}°N, {target[1]}°E]`:**")
-            chat_lines.append(f"• **IMBL Standoff:** `{dist_imbl} km` to sovereign treaty line ({'GREEN / SECURE' if dist_imbl > 20 else 'RED / CLOSE APPROACH'}).")
+            imbl_nm = round(dist_imbl / 1.852, 1)
+            chat_lines.append(f"• **IMBL Standoff:** `{dist_imbl} km` ({imbl_nm} NM) to treaty baseline ({'SECURE / GREEN' if dist_imbl > 20 else 'CLOSE APPROACH / AMBER'}).")
             if warnings:
-                chat_lines.append(f"• **Alert State:** ⚠️ {warnings[0]}")
-            chat_lines.append(f"• **Sea State:** SWH `{swh}m` | Surface wind: nominal | Marine VHF: Ch 16 active.")
+                chat_lines.append(f"• **Hazard Alert:** ⚠️ {warnings[0]}")
+            chat_lines.append(f"• **Tactical Sea State:** SWH `{swh}m` | Surface wind: nominal | Guard: VHF Ch 16 active.")
 
-        # 4. Fisherman / Navigator Persona (Default)
+        # 4. Fisherman / Navigator Persona (Matsya-Sutradhar)
         else:
             if "ocean_analytics" in active_tasks and len(active_tasks) == 1:
-                # Specific question about fish or weather
                 if any(w in text_lower for w in ["fish", "pfz", "tuna", "species", "catch", "feeding"]):
                     top_species = [f.get("properties", {}).get("target_species", "Pelagics") for f in pfz_features[:2]]
-                    chat_lines.append(f"🐟 **Fish Availability near `[{target[0]}°N, {target[1]}°E]`:**")
-                    chat_lines.append(f"Active aggregation detected at SST **{sst}°C** with high plankton ({chl} mg/m³).")
+                    chat_lines.append(f"Active fish aggregation detected at SST **{sst}°C** with high plankton ({chl} mg/m³).")
                     if top_species:
-                        chat_lines.append(f"• Primary targets: **{', '.join(top_species)}**.")
-                    chat_lines.append(f"• Best feeding time: **Dawn (04:30 – 07:30 IST)** and **Dusk (17:30 – 20:30 IST)**.")
+                        chat_lines.append(f"• Target species: **{', '.join(top_species)}**.")
+                    chat_lines.append(f"• Best feeding window: **Dawn (04:30 – 07:30 IST)** and **Dusk (17:30 – 20:30 IST)**.")
                 elif any(w in text_lower for w in ["weather", "wave", "safe", "venture", "swh", "temp"]):
                     is_safe_msg = "✅ Safe to venture into sea" if swh < 2.0 else "⚠️ Caution advised due to rough waves"
-                    chat_lines.append(f"🌊 **Sea State near `[{target[0]}°N, {target[1]}°E]`:**")
-                    chat_lines.append(f"• **Status:** {is_safe_msg}")
-                    chat_lines.append(f"• **Wave Height:** `{swh} meters` | **SST:** `{sst}°C` | **Condition:** {sea_state}.")
+                    chat_lines.append(f"• **Operational Status:** {is_safe_msg}")
+                    chat_lines.append(f"• **Wave Height:** `{swh} meters` | **Water Temp:** `{sst}°C` | **Sea State:** {sea_state}.")
                 else:
-                    chat_lines.append(f"🌊 Sea State is **{sea_state}** with wave height `{swh}m` and SST `{sst}°C`.")
+                    chat_lines.append(f"Sea State is **{sea_state}** with wave height `{swh}m` and SST `{sst}°C`.")
             elif "risk_geofencing" in active_tasks and len(active_tasks) == 1:
-                chat_lines.append(f"🛡️ **Border Safety Check:** You are **{dist_imbl} km** clear of the nearest International Maritime Boundary Line. Waters are clear of restricted no-trawl zones.")
+                chat_lines.append(f"🛡️ **Border Clearance:** You are **{dist_imbl} km** clear of the nearest IMBL boundary. Clear of restricted no-trawl zones.")
             elif "navigation" in active_tasks and len(active_tasks) == 1:
                 props = route.get("properties", {}) if route else {}
-                chat_lines.append(f"🧭 **Optimal Course:** Distance: `{props.get('distance_nautical_miles', 18)} NM` | Est. Time: `{props.get('total_time_hours', 1.6)} hrs` | **Fuel Savings: `{props.get('estimated_fuel_savings_percent', 22)}%`** riding current drift.")
+                chat_lines.append(f"🧭 **Optimal Course:** Distance: `{props.get('distance_nautical_miles', 18)} NM` | Est. Time: `{props.get('total_time_hours', 1.6)} hrs` | **Fuel Savings: `{props.get('estimated_fuel_savings_percent', 22)}%`** riding current streamline.")
             else:
-                # Concise summary of active tasks
                 top_sp = pfz_features[0].get("properties", {}).get("target_species", "Pelagic Finfish") if pfz_features else "Mixed Pelagics"
-                chat_lines.append(f"⚓ **Sector Summary `[{target[0]}°N, {target[1]}°E]`:**")
-                chat_lines.append(f"• **Condition:** {sea_state} (Wave: `{swh}m`, SST: `{sst}°C`).")
-                chat_lines.append(f"• **Fisheries:** Detected **{top_sp}** in thermal front (~{chl} mg/m³ chlorophyll).")
+                chat_lines.append(f"• **Sea State:** {sea_state} (Wave: `{swh}m`, SST: `{sst}°C`).")
+                chat_lines.append(f"• **Catch Potential:** Detected **{top_sp}** in thermal front (~{chl} mg/m³ plankton).")
                 chat_lines.append(f"• **Safety:** `{dist_imbl} km` to IMBL boundary (Clear).")
 
         synthesized_markdown = "\n".join(chat_lines).strip()

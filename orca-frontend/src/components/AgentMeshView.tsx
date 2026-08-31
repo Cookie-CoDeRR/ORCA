@@ -63,11 +63,13 @@ const NODES_DATA: AgentNode[] = [
       target_coords: [20.652, 70.118],
       intent_summary: "Fishery feasibility & IMBL safety check for Veraval pelagic fleet",
       tasks_to_trigger: ["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"],
+      active_persona_agent: "Matsya-Sutradhar (Fishery & Tactical Navigation)",
     },
     toolQueryLog: `[Supervisor] Parsing query with StructuredOutput(SubTaskPlan)...
 [Supervisor] Matched Indian Coastal Gazetteer: 'Veraval' -> [20.902, 70.368]
+[Supervisor] Routing to Persona Agent: 'Matsya-Sutradhar'
 [Supervisor] Emitted 4 parallel asynchronous task dispatches.`,
-    description: "Decomposes unstructured natural language into structured Pydantic task graphs and normalizes vernacular coastal port names.",
+    description: "Decomposes unstructured natural language into structured Pydantic task graphs and dynamically routes to the appropriate persona agent.",
   },
   {
     id: "ocean_analytics",
@@ -139,72 +141,62 @@ FROM sovereign_imbl_boundaries WHERE zone = 'pakistan_imbl';
     inputPayload: {
       origin: [70.368, 20.902],
       destination: [70.118, 20.652],
-      cruising_speed_knots: 11.3,
-      current_vectors: { uo: 0.42, vo: -0.21 },
+      engine_speed_knots: 10.0,
+      current_field_active: true,
     },
     outputPayload: {
-      nautical_distance_nm: 18.0,
-      estimated_transit_hours: 1.59,
-      fuel_savings_percentage: 22.0,
-      effective_sog_knots: 11.32,
-      optimal_heading_deg: 221.4,
-      geojson_waypoints_count: 14,
+      total_distance_nm: 21.4,
+      estimated_time_hours: 1.8,
+      fuel_savings_percent: 22.4,
+      route_waypoints_count: 14,
     },
-    toolQueryLog: `[Navigation] Initializing A* Heuristic Grid over Eulerian Field...
-[Navigation] Integrated current vector: [uo=0.42 m/s, vo=-0.21 m/s]
-[Navigation] SOG Adjusted: 11.32 kts | Fuel Delta: -22.0% (Assisting Current Stream)`,
-    description: "Evaluates surface current drift vectors to compute continuous fuel-optimal paths between harbor origins and fishing zones.",
-    formula: "\\vec{V}_{ground} = \\vec{V}_{ship} + \\vec{V}_{current} + K_{wind} \\cdot \\vec{V}_{wind}",
+    toolQueryLog: `[A* Nav] Integrating Mercator currents (uo=0.32 m/s, vo=-0.15 m/s)
+[A* Nav] Optimal streamline found. Fuel consumption delta: -22.4% vs rhumb line.`,
+    description: "Evaluates cost surfaces over dynamic vector fields to produce fuel-minimizing trajectories riding ocean currents.",
   },
   {
     id: "policy_rag",
-    name: "5. Sovereign Policy RAG",
+    name: "5. Policy RAG Node",
     category: "Vector RAG",
-    modelCore: "BGE-M3 (1024-dim) + pgvector HNSW",
+    modelCore: "pgvector + text-embedding-3-small",
     icon: BookOpen,
     status: "completed",
     latencyMs: 34,
     inputPayload: {
-      query: "Monsoon fishing ban and mesh size regulations for Gujarat coast Veraval",
+      query: "Monsoon fishing ban dates Gujarat Arabian Sea",
       top_k: 3,
-      state_jurisdiction: "Gujarat",
     },
     outputPayload: {
-      monsoon_ban_active: false,
-      ban_schedule: "West Coast 61-day ban: June 1 to July 31 (Currently Inactive)",
-      mandatory_safety_sop: "VHF Channel 16 continuous watch + BIS-approved life jackets",
-      source_citation: "Gujarat Fisheries Act Gaz. Notif. GJR-2026-FSH",
+      matched_circular: "DoF/GOI/2026/M-BAN-WEST-COAST",
+      ban_active: false,
+      regulatory_clearance: "APPROVED",
     },
-    toolQueryLog: `SELECT doc_id, chunk_text, 1 - (embedding <=> query_vec) AS similarity
-FROM maritime_regulatory_vault
-WHERE state = 'Gujarat' ORDER BY similarity DESC LIMIT 3;
--> Matched Clause: 'Uniform Seasonal Fishing Ban 2026' (Score: 0.91)`,
-    description: "Retrieves statutory fisheries gazettes, seasonal trawl bans, and Coast Guard safety bulletins using semantic dense retrieval.",
+    toolQueryLog: `[Policy RAG] Embedding query with text-embedding-3-small (1536-dim)
+[Policy RAG] Top Cosine Match: 'Gujarat Marine Fisheries Regulation Act (GMFRA 2003)' (Score: 0.91)`,
+    description: "Semantic vector retrieval over Indian maritime policy documents, seasonal fishing bans, and Coast Guard regulations.",
   },
   {
     id: "synthesizer",
     name: "6. Multilingual Synthesizer",
     category: "Synthesis",
-    modelCore: "Qwen 2.5 Multi-Modal Markdown + Indic Translation",
+    modelCore: "Qwen 2.5 7B-Instruct",
     icon: FileCheck,
     status: "completed",
     latencyMs: 510,
     inputPayload: {
-      telemetry_state: "SST 28.4°C, Chl-a 1.26 mg/m³, SWH 1.61m",
-      risk_state: "IMBL 45.0 km, Safe",
-      route_state: "18 NM, 1.59 hrs, -22% Fuel",
-      policy_state: "Ban Inactive, VHF 16 Mandatory",
-      language_target: "EN",
+      persona_agent: "Matsya-Sutradhar",
+      user_role: "navigator",
+      format_mode: "conversational",
     },
     outputPayload: {
-      advisory_markdown: "Advisory generated with 5-section executive format.",
+      advisory_markdown: "Advisory generated via Matsya-Sutradhar with targeted species and feeding window.",
       deckgl_geojson_layers: ["pfz_hexagons", "current_arcs", "imbl_line", "a_star_path"],
       confidence_score: 0.94,
     },
-    toolQueryLog: `[Synthesizer] Compiling multi-agent state into structured advisory...
-[Synthesizer] Stripped LLM markdown artifacts (*** -> clean headers)
-[Synthesizer] Generated deck.gl FeatureCollection with 3 active geospatial layers.`,
-    description: "Cross-correlates findings from all 5 workers, verifies consistency, formats executive advisories, and generates GeoJSON map layers.",
+    toolQueryLog: `[Synthesizer] Persona active: Matsya-Sutradhar (Fishery & Tactical Navigation)
+[Synthesizer] Compiling multi-agent state into structured advisory...
+[Synthesizer] Generated deck.gl FeatureCollection with active geospatial layers.`,
+    description: "Reconciles findings from all 5 workers and outputs tailored insights via the active specialized persona agent.",
   },
 ];
 

@@ -62,6 +62,7 @@ import { buildGraticuleLines } from "@/lib/graticuleLayer";
 import {
   connectAisStream,
   tickSimVessels,
+  generateSimVessels,
   Vessel,
   VesselType,
   computeClientColregs,
@@ -447,7 +448,7 @@ function DashboardContent() {
   const [dataError, setDataError] = useState<string | null>(null);
 
   // AIS ships
-  const [vessels, setVessels] = useState<Vessel[]>([]);
+  const [vessels, setVessels] = useState<Vessel[]>(() => generateSimVessels());
   const [aisConnected, setAisConnected] = useState(false);
   const [showVessels, setShowVessels] = useState(true);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
