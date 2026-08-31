@@ -6,7 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
-import { ScatterplotLayer, GeoJsonLayer, LineLayer, PathLayer } from "@deck.gl/layers";
+import { ScatterplotLayer, GeoJsonLayer, LineLayer, PathLayer, ColumnLayer, PolygonLayer, BitmapLayer } from "@deck.gl/layers";
+import { TileLayer } from "@deck.gl/geo-layers";
 import Map from "react-map-gl/maplibre";
 import * as maplibregl from "maplibre-gl";
 import { v4 as uuidv4 } from "uuid";
@@ -907,7 +908,30 @@ function DashboardContent() {
 
   const deckLayers: any[] = [];
 
-  // ━━━ 1. TACTICAL GRATICULE MESH ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ 1. REAL NASA GIBS SEA SURFACE TEMPERATURE (Continuous Raster TileLayer) ──
+  // Consumes high-resolution GHRSST L4 MUR global sea surface temperature imagery
+  if (layerVisibility.weather) {
+    deckLayers.push(
+      new TileLayer({
+        id: "layer-nasa-gibs-sst",
+        data: "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GHRSST_L4_MUR_Sea_Surface_Temperature/default/2024-05-01/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png",
+        minZoom: 0,
+        maxZoom: 7,
+        tileSize: 256,
+        opacity: 0.55,
+        renderSubLayers: (props: any) => {
+          const { boundingBox } = props.tile;
+          return new BitmapLayer(props, {
+            data: undefined,
+            image: props.data,
+            bounds: [boundingBox[0][0], boundingBox[0][1], boundingBox[1][0], boundingBox[1][1]],
+          });
+        },
+      })
+    );
+  }
+
+  // ━━━ 2. TACTICAL GRATICULE MESH ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   deckLayers.push(
     new LineLayer({
       id: "layer-graticule",
@@ -922,25 +946,6 @@ function DashboardContent() {
       pickable: false,
     })
   );
-
-  // ━━━ 2. WEATHER (SST Thermal Heatmap Surface) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (layerVisibility.weather && oceanPoints.length > 0) {
-    deckLayers.push(
-      new ScatterplotLayer({
-        id: "layer-weather-sst",
-        data: oceanPoints,
-        getPosition: (d: any) => d.position,
-        getFillColor: (d: any) => sstColor(d.sst),
-        getLineColor: [200, 230, 255, 40],
-        getRadius: (d: any) => 26000 + d.waveHeight * 8000,
-        radiusUnits: "meters",
-        stroked: false,
-        filled: true,
-        opacity: 0.45,
-        pickable: true,
-      })
-    );
-  }
 
   // ━━━ 3. OCEAN CURRENTS (Sleek Surface Hydrodynamic Flow Vectors) ━━━━━━━━━
   // Rendered directly on the sea plane (No giant flying 3D arcs)
@@ -996,18 +1001,18 @@ function DashboardContent() {
     );
   }
 
-  // ━━━ 5. AUTHENTIC POTENTIAL FISHING ZONES (Thermal & Chl-a Aggregations) ──
-  // Clean, high-contrast, military-grade radar ring with interactive hover metadata
+  // ━━━ 5. POTENTIAL FISHING ZONES (3D Extruded ColumnLayer & Interactive Reticles)
+  // Distinct 3D columns with elevation proportional to fish catch probability
   if (layerVisibility.fishingZones && pfzPoints.length > 0) {
-    // 5A: Outer Thermal Boundary Ring
+    // 5A: Radiant Ground Base Halo
     deckLayers.push(
       new ScatterplotLayer({
-        id: "layer-pfz-outer-ring",
+        id: "layer-pfz-base-halo",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [16, 185, 129, 25],
+        getFillColor: [16, 185, 129, 35],
         getLineColor: [52, 211, 153, 200],
-        getRadius: (d: any) => 14000 + (d.confidence || 75) * 80,
+        getRadius: (d: any) => 9000 + (d.confidence || 75) * 40,
         radiusUnits: "meters",
         stroked: true,
         filled: true,
@@ -1017,20 +1022,22 @@ function DashboardContent() {
       })
     );
 
-    // 5B: Inner Chlorophyll Core Target Reticle
+    // 5B: 3D Extruded Elevation Column
     deckLayers.push(
-      new ScatterplotLayer({
-        id: "layer-pfz-core",
+      new ColumnLayer({
+        id: "layer-pfz-3d-columns",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [16, 185, 129, 160],
-        getLineColor: [167, 243, 208, 240],
-        getRadius: 4500,
-        radiusUnits: "meters",
+        getFillColor: (d: any) => [16, 185, 129, Math.round(140 + (d.confidence || 75) * 1.1)],
+        getLineColor: [167, 243, 208, 255],
+        getElevation: (d: any) => (d.confidence || 75) * 450,
+        radius: 4500,
+        elevationScale: 1,
         stroked: true,
         filled: true,
-        lineWidthMinPixels: 2,
-        opacity: 0.95,
+        extruded: true,
+        lineWidthMinPixels: 1.5,
+        opacity: 0.9,
         pickable: true,
       })
     );
@@ -1042,7 +1049,7 @@ function DashboardContent() {
         data: pfzPoints,
         getPosition: (d: any) => d.position,
         getFillColor: [255, 255, 255, 250],
-        getRadius: 1200,
+        getRadius: 1000,
         radiusUnits: "meters",
         radiusMinPixels: 3.5,
         stroked: false,
@@ -1686,7 +1693,7 @@ function DashboardContent() {
             </div>
 
             {/* CONTEXTUAL BOTTOM TELEMETRY STRIP (ROLE & LOCATION SPECIFIC) */}
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl border border-white/15 bg-zinc-950/95 shadow-2xl backdrop-blur-xl text-xs font-mono select-none">
+            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl border border-slate-800 bg-slate-900/95 shadow-2xl backdrop-blur-xl text-xs font-mono select-none border-t border-slate-700/60">
               {!selectedCoordinates ? (
                 <div className="flex items-center gap-2 text-zinc-400">
                   <MapPin className="h-3.5 w-3.5 text-sky-400 animate-pulse" />

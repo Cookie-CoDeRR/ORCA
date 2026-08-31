@@ -141,10 +141,10 @@ export default function LayerControlPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.18 }}
-            className="absolute right-0 top-12 w-72 rounded-2xl border border-white/15 bg-zinc-950/98 shadow-2xl backdrop-blur-2xl overflow-hidden"
+            className="absolute right-0 top-12 w-72 max-h-[65vh] rounded-2xl border border-white/15 bg-zinc-950/98 shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col z-40"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
               <div className="flex items-center gap-2">
                 <Layers className="h-4 w-4 text-white" />
                 <span className="text-xs font-bold text-white">Map Layer Controls</span>
@@ -157,8 +157,8 @@ export default function LayerControlPanel({
               </button>
             </div>
 
-            {/* Layer Rows */}
-            <div className="p-2 space-y-1">
+            {/* Layer Rows with Scrollbar */}
+            <div className="p-2 space-y-1 overflow-y-auto flex-1">
               {LAYER_DEFS.map((layer) => {
                 const Icon = layer.icon;
                 const isOn = visibility[layer.id];

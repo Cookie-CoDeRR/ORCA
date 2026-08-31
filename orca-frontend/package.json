@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@deck.gl/aggregation-layers": "^9.3.10",
+    "@deck.gl/geo-layers": "^9.3.11",
     "@deck.gl/layers": "^9.3.10",
     "@deck.gl/react": "^9.3.10",
     "canvas-confetti": "^1.9.4",
