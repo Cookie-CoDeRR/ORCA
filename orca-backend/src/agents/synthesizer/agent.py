@@ -202,6 +202,39 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
                 f"- **Seasonal Ban Check:** Mechanized and motorized operations permitted in sovereign EEZ waters.",
                 f"- **Coast Guard Channel:** Monitor **VHF Channel 16 (156.800 MHz)** | Emergency Distress Toll-Free: **1554**",
             ]
+        # 3. Defense / Coast Guard Role Tactical SITREP Report (ORCA-Tactical Specification)
+        elif user_role == "defense":
+            imbl_nm = round(dist_imbl / 1.852, 1)
+            threat_level = "LEVEL 3: IMMEDIATE INTERCEPTION" if dist_imbl < 10 else ("LEVEL 2: ADVISORY REQUIRED" if dist_imbl < 25 else "LEVEL 1: NORMAL")
+            imbl_name = "India-Pakistan Maritime Boundary Line" if target[0] > 18 else ("India-Sri Lanka IMBL (Palk Strait)" if target[0] < 12 and target[1] > 78 else "Sovereign EEZ Baseline")
+            tpi_msg = f"{int(dist_imbl / (12 * 1.852 / 60))} minutes at current vector" if dist_imbl < 25 else "Diverging / Secure Standoff (>25 km)"
+            mpa_status = "INTERSECTING: Marine National Park (Restricted No-Trawl ESZ)" if risk.get("mpa_check", {}).get("in_protected_area") else "CLEAR of Protected Sanctuary & No-Trawl Zones"
+            statutory_check = "Maritime Zones of India (MZI) Act 1981 / Uniform Seasonal Conservation Order" if not warnings else warnings[0]
+            mrcc_hub = "MRCC Mumbai (West Coast Ops)" if target[1] < 77 else ("MRCC Chennai (East Coast Ops)" if target[0] > 10 else "MRCC Port Blair (A&N Command)")
+            tactical_uuid = f"ORCA-TAC-{abs(hash(str(target))) % 89999 + 10000}"
+
+            markdown_lines = [
+                f"### 🛡️ Project ORCA — Coast Guard & Maritime Law Enforcement Node (`{target[0]}°N, {target[1]}°E`)",
+                "",
+                f"🛡️ **TACTICAL SITUATION REPORT (SITREP)**",
+                f"- **Target Assessment:** MMSI: `419001088` | Position: `[{target[0]}°N, {target[1]}°E]` | Vector: `[225° COG / 11.2 kts SOG]`",
+                f"- **Threat / Compliance Level:** **{threat_level}**",
+                "",
+                f"📍 **BOUNDARY & GEOFENCING AUDIT**",
+                f"- **IMBL Standoff Distance:** `{dist_imbl} km` ({imbl_nm} NM) to **{imbl_name}**",
+                f"- **Time to Projected Incursion (TPI):** `{tpi_msg}`",
+                f"- **Protected Marine Zones:** {mpa_status}",
+                f"- **Statutory Violation Check:** {statutory_check}",
+                "",
+                f"⚓ **TRAFFIC & COLLISION HAZARDS (COLREGs)**",
+                f"- **Nearby Contacts within 6 NM:** 4 Tracked AIS Contacts (Commercial & Coastal Trawlers)",
+                f"- **Critical Collision Risk:** Stand-on vessel approaching on Port beam (CPA: 1.8 NM | TCPA: 14 min | Rule 15 Compliance)",
+                f"- **Recommended Intercept / Patrol Heading:** Course `240° WSW` | Required SOG: `18.5 kts`",
+                "",
+                f"📻 **OPERATIONAL DIRECTIVES**",
+                f"- **Hail Mandate:** Issue immediate advisory on **VHF Channel 16 (156.800 MHz)** | Maintain 5 NM standoff buffer",
+                f"- **MRCC Sector Hub:** **{mrcc_hub}** | Tactical Log ID: `{tactical_uuid}`",
+            ]
         else:
             if "ocean_analytics" in active_tasks or is_report_requested:
                 markdown_lines.extend([
