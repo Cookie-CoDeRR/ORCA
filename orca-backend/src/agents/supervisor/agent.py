@@ -17,40 +17,92 @@ from ...agent.llm_config import get_chat_llm, check_ollama_health
 
 logger = logging.getLogger("ORCA.SupervisorAgent")
 
-# Sovereign Indian coastal ports & landing centers gazetteer
+# Sovereign Indian coastal ports, landing centers, and maritime zones gazetteer
 GAZETTEER = {
+    # Gujarat / Saurashtra
     "veraval": [20.902, 70.368],
     "porbandar": [21.638, 69.595],
     "okha": [22.470, 69.075],
     "kandla": [23.000, 70.220],
-    "ratnagiri": [16.995, 73.275],
+    "saurashtra": [21.200, 69.800],
+    "gujarat": [20.902, 70.368],
+    "gulf of kutch": [22.600, 69.400],
+    "gulf of khambhat": [21.500, 72.200],
+    "diu": [20.700, 70.980],
+    "daman": [20.400, 72.830],
+    "bhavnagar": [21.760, 72.150],
+    
+    # Maharashtra / Konkan
     "mumbai": [18.915, 72.825],
+    "ratnagiri": [16.995, 73.275],
+    "alibag": [18.640, 72.870],
+    "vasai": [19.390, 72.830],
+    "jaigad": [17.300, 73.200],
+    "konkan": [17.500, 73.000],
+    "maharashtra": [18.915, 72.825],
+    
+    # Goa / Karnataka
     "goa": [15.498, 73.827],
     "panaji": [15.498, 73.827],
+    "mormugao": [15.410, 73.800],
     "karwar": [14.818, 74.130],
     "mangalore": [12.855, 74.832],
     "malpe": [13.350, 74.700],
+    "karnataka": [13.350, 74.700],
+    
+    # Kerala / Malabar
     "kochi": [9.942, 76.262],
     "cochin": [9.942, 76.262],
+    "munambam": [10.180, 76.160],
+    "beypore": [11.160, 75.800],
     "kollam": [8.893, 76.589],
+    "vizhinjam": [8.370, 76.990],
     "trivandrum": [8.487, 76.952],
+    "kerala": [9.942, 76.262],
+    "malabar": [11.000, 75.800],
+    
+    # Tamil Nadu / Palk Bay / Gulf of Mannar
     "kanyakumari": [8.088, 77.538],
     "tuticorin": [8.800, 78.160],
+    "thoothukudi": [8.800, 78.160],
     "rameswaram": [9.285, 79.315],
     "palk strait": [9.500, 79.500],
+    "palk bay": [9.500, 79.500],
+    "gulf of mannar": [8.700, 78.500],
     "nagapattinam": [10.765, 79.842],
+    "cuddalore": [11.750, 79.770],
     "chennai": [13.128, 80.298],
+    "madras": [13.128, 80.298],
+    "tamil nadu": [11.500, 80.000],
+    "coromandel": [12.500, 80.500],
+    
+    # Andhra Pradesh
+    "krishna godavari": [15.800, 81.500],
+    "machilipatnam": [16.180, 81.140],
+    "kakinada": [16.989, 82.247],
     "visakhapatnam": [17.698, 83.298],
     "vizag": [17.698, 83.298],
-    "kakinada": [16.989, 82.247],
+    "andhra": [16.500, 82.000],
+    
+    # Odisha / West Bengal
+    "gopalpur": [19.260, 84.910],
     "paradip": [20.298, 86.685],
     "dhamra": [20.800, 86.950],
-    "kolkata": [22.572, 88.363],
+    "odisha": [20.000, 86.500],
     "digha": [21.626, 87.507],
+    "haldia": [22.020, 88.060],
+    "kolkata": [22.572, 88.363],
+    "sundarbans": [21.800, 88.800],
+    "bengal": [21.600, 87.800],
+    
+    # Island Territories
     "port blair": [11.672, 92.735],
-    "kavaratti": [10.566, 72.641],
-    "lakshadweep": [10.566, 72.641],
     "andaman": [11.672, 92.735],
+    "nicobar": [7.000, 93.800],
+    "kavaratti": [10.566, 72.641],
+    "agatti": [10.850, 72.180],
+    "minicoy": [8.280, 73.050],
+    "lakshadweep": [10.566, 72.641],
 }
 
 BASIN_DEFAULT_COORDS = {

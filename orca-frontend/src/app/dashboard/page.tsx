@@ -599,8 +599,113 @@ function DashboardContent() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, currentThoughts]);
 
+  // Interactive DeckGL Tooltip on Hover for PFZ clusters and AIS vessels
+  const getMapTooltip = (info: any) => {
+    if (!info.object) return null;
+    const obj = info.object;
+    const layerId = info.layer?.id;
+
+    // 1. PFZ Fishing Cluster Tooltip
+    if (layerId?.startsWith("layer-pfz")) {
+      const speciesList = obj.speciesList || [];
+      const speciesBadges = speciesList
+        .map(
+          (sp: any) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:3px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div>
+              <strong style="color:#ffffff; font-size:11px;">${sp.name}</strong>
+              <span style="color:#94a3b8; font-size:9px; font-style:italic; margin-left:4px;">(${sp.sciName})</span>
+            </div>
+            <span style="color:#34d399; font-weight:700; font-size:10px; font-family:monospace; background:rgba(6,78,59,0.7); border:1px solid rgba(52,211,153,0.3); padding:1px 5px; border-radius:4px;">
+              ${sp.confidence}% Catch
+            </span>
+          </div>`
+        )
+        .join("");
+
+      return {
+        html: `
+          <div style="background:#090d16; color:#f1f5f9; padding:12px 14px; border-radius:10px; border:1px solid #1e293b; box-shadow:0 12px 30px -5px rgba(0,0,0,0.9); font-family:system-ui, sans-serif; min-width:280px; max-width:330px; pointer-events:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:15px;">🐟</span>
+                <div>
+                  <div style="font-weight:700; font-size:12px; color:#ffffff;">${obj.name || "Potential Fishing Zone"}</div>
+                  <div style="font-size:9px; color:#64748b; font-family:monospace;">[${obj.position[1]}°N, ${obj.position[0]}°E] • ${obj.zone === "bay_of_bengal" ? "Bay of Bengal" : "Arabian Sea"}</div>
+                </div>
+              </div>
+              <span style="background:#064e3b; color:#34d399; font-size:10px; font-weight:700; font-family:monospace; padding:2px 6px; border-radius:4px; border:1px solid #059669; white-space:nowrap;">
+                ${obj.confidence}% PFZ
+              </span>
+            </div>
+
+            <div style="margin-bottom:8px;">
+              <div style="font-size:9px; text-transform:uppercase; letter-spacing:0.05em; color:#94a3b8; font-weight:700; margin-bottom:2px;">Target Species In This Area:</div>
+              ${speciesBadges || `<div style="font-size:11px; color:#ffffff; font-weight:600;">${obj.species}</div>`}
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; background:#0f172a; padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); font-family:monospace; font-size:10px; margin-bottom:8px;">
+              <div><span style="color:#64748b;">SST (Temp):</span> <strong style="color:#38bdf8;">${obj.sst}°C</strong></div>
+              <div><span style="color:#64748b;">Chlorophyll:</span> <strong style="color:#34d399;">${obj.chlorophyll || 1.25} mg/m³</strong></div>
+              <div><span style="color:#64748b;">Wave (Hs):</span> <strong style="color:#e2e8f0;">${obj.waveHeight || 1.4} m</strong></div>
+              <div><span style="color:#64748b;">Thermal Front:</span> <strong style="color:#f59e0b;">∇ ${obj.thermalGradient || "0.82°C/km"}</strong></div>
+            </div>
+
+            <div style="font-size:10px; color:#94a3b8; line-height:1.3; background:rgba(59,130,246,0.08); padding:5px 7px; border-radius:4px; border-left:2px solid #38bdf8;">
+              <strong style="color:#e2e8f0;">⏰ Feeding Window:</strong> ${obj.feedingWindow || "Dawn (04:30 – 07:30 IST) & Dusk (17:30 – 20:30 IST)"}
+              <div style="color:#64748b; font-size:9px; margin-top:2px;">📍 ~${obj.distanceOffshoreKm || 28} km offshore • Depth: ~${obj.depthMeters || 60}m</div>
+            </div>
+            
+            <div style="font-size:9px; color:#38bdf8; text-align:center; margin-top:6px; font-weight:600;">
+              🖱 Click to lock sector & calculate optimal route
+            </div>
+          </div>
+        `,
+      };
+    }
+
+    // 2. AIS Vessel Tooltip
+    if (layerId?.startsWith("layer-ais") || obj.mmsi) {
+      return {
+        html: `
+          <div style="background:#090d16; color:#f1f5f9; padding:10px 12px; border-radius:8px; border:1px solid #1e293b; font-family:monospace; font-size:11px; max-width:260px; pointer-events:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px;">
+              <strong style="color:#38bdf8; font-size:12px;">🚢 ${obj.name || "VESSEL"}</strong>
+              <span style="color:#94a3b8; font-size:9px;">MMSI: ${obj.mmsi}</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:10px;">
+              <div><span style="color:#64748b;">Speed (SOG):</span> <strong style="color:#ffffff;">${obj.sog} kts</strong></div>
+              <div><span style="color:#64748b;">Course (COG):</span> <strong style="color:#ffffff;">${obj.cog}°</strong></div>
+              <div><span style="color:#64748b;">Type:</span> <strong style="color:#34d399;">${obj.type}</strong></div>
+              <div><span style="color:#64748b;">Flag:</span> <strong style="color:#ffffff;">${obj.flag || "IND"}</strong></div>
+            </div>
+          </div>
+        `,
+      };
+    }
+
+    return null;
+  };
+
   // Map Click
   const handleMapClick = (info: any) => {
+    // 1. If clicked directly on a PFZ point, select it and update telemetry immediately
+    if (info.object && (info.layer?.id?.startsWith("layer-pfz") || info.object.speciesList)) {
+      const pfz = info.object;
+      const [lon, lat] = pfz.position;
+      setSelectedCoordinates([lon, lat]);
+      setActionCardData((prev) => ({
+        ...prev,
+        sst: pfz.sst,
+        chlorophyll: pfz.chlorophyll || 1.25,
+        swh: pfz.waveHeight || 1.4,
+        confidence: pfz.confidence || 88,
+        imblStandoffKm: parseFloat((25 + Math.abs(lat - 22.5) * 15).toFixed(1)),
+      }));
+      return;
+    }
+
+    // 2. Standard map click
     if (info.coordinate) {
       const [lon, lat] = info.coordinate;
       const roundedLon = parseFloat(lon.toFixed(4));
@@ -892,37 +997,40 @@ function DashboardContent() {
   }
 
   // ━━━ 5. AUTHENTIC POTENTIAL FISHING ZONES (Thermal & Chl-a Aggregations) ──
-  // Multi-tier realistic visual: diffuse thermal aura + dense chlorophyll core + tactical reticle
+  // Clean, high-contrast, military-grade radar ring with interactive hover metadata
   if (layerVisibility.fishingZones && pfzPoints.length > 0) {
-    // 5A: Diffuse Thermal Front Glow (Outer Radiant Aura)
+    // 5A: Outer Thermal Boundary Ring
     deckLayers.push(
       new ScatterplotLayer({
-        id: "layer-pfz-aura",
+        id: "layer-pfz-outer-ring",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [52, 211, 153, 35],
-        getRadius: (d: any) => 30000 + d.confidence * 250,
+        getFillColor: [16, 185, 129, 25],
+        getLineColor: [52, 211, 153, 200],
+        getRadius: (d: any) => 14000 + (d.confidence || 75) * 80,
         radiusUnits: "meters",
-        stroked: false,
+        stroked: true,
         filled: true,
-        opacity: 0.8,
-        pickable: false,
+        lineWidthMinPixels: 1.5,
+        opacity: 0.85,
+        pickable: true,
       })
     );
 
-    // 5B: High-Chlorophyll Aggregation Core
+    // 5B: Inner Chlorophyll Core Target Reticle
     deckLayers.push(
       new ScatterplotLayer({
         id: "layer-pfz-core",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: (d: any) => [16, 185, 129, Math.round(110 + d.confidence * 0.8)],
-        getLineColor: [167, 243, 208, 200],
-        getRadius: (d: any) => 12000 + d.confidence * 90,
+        getFillColor: [16, 185, 129, 160],
+        getLineColor: [167, 243, 208, 240],
+        getRadius: 4500,
         radiusUnits: "meters",
         stroked: true,
-        lineWidthMinPixels: 1.5,
-        opacity: 0.9,
+        filled: true,
+        lineWidthMinPixels: 2,
+        opacity: 0.95,
         pickable: true,
       })
     );
@@ -933,10 +1041,10 @@ function DashboardContent() {
         id: "layer-pfz-center-reticle",
         data: pfzPoints,
         getPosition: (d: any) => d.position,
-        getFillColor: [255, 255, 255, 240],
-        getRadius: 2500,
+        getFillColor: [255, 255, 255, 250],
+        getRadius: 1200,
         radiusUnits: "meters",
-        radiusMinPixels: 3,
+        radiusMinPixels: 3.5,
         stroked: false,
         filled: true,
         opacity: 1,
@@ -1771,6 +1879,7 @@ function DashboardContent() {
               controller={true}
               layers={deckLayers}
               onClick={handleMapClick}
+              getTooltip={getMapTooltip}
               getCursor={({ isHovering }) => (isHovering ? "pointer" : "crosshair")}
               style={{ width: "100%", height: "100%" }}
             >
