@@ -154,35 +154,55 @@ export default function CommandPortalLayout({
       {/* MAIN PORTAL BODY (TOP BAR + ACTIVE VIEW CONTENT)                      */}
       {/* ===================================================================== */}
       <div className="relative flex flex-col flex-1 h-full overflow-hidden bg-black">
-        {/* TOP COMMAND BAR */}
-        <header className="relative z-20 flex items-center justify-between h-14 px-4 md:px-6 bg-zinc-950/95 border-b border-white/10 backdrop-blur-xl">
-          {/* Left Title & Status */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm md:text-base font-bold tracking-tight text-white flex items-center gap-2">
-                <span>PROJECT ORCA</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/10 text-zinc-300 border border-white/15">
-                  SIH26176
-                </span>
-              </h2>
+        {/* TOP COMMAND BAR (GOVERNMENT OF INDIA & INCOIS OFFICIAL MARITIME PORTAL STYLE) */}
+        <header className="relative z-20 flex items-center justify-between h-16 px-4 md:px-6 bg-zinc-950 border-b border-white/10 select-none">
+          {/* Left: Official Government of India & Ministry Branding */}
+          <div className="flex items-center gap-3.5">
+            {/* National Tri-Color Accent Pill */}
+            <div className="hidden lg:flex flex-col h-9 w-1 rounded-full overflow-hidden shrink-0">
+              <div className="h-3 bg-[#FF9933]" />
+              <div className="h-3 bg-white" />
+              <div className="h-3 bg-[#138808]" />
             </div>
 
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-[10px] font-mono text-emerald-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>AIR-GAPPED SOVEREIGN SWARM</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-semibold">
+                  GOVERNMENT OF INDIA • MINISTRY OF EARTH SCIENCES • INCOIS
+                </span>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>24x7 OPERATIONAL</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm md:text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                  <span>PROJECT ORCA</span>
+                  <span className="text-zinc-500 font-normal">|</span>
+                  <span className="text-xs md:text-sm font-semibold text-zinc-300">
+                    National Maritime Intelligence & Fisheries Portal
+                  </span>
+                </h1>
+                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/10 text-zinc-300 border border-white/15">
+                  SIH-26176
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right Controls (Persona, Basin, Language, View Info) */}
+          {/* Right Controls (Persona, Basin, Language) */}
           <div className="flex items-center gap-2 md:gap-3">
             {/* User Persona / Role Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
+                title="Change User Persona"
               >
                 <span>{USER_ROLES.find((r) => r.id === userRole)?.icon}</span>
-                <span className="hidden sm:inline font-mono text-[11px]">{USER_ROLES.find((r) => r.id === userRole)?.label}</span>
+                <span className="font-mono text-[11px]">
+                  {USER_ROLES.find((r) => r.id === userRole)?.label}
+                </span>
                 <ChevronDown className="h-3 w-3 text-zinc-400" />
               </button>
               <AnimatePresence>
@@ -191,10 +211,10 @@ export default function CommandPortalLayout({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-10 w-56 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
+                    className="absolute right-0 top-11 w-64 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50 font-sans"
                   >
-                    <div className="px-2 py-1 text-[9px] font-mono text-zinc-400 uppercase tracking-widest border-b border-white/10 mb-1">
-                      Select User Persona
+                    <div className="px-2.5 py-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-widest border-b border-white/10 mb-1">
+                      Select Operational Persona
                     </div>
                     {USER_ROLES.map((role) => (
                       <button
@@ -203,18 +223,26 @@ export default function CommandPortalLayout({
                           onRoleChange(role.id);
                           setRoleMenuOpen(false);
                         }}
-                        className={`flex flex-col items-start w-full px-2.5 py-1.5 rounded-lg text-xs transition cursor-pointer text-left ${
-                          userRole === role.id ? "bg-white text-black font-bold" : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                        className={`flex flex-col items-start w-full px-2.5 py-2 rounded-lg text-xs transition cursor-pointer text-left ${
+                          userRole === role.id
+                            ? "bg-white text-black font-bold"
+                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-2">
                             <span>{role.icon}</span>
-                            <span>{role.label}</span>
+                            <span className="font-semibold">{role.label}</span>
                           </span>
-                          {userRole === role.id && <CheckCircle2 className="h-3.5 w-3.5 text-black" />}
+                          {userRole === role.id && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-black" />
+                          )}
                         </div>
-                        <span className={`text-[9px] font-normal mt-0.5 ${userRole === role.id ? "text-zinc-800" : "text-zinc-400"}`}>
+                        <span
+                          className={`text-[10px] font-normal mt-0.5 ${
+                            userRole === role.id ? "text-zinc-700 font-medium" : "text-zinc-400"
+                          }`}
+                        >
                           {role.desc}
                         </span>
                       </button>
@@ -228,10 +256,12 @@ export default function CommandPortalLayout({
             <div className="relative">
               <button
                 onClick={() => setBasinMenuOpen(!basinMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900/80 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
               >
                 <Globe className="h-3.5 w-3.5 text-sky-400" />
-                <span className="hidden sm:inline">{BASINS.find((b) => b.id === activeBasin)?.label || "Arabian Sea"}</span>
+                <span className="hidden sm:inline font-mono text-[11px]">
+                  {BASINS.find((b) => b.id === activeBasin)?.label || "Arabian Sea"}
+                </span>
                 <ChevronDown className="h-3 w-3 text-zinc-400" />
               </button>
               <AnimatePresence>
@@ -240,7 +270,7 @@ export default function CommandPortalLayout({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-10 w-48 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
+                    className="absolute right-0 top-11 w-48 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50 font-mono"
                   >
                     {BASINS.map((basin) => (
                       <button
@@ -250,11 +280,15 @@ export default function CommandPortalLayout({
                           setBasinMenuOpen(false);
                         }}
                         className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition cursor-pointer ${
-                          activeBasin === basin.id ? "bg-white text-black font-bold" : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                          activeBasin === basin.id
+                            ? "bg-white text-black font-bold"
+                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
                         }`}
                       >
                         <span>{basin.label}</span>
-                        {activeBasin === basin.id && <CheckCircle2 className="h-3.5 w-3.5 text-black" />}
+                        {activeBasin === basin.id && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-black" />
+                        )}
                       </button>
                     ))}
                   </motion.div>
@@ -266,10 +300,10 @@ export default function CommandPortalLayout({
             <div className="relative">
               <button
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900/80 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
               >
                 <Languages className="h-3.5 w-3.5 text-amber-400" />
-                <span>{selectedLanguage}</span>
+                <span className="font-mono text-[11px]">{selectedLanguage}</span>
                 <ChevronDown className="h-3 w-3 text-zinc-400" />
               </button>
               <AnimatePresence>
@@ -278,7 +312,7 @@ export default function CommandPortalLayout({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-10 w-40 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
+                    className="absolute right-0 top-11 w-40 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
                   >
                     {LANGUAGES.map((l) => (
                       <button
@@ -288,7 +322,9 @@ export default function CommandPortalLayout({
                           setLangMenuOpen(false);
                         }}
                         className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-xs transition cursor-pointer ${
-                          selectedLanguage === l.code ? "bg-white text-black font-bold" : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                          selectedLanguage === l.code
+                            ? "bg-white text-black font-bold"
+                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
                         }`}
                       >
                         <span>{l.native}</span>

@@ -1199,222 +1199,214 @@ function DashboardContent() {
       {/* ─── TAB 1: TACTICAL COMMAND ─────────────────────────────────────── */}
       {currentTab === "tactical" && (
         <div className="relative flex h-full w-full overflow-hidden">
-          {/* LEFT: RETRACTABLE AGENT CHAT (35%) */}
+          {/* LEFT: RETRACTABLE AGENT CHAT (CLEAN HIGH-READABILITY INTERFACE) */}
           <div
-            className={`relative z-20 flex flex-col border-r border-white/10 bg-zinc-950/95 backdrop-blur-2xl transition-all duration-300 ${
-              isChatOpen ? "w-full md:w-[410px] lg:w-[460px]" : "w-0 overflow-hidden border-r-0"
+            className={`relative z-20 flex flex-col border-r border-white/10 bg-zinc-950 backdrop-blur-2xl transition-all duration-300 ${
+              isChatOpen ? "w-full md:w-[420px] lg:w-[470px]" : "w-0 overflow-hidden border-r-0"
             }`}
           >
-            {/* Target Coordinate HUD */}
-            <div className="p-3 bg-black/80 border-b border-white/10 flex items-center justify-between">
+            {/* Clean Header Bar */}
+            <div className="px-4 py-3 bg-zinc-950 border-b border-white/10 flex items-center justify-between select-none">
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-xl bg-white text-black font-black shadow-md shadow-white/10">
-                  <MapPin className="h-4 w-4 animate-pulse" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-black font-black shadow-md shadow-white/10">
+                  <Compass className="h-4 w-4" />
                 </div>
                 <div>
-                  <span className="text-[9px] font-mono text-zinc-400 block uppercase tracking-widest font-bold">
-                    Sector Target Lock
-                  </span>
-                  <div className="text-xs font-mono font-bold text-white tracking-wide">
-                    {selectedCoordinates ? `${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E` : "Click map to lock"}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white tracking-tight">
+                      ORCA Tactical Assistant
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/10">
+                      {USER_ROLES.find((r) => r.id === userRole)?.label.split(" ")[0]}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                    <MapPin className="h-3 w-3 text-sky-400 shrink-0" />
+                    {selectedCoordinates ? (
+                      <span className="text-sky-300 font-semibold">
+                        Sector: {selectedCoordinates[1]}°N, {selectedCoordinates[0]}°E
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">No Sector Locked (Click Map)</span>
+                    )}
+                    {selectedCoordinates && (
+                      <button
+                        onClick={() => setSelectedCoordinates(null)}
+                        className="text-zinc-500 hover:text-white text-[9px] underline ml-1 cursor-pointer"
+                        title="Clear Sector Target"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <button
-                onClick={() => setIsChatOpen(false)}
-                className="p-1.5 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
-                title="Collapse for fullscreen 3D map"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button
+                    onClick={() => setMessages([])}
+                    className="p-1.5 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 hover:text-rose-400 transition cursor-pointer"
+                    title="Clear Conversation History"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsChatOpen(false)}
+                  className="p-1.5 rounded-lg bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
+                  title="Collapse for Full Map View"
+                >
+                  <PanelLeftClose className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
-            {/* ADAPTIVE PERSONA HUD: Researcher vs Navigator/Consumer */}
-            {userRole === "researcher" ? (
-              <div className="p-3.5 bg-zinc-950 border-b border-white/10 space-y-2 font-mono">
-                <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                  <span className="font-bold text-sky-400 flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5 text-sky-400" />
-                    <span>Scientific Oceanographic Parameters</span>
-                  </span>
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/30">
-                    Copernicus / MOSDAC Ingestion
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">SST (Ts)</span>
-                    <span className="text-white font-bold">{actionCardData.sst}°C</span>
-                  </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">Chlorophyll-a</span>
-                    <span className="text-emerald-400 font-bold">{actionCardData.chlorophyll} mg/m³</span>
-                  </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">SWH (Hs)</span>
-                    <span className="text-sky-300 font-bold">{actionCardData.swh} m</span>
-                  </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">∇SST Gradient</span>
-                    <span className="text-amber-300 font-bold">0.82 °C/km</span>
-                  </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">Wind (U10)</span>
-                    <span className="text-white font-bold">{actionCardData.windKnots} kt</span>
-                  </div>
-                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
-                    <span className="text-zinc-500 block text-[8px] uppercase">Geodesic IMBL</span>
-                    <span className="text-zinc-300 font-bold">{actionCardData.imblStandoffKm} km</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Standard Synthesized Action Card for Navigator / Seafarer */
-              <div className="p-3.5 bg-zinc-900/60 border-b border-white/10 space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                  <span className="font-bold text-white flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Synthesized Action Card</span>
-                  </span>
-                  <span className="text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-md">
-                    {actionCardData.confidence}% PFZ
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
-                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Target Species</span>
-                    <span className="text-emerald-400 font-bold text-[11px] block mt-0.5">Y-Fin Tuna</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Fuel Delta</span>
-                    <span className="text-white font-bold text-[11px] block mt-0.5">-{actionCardData.fuelSavings}%</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">IMBL Standoff</span>
-                    <span className="text-sky-400 font-bold text-[11px] block mt-0.5">{actionCardData.imblStandoffKm} km</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Multi-Agent Thought Stream Accordion */}
-            <div className="border-b border-white/10 bg-black/40">
+            {/* Unobtrusive Swarm Execution Accordion */}
+            <div className="px-3.5 py-1.5 bg-black/60 border-b border-white/5 flex items-center justify-between text-[10px] font-mono">
               <button
                 onClick={() => setShowThoughtStream(!showThoughtStream)}
-                className="flex items-center justify-between w-full px-3.5 py-2 text-[10px] font-mono text-zinc-400 hover:text-white cursor-pointer"
+                className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer"
               >
-                <div className="flex items-center gap-1.5 font-bold text-zinc-300">
-                  <Cpu className="h-3.5 w-3.5 text-sky-400" />
-                  <span>Multi-Agent Thought Stream (Supervisor → Workers)</span>
-                </div>
-                {showThoughtStream ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                <Cpu className="h-3 w-3 text-sky-400" />
+                <span>Multi-Agent Swarm Telemetry</span>
+                {isStreaming && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />}
               </button>
-
-              <AnimatePresence>
-                {showThoughtStream && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="px-3.5 pb-3 space-y-1 text-[10px] font-mono text-zinc-400 border-t border-white/5 pt-2 max-h-32 overflow-y-auto"
-                  >
-                    {currentThoughts.length > 0 ? (
-                      currentThoughts.map((t, idx) => <div key={idx} className="text-emerald-300">{t}</div>)
-                    ) : (
-                      <>
-                        <div className="text-zinc-500">[SUPERVISOR] Persona: {userRole.toUpperCase()} | SubTaskPlan routing active</div>
-                        <div className="text-zinc-500">[OCEAN_AI] Open-Meteo SST: {actionCardData.sst}°C | Chlorophyll-a: {actionCardData.chlorophyll} mg/m³</div>
-                        <div className="text-zinc-500">[GEOFENCE] PostGIS ST_Distance: {actionCardData.imblStandoffKm} km to IMBL</div>
-                        <div className="text-zinc-500">[NAVIGATION] A* Current routing: +1.2 kts boost, -{actionCardData.fuelSavings}% fuel</div>
-                      </>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <button
+                onClick={() => setShowThoughtStream(!showThoughtStream)}
+                className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+              >
+                {showThoughtStream ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
             </div>
 
-            {/* Quick Preset Queries */}
-            <div className="p-2.5 bg-black/60 border-b border-white/10 space-y-1.5">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 px-1">
-                ⚡ Quick Scenarios
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  { label: "Veraval Tuna PFZ", sub: "Thermal Front", icon: Fish, color: "text-emerald-400", query: "Tuna fishing potential off Veraval Gujarat?", coords: [70.37, 20.90] as [number, number] },
-                  { label: "IMBL Border Alert", sub: "Sovereignty Check", icon: Shield, color: "text-rose-400", query: "Am I crossing the Sri Lanka IMBL boundary?", coords: [79.315, 9.285] as [number, number] },
-                  { label: "Mumbai → Kochi", sub: "A* Current Routing", icon: Navigation, color: "text-white", query: "Optimal fuel route Mumbai to Kochi currents?", coords: [72.83, 18.92] as [number, number] },
-                  { label: "Lakshadweep SST", sub: "Weather Telemetry", icon: Waves, color: "text-sky-400", query: "Wave height and SST in Lakshadweep sea?", coords: [73.0, 10.5] as [number, number] },
-                ].map(({ label, sub, icon: Icon, color, query, coords }) => (
-                  <button
-                    key={label}
-                    onClick={() => handlePresetClick(query, coords)}
-                    className="p-2 rounded-xl border border-white/10 bg-zinc-950/70 hover:bg-zinc-900 text-left text-[11px] transition cursor-pointer"
-                  >
-                    <div className={`font-bold flex items-center gap-1 ${color}`}>
-                      <Icon className="h-3 w-3" /><span>{label}</span>
-                    </div>
-                    <span className="text-[9px] text-zinc-500 block">{sub}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Chat Messages History */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {msg.role === "assistant" && (
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-900 border border-white/10 text-white shadow-sm">
-                      <Bot className="h-4 w-4" />
+            <AnimatePresence>
+              {showThoughtStream && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="px-3.5 py-2 space-y-1 text-[10px] font-mono text-zinc-400 bg-zinc-950/90 border-b border-white/10 max-h-28 overflow-y-auto"
+                >
+                  {currentThoughts.length > 0 ? (
+                    currentThoughts.map((t, idx) => (
+                      <div key={idx} className="text-emerald-300">{t}</div>
+                    ))
+                  ) : (
+                    <div className="text-zinc-500">
+                      [SUPERVISOR] Swarm ready · Persona: {userRole.toUpperCase()} · Basin: {activeBasin}
                     </div>
                   )}
-                  <div
-                    className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-white text-black rounded-br-none font-medium shadow-md"
-                        : "bg-zinc-900/90 text-zinc-200 border border-white/10 rounded-bl-none shadow-md"
-                    }`}
-                  >
-                    {msg.role === "user" ? (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
-                    ) : (
-                      <div>
-                        <div className="orca-markdown">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                        </div>
-                        {/* Quick Action: Generate Formal Report */}
-                        {!msg.content.includes("Formal Maritime Operational Advisory Report") && (
-                          <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between">
-                            <button
-                              onClick={() => handleSubmit(undefined, `Generate a full formal operational advisory report for sector ${selectedCoordinates ? `[${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E]` : activeBasin}.`, "report")}
-                              disabled={isStreaming}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/15 text-[10px] font-mono transition cursor-pointer"
-                              title="Compile comprehensive 4-section multi-agent briefing"
-                            >
-                              <BookOpen className="h-3 w-3 text-sky-400" />
-                              <span>📑 Generate Full Advisory Report</span>
-                            </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Chat Messages / Welcome Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+              {messages.length === 0 ? (
+                <div className="flex flex-col justify-center items-center h-full text-center space-y-4 my-auto py-8">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 border border-white/10 text-white shadow-xl">
+                    <Bot className="h-6 w-6 text-zinc-300" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white tracking-tight">
+                      Sovereign Maritime Intelligence Assistant
+                    </h3>
+                    <p className="text-xs text-zinc-400 max-w-xs mt-1 leading-relaxed">
+                      Ask about ocean currents, fishery aggregation zones, collision hazards, or coastal safety regulations.
+                    </p>
+                  </div>
+
+                  {/* Quick Suggested Scenarios */}
+                  <div className="w-full space-y-2 pt-3 text-left">
+                    <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 px-1">
+                      ⚡ Quick Scenarios
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: "Veraval Tuna PFZ", sub: "Thermal Front", icon: Fish, color: "text-emerald-400", query: "Tuna fishing potential off Veraval Gujarat?", coords: [70.37, 20.90] as [number, number] },
+                        { label: "IMBL Border Alert", sub: "Sovereignty Check", icon: Shield, color: "text-rose-400", query: "Am I crossing the Sri Lanka IMBL boundary?", coords: [79.315, 9.285] as [number, number] },
+                        { label: "Mumbai → Kochi", sub: "A* Current Routing", icon: Navigation, color: "text-white", query: "Optimal fuel route Mumbai to Kochi currents?", coords: [72.83, 18.92] as [number, number] },
+                        { label: "Lakshadweep SST", sub: "Weather Telemetry", icon: Waves, color: "text-sky-400", query: "Wave height and SST in Lakshadweep sea?", coords: [73.0, 10.5] as [number, number] },
+                      ].map(({ label, sub, icon: Icon, color, query, coords }) => (
+                        <button
+                          key={label}
+                          onClick={() => handlePresetClick(query, coords)}
+                          className="p-2.5 rounded-xl border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-left transition cursor-pointer"
+                        >
+                          <div className={`font-bold flex items-center gap-1.5 text-xs ${color}`}>
+                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{label}</span>
                           </div>
-                        )}
+                          <span className="text-[9px] text-zinc-400 block mt-0.5 truncate">{sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                messages.map((msg) => (
+                  <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    {msg.role === "assistant" && (
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-900 border border-white/10 text-white shadow-sm">
+                        <Bot className="h-4 w-4" />
                       </div>
                     )}
-                    <div className="mt-1.5 text-[9px] text-zinc-500 text-right font-mono">{msg.timestamp}</div>
-                  </div>
-                  {msg.role === "user" && (
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300">
-                      <User className="h-4 w-4" />
+                    <div
+                      className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-white text-black rounded-br-none font-medium shadow-md"
+                          : "bg-zinc-900/90 text-zinc-200 border border-white/10 rounded-bl-none shadow-md"
+                      }`}
+                    >
+                      {msg.role === "user" ? (
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      ) : (
+                        <div>
+                          <div className="orca-markdown">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          </div>
+                          {/* Quick Action: Generate Formal Report */}
+                          {!msg.content.includes("Formal Maritime Operational Advisory Report") && (
+                            <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between">
+                              <button
+                                onClick={() =>
+                                  handleSubmit(
+                                    undefined,
+                                    `Generate a full formal operational advisory report for sector ${
+                                      selectedCoordinates
+                                        ? `[${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E]`
+                                        : activeBasin
+                                    }.`,
+                                    "report"
+                                  )
+                                }
+                                disabled={isStreaming}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/15 text-[10px] font-mono transition cursor-pointer"
+                                title="Compile comprehensive formal multi-agent briefing"
+                              >
+                                <BookOpen className="h-3 w-3 text-sky-400" />
+                                <span>📑 Generate Full Advisory Report</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-1.5 text-[9px] text-zinc-500 text-right font-mono">{msg.timestamp}</div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {msg.role === "user" && (
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-zinc-300">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
               <div ref={chatEndRef} />
             </div>
 
             {/* Input Bar with Output Style Toggle & Voice Mic */}
-            <div className="border-t border-white/10 bg-black p-3 space-y-2">
+            <div className="border-t border-white/10 bg-black p-3 space-y-2 select-none">
               {/* Output Style Toggle */}
               <div className="flex items-center justify-between px-1 text-[10px] font-mono">
                 <span className="text-zinc-500 uppercase tracking-wider text-[9px] font-bold">Response Format:</span>
@@ -1451,7 +1443,7 @@ function DashboardContent() {
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder={
                     selectedCoordinates
-                      ? `Query sector [${selectedCoordinates[1]}, ${selectedCoordinates[0]}] or type naturally...`
+                      ? `Query sector [${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E]...`
                       : "Type query or click map to lock..."
                   }
                   disabled={isStreaming}
@@ -1515,48 +1507,62 @@ function DashboardContent() {
                     <button
                       key={mode}
                       onClick={() => setActiveMapMode(mode)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
-                        activeMapMode === mode ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
+                        activeMapMode === mode
+                          ? "bg-white text-black font-bold shadow-sm"
+                          : "text-zinc-400 hover:text-white"
                       }`}
                     >
-                      <Icon className="h-3 w-3" /><span>{label}</span>
+                      <Icon className="h-3 w-3" />
+                      <span>{label}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* 3D Toggle */}
+              {/* 3D Bathymetry Toggle */}
               <button
                 onClick={() => setEnable3DTerrain(!enable3DTerrain)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold shadow-xl backdrop-blur-md transition cursor-pointer ${
-                  enable3DTerrain ? "bg-zinc-900 text-white border-white/30" : "bg-black/90 text-zinc-400 border-white/15 hover:text-white"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition cursor-pointer shadow-xl backdrop-blur-md ${
+                  enable3DTerrain
+                    ? "bg-white text-black font-bold border-white"
+                    : "bg-black/90 text-zinc-400 border-white/15 hover:text-white"
                 }`}
+                title="Toggle 3D Bathymetry & Terrain"
               >
                 <Mountain className="h-3.5 w-3.5" />
                 <span>3D {enable3DTerrain ? "ON" : "OFF"}</span>
               </button>
 
-              {/* Ships Toggle */}
+              {/* AIS Vessel Toggle Button */}
               <button
                 onClick={() => setShowVessels(!showVessels)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold shadow-xl backdrop-blur-md transition cursor-pointer ${
-                  showVessels ? "bg-zinc-900 text-white border-white/30" : "bg-black/90 text-zinc-400 border-white/15 hover:text-white"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition cursor-pointer shadow-xl backdrop-blur-md ${
+                  showVessels
+                    ? "bg-zinc-900 text-cyan-300 border-cyan-500/40 font-bold"
+                    : "bg-black/90 text-zinc-400 border-white/15 hover:text-white"
                 }`}
+                title="Toggle AIS Vessel Feed"
               >
                 <Anchor className="h-3.5 w-3.5" />
                 <span>Ships ({vessels.length})</span>
+                {aisConnected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
               </button>
 
+              {/* Quick Preset Fly-to */}
               <button
-                onClick={handleTogglePerspective}
+                onClick={() => {
+                  setViewState({ longitude: 70.368, latitude: 20.902, zoom: 7.2, pitch: 45, bearing: 10 });
+                  setSelectedCoordinates([70.368, 20.902]);
+                }}
                 className="h-9 w-9 flex items-center justify-center rounded-xl border border-white/15 bg-black/90 text-zinc-400 hover:text-white shadow-xl backdrop-blur-md transition cursor-pointer"
-                title="Toggle 2D/3D Pitch"
+                title="Focus Veraval Sector"
               >
                 <Eye className="h-4 w-4" />
               </button>
 
               <button
-                onClick={handleResetView}
+                onClick={() => setViewState({ longitude: 72.83, latitude: 18.92, zoom: 6.5, pitch: 40, bearing: 0 })}
                 className="h-9 w-9 flex items-center justify-center rounded-xl border border-white/15 bg-black/90 text-zinc-400 hover:text-white shadow-xl backdrop-blur-md transition cursor-pointer"
                 title="Reset Camera"
               >
@@ -1570,47 +1576,190 @@ function DashboardContent() {
               />
             </div>
 
-            {/* CONTEXTUAL BOTTOM TELEMETRY STRIP */}
-            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl border border-white/15 bg-zinc-950/95 shadow-2xl backdrop-blur-xl text-xs font-mono">
-              <div className="flex items-center gap-1.5 text-sky-300">
-                <Droplets className="h-3.5 w-3.5" />
-                <span>SST: <strong>{actionCardData.sst}°C</strong></span>
-              </div>
-              <span className="text-zinc-700">|</span>
-              <div className="flex items-center gap-1.5 text-emerald-300">
-                <Fish className="h-3.5 w-3.5" />
-                <span>Chl-a: <strong>{actionCardData.chlorophyll} mg/m³</strong></span>
-              </div>
-              <span className="text-zinc-700">|</span>
-              <div className="flex items-center gap-1.5 text-cyan-300">
-                <Waves className="h-3.5 w-3.5" />
-                <span>SWH: <strong>{actionCardData.swh}m</strong></span>
-              </div>
-              <span className="text-zinc-700">|</span>
-              <div className="flex items-center gap-1.5 text-amber-300">
-                <Wind className="h-3.5 w-3.5" />
-                <span>Wind: <strong>{actionCardData.windKnots}kt</strong></span>
-              </div>
-              <span className="text-zinc-700">|</span>
-              <div className="flex items-center gap-1.5 text-rose-300">
-                <Shield className="h-3.5 w-3.5" />
-                <span>IMBL: <strong>{actionCardData.imblStandoffKm}km</strong></span>
-              </div>
+            {/* CONTEXTUAL BOTTOM TELEMETRY STRIP (ROLE & LOCATION SPECIFIC) */}
+            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3 px-4 py-2.5 rounded-2xl border border-white/15 bg-zinc-950/95 shadow-2xl backdrop-blur-xl text-xs font-mono select-none">
+              {!selectedCoordinates ? (
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <MapPin className="h-3.5 w-3.5 text-sky-400 animate-pulse" />
+                  <span className="text-[11px]">Select a point on map to inspect real-time sector ocean telemetry</span>
+                </div>
+              ) : userRole === "researcher" ? (
+                // 🔬 Scientific Research Parameters
+                <>
+                  <div className="flex items-center gap-1.5 text-sky-300">
+                    <Droplets className="h-3.5 w-3.5" />
+                    <span>Ts: <strong>{actionCardData.sst}°C</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-emerald-300">
+                    <Fish className="h-3.5 w-3.5" />
+                    <span>Chl-a: <strong>{actionCardData.chlorophyll} mg/m³</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-cyan-300">
+                    <Waves className="h-3.5 w-3.5" />
+                    <span>Hs: <strong>{actionCardData.swh}m</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-amber-300">
+                    <Wind className="h-3.5 w-3.5" />
+                    <span>∇SST: <strong>0.82°C/km</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-indigo-300">
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>U10: <strong>{actionCardData.windKnots}kt</strong></span>
+                  </div>
+                </>
+              ) : userRole === "defense" ? (
+                // 🛡️ Sovereign Defense & Coast Guard Parameters
+                <>
+                  <div className="flex items-center gap-1.5 text-rose-300">
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>IMBL Standoff: <strong>{Math.round(actionCardData.imblStandoffKm / 1.852)} NM</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-cyan-300">
+                    <Navigation className="h-3.5 w-3.5" />
+                    <span>EEZ: <strong>Sovereign Waters</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-amber-300">
+                    <Radio className="h-3.5 w-3.5" />
+                    <span>AIS Contacts: <strong>{vessels.length} Tracked</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-emerald-300">
+                    <Waves className="h-3.5 w-3.5" />
+                    <span>Sea State: <strong>Code {actionCardData.swh > 2 ? 4 : 3} ({actionCardData.swh}m)</strong></span>
+                  </div>
+                </>
+              ) : userRole === "student" ? (
+                // 🎓 Educational Ocean Learner Parameters
+                <>
+                  <div className="flex items-center gap-1.5 text-sky-300">
+                    <Droplets className="h-3.5 w-3.5" />
+                    <span>Water Temp: <strong>{actionCardData.sst}°C (Tropical)</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-cyan-300">
+                    <Waves className="h-3.5 w-3.5" />
+                    <span>Waves: <strong>{actionCardData.swh}m (Mild)</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-emerald-300">
+                    <Fish className="h-3.5 w-3.5" />
+                    <span>Plankton Density: <strong>{actionCardData.chlorophyll} mg/m³</strong></span>
+                  </div>
+                </>
+              ) : (
+                // 🧭 Navigator & Commercial Fishery Parameters
+                <>
+                  <div className="flex items-center gap-1.5 text-sky-300">
+                    <Droplets className="h-3.5 w-3.5" />
+                    <span>SST: <strong>{actionCardData.sst}°C</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-emerald-300">
+                    <Fish className="h-3.5 w-3.5" />
+                    <span>PFZ Catch: <strong>{actionCardData.confidence}% (Tuna)</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-cyan-300">
+                    <Waves className="h-3.5 w-3.5" />
+                    <span>Sea State: <strong>{actionCardData.swh > 2.0 ? "Rough" : "Operable"} ({actionCardData.swh}m)</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-amber-300">
+                    <Wind className="h-3.5 w-3.5" />
+                    <span>Wind: <strong>{actionCardData.windKnots}kt</strong></span>
+                  </div>
+                  <span className="text-zinc-700">|</span>
+                  <div className="flex items-center gap-1.5 text-rose-300">
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>IMBL: <strong>{actionCardData.imblStandoffKm}km</strong></span>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Bottom-right Legend */}
-            <div className="absolute bottom-4 right-4 z-20 rounded-2xl border border-white/10 bg-black/90 p-3.5 shadow-2xl backdrop-blur-md text-[11px] text-zinc-300 min-w-[170px]">
-              <div className="font-bold text-white flex items-center gap-1.5 mb-1.5">
-                <Layers className="h-3.5 w-3.5" />
-                <span>Active Layers</span>
+            {/* Bottom-right Active Layers Legend (True Dynamic Active Layers Only) */}
+            <div className="absolute bottom-4 right-4 z-20 rounded-2xl border border-white/10 bg-zinc-950/95 p-3.5 shadow-2xl backdrop-blur-md text-[11px] text-zinc-300 min-w-[190px] select-none">
+              <div className="font-bold text-white flex items-center justify-between gap-1.5 mb-2 pb-1.5 border-b border-white/10">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-sky-400" />
+                  <span>Active Layers</span>
+                </div>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">
+                  {[
+                    layerVisibility.weather,
+                    layerVisibility.currents,
+                    layerVisibility.fishingZones,
+                    layerVisibility.transport,
+                    layerVisibility.resources,
+                    layerVisibility.military && isDefenseUser,
+                    showVessels,
+                  ].filter(Boolean).length}{" "}
+                  ON
+                </span>
               </div>
-              <div className="space-y-1">
-                {layerVisibility.weather && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" /><span>SST Thermal</span></div>}
-                {layerVisibility.currents && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-cyan-300" /><span>Current Vectors</span></div>}
-                {layerVisibility.fishingZones && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /><span>PFZ Aggregations</span></div>}
-                {layerVisibility.transport && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-white" /><span>Coastal Shipping Lanes</span></div>}
-                {layerVisibility.military && isDefenseUser && <div className="flex items-center gap-2"><span className="h-1 w-4 rounded bg-rose-500" /><span>IMBL Boundary</span></div>}
-                {showVessels && <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-cyan-400" /><span>AIS Ships ({vessels.length})</span></div>}
+
+              <div className="space-y-1.5">
+                {layerVisibility.weather && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    <span className="text-zinc-200">SST Thermal Field</span>
+                  </div>
+                )}
+                {layerVisibility.currents && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1 w-3.5 rounded bg-cyan-300" />
+                    <span className="text-zinc-200">Current Flow Vectors</span>
+                  </div>
+                )}
+                {layerVisibility.fishingZones && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="text-zinc-200">PFZ Aggregations ({pfzPoints.length})</span>
+                  </div>
+                )}
+                {layerVisibility.transport && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1 w-3.5 rounded bg-white" />
+                    <span className="text-zinc-200">Shipping Lanes & TSS</span>
+                  </div>
+                )}
+                {layerVisibility.resources && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full border border-amber-400" />
+                    <span className="text-zinc-200">200m Shelf Break</span>
+                  </div>
+                )}
+                {layerVisibility.military && isDefenseUser && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-1 w-3.5 rounded bg-rose-500" />
+                    <span className="text-zinc-200">IMBL Sovereignty Line</span>
+                  </div>
+                )}
+                {showVessels && (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                    <span className="text-zinc-200">AIS Ships ({vessels.length})</span>
+                  </div>
+                )}
+                {![
+                  layerVisibility.weather,
+                  layerVisibility.currents,
+                  layerVisibility.fishingZones,
+                  layerVisibility.transport,
+                  layerVisibility.resources,
+                  layerVisibility.military && isDefenseUser,
+                  showVessels,
+                ].some(Boolean) && (
+                  <div className="text-[10px] text-zinc-500 italic py-1">
+                    No active overlays (Enable via Layers menu)
+                  </div>
+                )}
               </div>
             </div>
 
