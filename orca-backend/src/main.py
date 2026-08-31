@@ -106,6 +106,9 @@ class ChatRequest(BaseModel):
     """Incoming user chat inquiry for multi-agent reasoning."""
     message: str = Field(..., description="User's natural language marine or navigation query")
     thread_id: str = Field("default-session", description="Unique conversation session ID for state checkpointer")
+    user_role: str = Field("navigator", description="Active user persona ('researcher', 'navigator', 'student', 'defense', 'authority')")
+    format_mode: str = Field("conversational", description="Output format ('conversational' for direct chat, 'report' for formal briefing)")
+    active_basin: str = Field("arabian_sea", description="Active ocean basin context ('arabian_sea', 'bay_of_bengal', 'lakshadweep', 'andaman')")
     target_coordinates: Optional[list[float]] = Field(None, description="Optional target coordinates [latitude, longitude]")
     origin_coordinates: Optional[list[float]] = Field(None, description="Optional origin coordinates [latitude, longitude]")
 
@@ -154,10 +157,6 @@ async def root_health_check():
 async def chat_with_multi_agent_swarm(req: ChatRequest):
     """
     Executes a complete multi-agent turn through the compiled LangGraph.
-    
-    1. Supervisor decomposes query into sub-tasks (PFZ, Geofence, Routing, Policy).
-    2. Parallel workers execute deterministic tools (xarray, PostGIS, A*, pgvector).
-    3. Synthesizer formats actionable markdown and deck.gl GeoJSON FeatureCollection.
     """
     try:
         checkpointer = get_default_checkpointer()
@@ -165,6 +164,11 @@ async def chat_with_multi_agent_swarm(req: ChatRequest):
         result = await run_orca_multi_agent(
             user_query=req.message,
             thread_id=req.thread_id,
+            user_role=req.user_role,
+            format_mode=req.format_mode,
+            active_basin=req.active_basin,
+            target_coordinates=req.target_coordinates,
+            origin_coordinates=req.origin_coordinates,
             checkpointer=checkpointer
         )
         return result
@@ -183,14 +187,19 @@ async def stream_chat_with_agent_swarm(req: ChatRequest):
         import asyncio
         try:
             # 1. Thought step: Supervisor
-            yield f"data: {json.dumps({'type': 'thought', 'agent': 'supervisor', 'text': 'Decomposing query with Qwen 2.5 7B & resolving sovereign coastal nodes...'})}\n\n"
-            await asyncio.sleep(0.3)
+            yield f"data: {json.dumps({'type': 'thought', 'agent': 'supervisor', 'text': f'Routing for persona: {req.user_role.upper()} | Basin: {req.active_basin}'})}\n\n"
+            await asyncio.sleep(0.2)
 
             # 2. Run multi-agent graph
             checkpointer = get_default_checkpointer()
             result = await run_orca_multi_agent(
                 user_query=req.message,
                 thread_id=req.thread_id,
+                user_role=req.user_role,
+                format_mode=req.format_mode,
+                active_basin=req.active_basin,
+                target_coordinates=req.target_coordinates,
+                origin_coordinates=req.origin_coordinates,
                 checkpointer=checkpointer
             )
 
@@ -198,7 +207,7 @@ async def stream_chat_with_agent_swarm(req: ChatRequest):
             active_tasks = result.get("active_tasks", [])
             for task in active_tasks:
                 yield f"data: {json.dumps({'type': 'thought', 'agent': task, 'text': f'Executing worker node: {task}'})}\n\n"
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.15)
 
             # 4. Stream final synthesized response and deck.gl GeoJSON
             response_payload = result.get("response", {})
@@ -209,7 +218,7 @@ async def stream_chat_with_agent_swarm(req: ChatRequest):
             lines = markdown_text.split("\n")
             for line in lines:
                 yield f"data: {json.dumps({'type': 'chunk', 'text': line + '\n'})}\n\n"
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.03)
 
             # Final complete payload event
             yield f"data: {json.dumps({'type': 'complete', 'result': result, 'geojson': geojson_data})}\n\n"

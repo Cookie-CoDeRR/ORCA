@@ -1,7 +1,7 @@
 """
 Project ORCA (SIH26176) — Global Multi-Agent State Definition
 Defines the central AgentState TypedDict with accumulative messaging, spatial coordinates,
-task plan decomposition, and structured outputs across specialized worker nodes.
+task plan decomposition, persona adaptation, and structured outputs across specialized worker nodes.
 """
 
 from typing import TypedDict, Annotated, Sequence, Optional, Any
@@ -16,6 +16,9 @@ class AgentState(TypedDict, total=False):
     Fields:
       - messages: Accumulated conversational turns (Human, AI, System, Tool).
       - user_query: Original verbatim user request string.
+      - user_role: Active persona ('researcher', 'navigator', 'student', 'defense', 'authority').
+      - format_mode: Desired response style ('conversational' for direct chat, 'report' for formal briefing).
+      - active_basin: Geographical ocean basin context ('arabian_sea', 'bay_of_bengal', 'lakshadweep', 'andaman').
       - target_coordinates: Resolved destination or search coordinate [latitude, longitude].
       - origin_coordinates: Resolved starting harbor/vessel coordinate [latitude, longitude].
       - active_tasks: Sub-tasks to execute (e.g. ['ocean_analytics', 'risk_geofencing', 'navigation', 'policy_rag']).
@@ -27,6 +30,9 @@ class AgentState(TypedDict, total=False):
     """
     messages: Annotated[Sequence[BaseMessage], add_messages]
     user_query: str
+    user_role: Optional[str]
+    format_mode: Optional[str]
+    active_basin: Optional[str]
     target_coordinates: Optional[list[float]]
     origin_coordinates: Optional[list[float]]
     active_tasks: list[str]

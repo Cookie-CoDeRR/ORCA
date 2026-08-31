@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL from "@deck.gl/react";
@@ -49,9 +49,10 @@ import {
   Gauge,
   Sliders,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 
-import CommandPortalLayout, { PortalTab } from "@/components/CommandPortalLayout";
+import CommandPortalLayout, { PortalTab, UserRole, USER_ROLES } from "@/components/CommandPortalLayout";
 import LayerControlPanel, { LayerVisibility } from "@/components/LayerControlPanel";
 import AgentMeshView from "@/components/AgentMeshView";
 import DataHubView from "@/components/DataHubView";
@@ -292,16 +293,20 @@ function VesselTooltip({ vessel, onClose }: { vessel: Vessel; onClose: () => voi
   );
 }
 
-// ─── Main Portal Dashboard ────────────────────────────────────────────────────
 function DashboardContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const roleParam = searchParams.get("role") || "visitor";
-  const isDefenseUser = roleParam === "defense";
+
+  // URL Role / Auth Check
+  const roleParam = searchParams.get("role");
+  const isDefenseUser = roleParam === "defense" || roleParam === "admin";
 
   const [mounted, setMounted] = useState(false);
   const [currentTab, setCurrentTab] = useState<PortalTab>("tactical");
   const [activeBasin, setActiveBasin] = useState("arabian_sea");
   const [selectedLanguage, setSelectedLanguage] = useState("EN");
+  const [userRole, setUserRole] = useState<UserRole>("navigator");
+  const [chatMode, setChatMode] = useState<"conversational" | "report">("conversational");
 
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [threadId, setThreadId] = useState("");
@@ -374,7 +379,21 @@ function DashboardContent() {
   const graticuleLines = useMemo(() => buildGraticuleLines(), []);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // ─── Basin fly-to ─────────────────────────────────────────────────────────
+  const handleLayerToggle = (id: keyof LayerVisibility) => {
+    if (id === "military" && !isDefenseUser) return;
+    setLayerVisibility((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleResetView = () =>
+    setViewState({ longitude: 70.368, latitude: 20.902, zoom: 6.2, pitch: 45, bearing: 10 });
+
+  const handleTogglePerspective = () =>
+    setViewState((prev) => ({
+      ...prev,
+      pitch: prev.pitch > 20 ? 0 : 45,
+      bearing: prev.pitch > 20 ? 0 : 10,
+    }));
+
   const handleBasinChange = (basinId: string) => {
     setActiveBasin(basinId);
     const basinCoords: Record<string, [number, number]> = {
@@ -408,10 +427,8 @@ function DashboardContent() {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
 
-    const langMap: Record<string, string> = {
+    const langCodes: Record<string, string> = {
       EN: "en-IN",
       HI: "hi-IN",
       GU: "gu-IN",
@@ -420,144 +437,135 @@ function DashboardContent() {
       TE: "te-IN",
       BN: "bn-IN",
     };
-    recognition.lang = langMap[selectedLanguage] || "en-IN";
 
-    recognition.onstart = () => setIsRecording(true);
+    recognition.lang = langCodes[selectedLanguage] || "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setInputMessage(transcript);
       setIsRecording(false);
+      // Auto-submit recognized speech query
+      setTimeout(() => {
+        handleSubmit(undefined, transcript);
+      }, 300);
     };
-    recognition.onerror = () => setIsRecording(false);
-    recognition.onend = () => setIsRecording(false);
+
+    recognition.onerror = () => {
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
 
     recognition.start();
   };
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  // ─── Initialize session & fetch data ───────────────────────────────────────
   useEffect(() => {
     setMounted(true);
-    const savedThread = localStorage.getItem("orca_thread_id") || uuidv4();
-    localStorage.setItem("orca_thread_id", savedThread);
-    setThreadId(savedThread);
+    const sid = `orca-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    setThreadId(sid);
 
-    if (isDefenseUser) {
-      setLayerVisibility((prev) => ({ ...prev, military: true }));
+    async function loadData() {
+      setIsLoadingData(true);
+      try {
+        const data = await fetchOceanData();
+        setRealOceanData(data);
+      } catch (err: any) {
+        setDataError(err?.message ?? "Failed to fetch marine data");
+      } finally {
+        setIsLoadingData(false);
+      }
     }
-
-    const greetingRole =
-      roleParam === "researcher" ? "Marine Researcher" : roleParam === "defense" ? "Defense Officer" : "Coastal Navigator";
-
-    setMessages([
-      {
-        id: "msg_welcome",
-        role: "assistant",
-        content: `### 🐬 Welcome, ${greetingRole} — Project ORCA (SIH26176)
-**India's Sovereign Multi-Agent Marine Intelligence Command Platform.**
-
-- Click anywhere on the **2.5D Bathymetric Deck** to lock target coordinates.
-- **Synthesized Action Card** & **Live Telemetry Strip** active below.
-- Local **Qwen 2.5 7B & BGE-M3** swarm running 100% on-premise.`,
-        timestamp: new Date().toLocaleTimeString(),
-      },
-    ]);
-  }, [roleParam, isDefenseUser]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, currentThoughts]);
-
-  // ─── Ocean data & AIS ──────────────────────────────────────────────────────
-  useEffect(() => {
-    fetchOceanData()
-      .then((data) => { setRealOceanData(data); setIsLoadingData(false); })
-      .catch(() => { setDataError("Ocean API unavailable"); setIsLoadingData(false); });
+    loadData();
   }, []);
 
+  // ─── Live AIS or simulation ────────────────────────────────────────────────
   useEffect(() => {
-    if (AIS_API_KEY) {
-      const cleanup = connectAisStream(
-        AIS_API_KEY,
+    let wsCleanup: (() => void) | null = null;
+    const apiKey = process.env.NEXT_PUBLIC_AIS_API_KEY;
+
+    if (apiKey) {
+      wsCleanup = connectAisStream(
+        apiKey,
         (vesselMap) => {
           setVessels(Array.from(vesselMap.values()));
           setAisConnected(true);
         },
         () => {
           setAisConnected(false);
-          startSimulation();
         }
       );
-      return cleanup;
     } else {
-      startSimulation();
+      setVessels(tickSimVessels(0));
+      setAisConnected(true);
+      simTimerRef.current = setInterval(() => {
+        setVessels(tickSimVessels(10));
+      }, 4000);
     }
-  }, []);
 
-  function startSimulation() {
-    const initial = tickSimVessels(0);
-    setVessels([...initial]);
-    if (simTimerRef.current) clearInterval(simTimerRef.current);
-    simTimerRef.current = setInterval(() => {
-      const updated = tickSimVessels(10);
-      setVessels([...updated]);
-    }, 10000);
-  }
+    return () => {
+      if (wsCleanup) wsCleanup();
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
-    return () => { if (simTimerRef.current) clearInterval(simTimerRef.current); };
-  }, []);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, currentThoughts]);
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
-  const handleLayerToggle = (id: keyof LayerVisibility) => {
-    if (id === "military" && !isDefenseUser) return;
-    setLayerVisibility((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
+  // Map Click
   const handleMapClick = (info: any) => {
-    if (info?.coordinate) {
+    if (info.coordinate) {
       const [lon, lat] = info.coordinate;
-      const coords: [number, number] = [+lon.toFixed(4), +lat.toFixed(4)];
-      setSelectedCoordinates(coords);
+      const roundedLon = parseFloat(lon.toFixed(4));
+      const roundedLat = parseFloat(lat.toFixed(4));
+      setSelectedCoordinates([roundedLon, roundedLat]);
 
-      const sstVal = +(27.0 + Math.sin(lat) * 2.5).toFixed(1);
-      const chlaVal = +(0.8 + Math.cos(lon) * 0.7).toFixed(2);
-      const swhVal = +(1.2 + Math.sin(lon * 0.5) * 0.6).toFixed(2);
-      const imblDist = Math.max(12, +(Math.abs(lon - 68.0) * 85).toFixed(1));
+      // Telemetry lookup
+      if (realOceanData?.weatherPoints) {
+        const closest = realOceanData.weatherPoints.reduce((best, pt) => {
+          const d = Math.hypot(pt.position[0] - lon, pt.position[1] - lat);
+          return !best || d < best.d ? { pt, d } : best;
+        }, null as any);
 
-      setActionCardData((prev) => ({
-        ...prev,
-        sst: sstVal,
-        chlorophyll: chlaVal,
-        swh: swhVal,
-        imblStandoffKm: imblDist,
-      }));
+        if (closest?.pt) {
+          setActionCardData((prev) => ({
+            ...prev,
+            sst: closest.pt.sst,
+            chlorophyll: parseFloat((0.8 + Math.sin(lat) * 0.5).toFixed(2)),
+            swh: closest.pt.waveHeight,
+            windKnots: closest.pt.windSpeed,
+            imblStandoffKm: parseFloat((25 + Math.abs(lat - 22.5) * 15).toFixed(1)),
+          }));
+        }
+      }
     }
   };
 
-  const handleResetView = () =>
-    setViewState({ longitude: 70.368, latitude: 20.902, zoom: 6.2, pitch: 45, bearing: 10 });
-
-  const handleTogglePerspective = () =>
-    setViewState((prev) => ({
-      ...prev,
-      pitch: prev.pitch > 20 ? 0 : 45,
-      bearing: prev.pitch > 20 ? 0 : 10,
-    }));
-
   const handlePresetClick = (query: string, coords: [number, number]) => {
+    setSelectedCoordinates([coords[0], coords[1]]);
     setInputMessage(query);
-    setSelectedCoordinates(coords);
     setViewState({ longitude: coords[0], latitude: coords[1], zoom: 7.0, pitch: 45, bearing: 10 });
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent, customQuery?: string, overrideFormatMode?: "conversational" | "report") => {
     if (e) e.preventDefault();
-    const query = inputMessage.trim();
+    const query = (customQuery || inputMessage).trim();
     if (!query || isStreaming) return;
+
+    const modeToSend = overrideFormatMode || chatMode;
 
     const targetCoords = selectedCoordinates
       ? [selectedCoordinates[1], selectedCoordinates[0]]
-      : null;
+      : [viewState.latitude, viewState.longitude];
 
     const userMsg: Message = {
       id: uuidv4(),
@@ -567,9 +575,9 @@ function DashboardContent() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInputMessage("");
+    if (!customQuery) setInputMessage("");
     setIsStreaming(true);
-    setCurrentThoughts(["[SUPERVISOR] Decomposing intent & gazetteer entity mapping..."]);
+    setCurrentThoughts([`[SUPERVISOR] Routing for persona: ${userRole.toUpperCase()} | Format: ${modeToSend.toUpperCase()}...`]);
 
     const assistantId = uuidv4();
     let acc = "";
@@ -578,7 +586,14 @@ function DashboardContent() {
       const res = await fetch(`${API_BASE}/api/v1/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query, thread_id: threadId, target_coordinates: targetCoords }),
+        body: JSON.stringify({
+          message: query,
+          thread_id: threadId,
+          user_role: userRole,
+          format_mode: modeToSend,
+          active_basin: activeBasin,
+          target_coordinates: targetCoords,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -617,7 +632,14 @@ function DashboardContent() {
         const res = await fetch(`${API_BASE}/api/v1/agent/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: query, thread_id: threadId, target_coordinates: targetCoords }),
+          body: JSON.stringify({
+            message: query,
+            thread_id: threadId,
+            user_role: userRole,
+            format_mode: modeToSend,
+            active_basin: activeBasin,
+            target_coordinates: targetCoords,
+          }),
         });
         const data = await res.json();
         const rp = data.response || {};
@@ -652,16 +674,36 @@ function DashboardContent() {
     target: IMBL_SRILANKA[i + 1],
   }));
 
+  // True compass heading vector & directional chevron
   const vesselHeadingPaths = vessels
     .filter((v) => v.sog > 0.5)
     .map((v) => {
-      const rad = ((v.cog - 90) * Math.PI) / 180;
-      const len = Math.max(0.05, v.sog * 0.008);
-      const endLon = v.lon + len * Math.cos(rad);
-      const endLat = v.lat + len * Math.sin(rad);
+      const cogRad = (v.cog * Math.PI) / 180;
+      const len = Math.max(0.06, Math.min(0.20, (v.sog / 20) * 0.15));
+      const latCos = Math.cos((v.lat * Math.PI) / 180) || 1.0;
+      const dLon = (len * Math.sin(cogRad)) / latCos;
+      const dLat = len * Math.cos(cogRad);
+      const endLon = v.lon + dLon;
+      const endLat = v.lat + dLat;
+
+      // Chevron wings
+      const wingLen = len * 0.35;
+      const wingAngle1 = cogRad + (145 * Math.PI) / 180;
+      const wingAngle2 = cogRad - (145 * Math.PI) / 180;
+      const w1Lon = endLon + (wingLen * Math.sin(wingAngle1)) / latCos;
+      const w1Lat = endLat + wingLen * Math.cos(wingAngle1);
+      const w2Lon = endLon + (wingLen * Math.sin(wingAngle2)) / latCos;
+      const w2Lat = endLat + wingLen * Math.cos(wingAngle2);
+
       return {
-        path: [[v.lon, v.lat], [endLon, endLat]] as [number, number][],
-        color: VESSEL_COLORS[v.type],
+        path: [
+          [v.lon, v.lat],
+          [endLon, endLat],
+          [w1Lon, w1Lat],
+          [endLon, endLat],
+          [w2Lon, w2Lat],
+        ] as [number, number][],
+        color: VESSEL_COLORS[v.type] || [255, 255, 255, 220],
       };
     });
 
@@ -1020,6 +1062,8 @@ function DashboardContent() {
       onBasinChange={handleBasinChange}
       selectedLanguage={selectedLanguage}
       onLanguageChange={setSelectedLanguage}
+      userRole={userRole}
+      onRoleChange={setUserRole}
     >
       {/* ─── TAB 1: TACTICAL COMMAND ─────────────────────────────────────── */}
       {currentTab === "tactical" && (
@@ -1055,33 +1099,75 @@ function DashboardContent() {
               </button>
             </div>
 
-            {/* Synthesized Action Card */}
-            <div className="p-3.5 bg-zinc-900/60 border-b border-white/10 space-y-2">
-              <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                <span className="font-bold text-white flex items-center gap-1.5">
-                  <Activity className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Synthesized Action Card</span>
-                </span>
-                <span className="text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-md">
-                  {actionCardData.confidence}% PFZ
-                </span>
-              </div>
+            {/* ADAPTIVE PERSONA HUD: Researcher vs Navigator/Consumer */}
+            {userRole === "researcher" ? (
+              <div className="p-3.5 bg-zinc-950 border-b border-white/10 space-y-2 font-mono">
+                <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                  <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-sky-400" />
+                    <span>Scientific Oceanographic Parameters</span>
+                  </span>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/30">
+                    Copernicus / MOSDAC Ingestion
+                  </span>
+                </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
-                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Target Species</span>
-                  <span className="text-emerald-400 font-bold text-[11px] block mt-0.5">Y-Fin Tuna</span>
-                </div>
-                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Fuel Delta</span>
-                  <span className="text-white font-bold text-[11px] block mt-0.5">-{actionCardData.fuelSavings}%</span>
-                </div>
-                <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
-                  <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">IMBL Standoff</span>
-                  <span className="text-sky-400 font-bold text-[11px] block mt-0.5">{actionCardData.imblStandoffKm} km</span>
+                <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">SST (Ts)</span>
+                    <span className="text-white font-bold">{actionCardData.sst}°C</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">Chlorophyll-a</span>
+                    <span className="text-emerald-400 font-bold">{actionCardData.chlorophyll} mg/m³</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">SWH (Hs)</span>
+                    <span className="text-sky-300 font-bold">{actionCardData.swh} m</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">∇SST Gradient</span>
+                    <span className="text-amber-300 font-bold">0.82 °C/km</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">Wind (U10)</span>
+                    <span className="text-white font-bold">{actionCardData.windKnots} kt</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-zinc-900 border border-white/10">
+                    <span className="text-zinc-500 block text-[8px] uppercase">Geodesic IMBL</span>
+                    <span className="text-zinc-300 font-bold">{actionCardData.imblStandoffKm} km</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Standard Synthesized Action Card for Navigator / Seafarer */
+              <div className="p-3.5 bg-zinc-900/60 border-b border-white/10 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Synthesized Action Card</span>
+                  </span>
+                  <span className="text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                    {actionCardData.confidence}% PFZ
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
+                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Target Species</span>
+                    <span className="text-emerald-400 font-bold text-[11px] block mt-0.5">Y-Fin Tuna</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">Fuel Delta</span>
+                    <span className="text-white font-bold text-[11px] block mt-0.5">-{actionCardData.fuelSavings}%</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-black border border-white/10 shadow-sm">
+                    <span className="text-zinc-500 block text-[8px] tracking-wider uppercase font-bold">IMBL Standoff</span>
+                    <span className="text-sky-400 font-bold text-[11px] block mt-0.5">{actionCardData.imblStandoffKm} km</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Multi-Agent Thought Stream Accordion */}
             <div className="border-b border-white/10 bg-black/40">
@@ -1108,10 +1194,10 @@ function DashboardContent() {
                       currentThoughts.map((t, idx) => <div key={idx} className="text-emerald-300">{t}</div>)
                     ) : (
                       <>
-                        <div className="text-zinc-500">[SUPERVISOR] Qwen 2.5 7B decomp intent: Verified Veraval Tuna Fleet</div>
-                        <div className="text-zinc-500">[OCEAN_AI] Open-Meteo SST: 28.4°C | Chlorophyll-a: 1.26 mg/m³</div>
-                        <div className="text-zinc-500">[GEOFENCE] PostGIS ST_Distance: 45.0 km to Pakistan IMBL (Green)</div>
-                        <div className="text-zinc-500">[NAVIGATION] A* Current routing: +1.2 kts boost, -22% fuel</div>
+                        <div className="text-zinc-500">[SUPERVISOR] Persona: {userRole.toUpperCase()} | SubTaskPlan routing active</div>
+                        <div className="text-zinc-500">[OCEAN_AI] Open-Meteo SST: {actionCardData.sst}°C | Chlorophyll-a: {actionCardData.chlorophyll} mg/m³</div>
+                        <div className="text-zinc-500">[GEOFENCE] PostGIS ST_Distance: {actionCardData.imblStandoffKm} km to IMBL</div>
+                        <div className="text-zinc-500">[NAVIGATION] A* Current routing: +1.2 kts boost, -{actionCardData.fuelSavings}% fuel</div>
                       </>
                     )}
                   </motion.div>
@@ -1164,8 +1250,24 @@ function DashboardContent() {
                     {msg.role === "user" ? (
                       <div className="whitespace-pre-wrap">{msg.content}</div>
                     ) : (
-                      <div className="orca-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      <div>
+                        <div className="orca-markdown">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        </div>
+                        {/* Quick Action: Generate Formal Report */}
+                        {!msg.content.includes("Formal Maritime Operational Advisory Report") && (
+                          <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between">
+                            <button
+                              onClick={() => handleSubmit(undefined, `Generate a full formal operational advisory report for sector ${selectedCoordinates ? `[${selectedCoordinates[1]}°N, ${selectedCoordinates[0]}°E]` : activeBasin}.`, "report")}
+                              disabled={isStreaming}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/15 text-[10px] font-mono transition cursor-pointer"
+                              title="Compile comprehensive 4-section multi-agent briefing"
+                            >
+                              <BookOpen className="h-3 w-3 text-sky-400" />
+                              <span>📑 Generate Full Advisory Report</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="mt-1.5 text-[9px] text-zinc-500 text-right font-mono">{msg.timestamp}</div>
@@ -1180,8 +1282,37 @@ function DashboardContent() {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Bar with Voice Mic */}
+            {/* Input Bar with Output Style Toggle & Voice Mic */}
             <div className="border-t border-white/10 bg-black p-3 space-y-2">
+              {/* Output Style Toggle */}
+              <div className="flex items-center justify-between px-1 text-[10px] font-mono">
+                <span className="text-zinc-500 uppercase tracking-wider text-[9px] font-bold">Response Format:</span>
+                <div className="flex items-center rounded-lg border border-white/10 bg-zinc-950 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setChatMode("conversational")}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[10px] ${
+                      chatMode === "conversational"
+                        ? "bg-white text-black font-bold shadow-sm"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    💬 Direct Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatMode("report")}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[10px] ${
+                      chatMode === "report"
+                        ? "bg-white text-black font-bold shadow-sm"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    📑 Formal Report
+                  </button>
+                </div>
+              </div>
+
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <input
                   type="text"

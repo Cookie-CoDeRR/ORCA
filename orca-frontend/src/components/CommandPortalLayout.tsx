@@ -23,6 +23,15 @@ import Link from "next/link";
 
 export type PortalTab = "tactical" | "agents" | "data-hub" | "regulatory-vault";
 
+export type UserRole = "navigator" | "researcher" | "student" | "defense";
+
+export const USER_ROLES: { id: UserRole; label: string; icon: string; desc: string }[] = [
+  { id: "navigator", label: "Navigator & Fishery", icon: "🧭", desc: "Pragmatic safety, targeted catch, and fuel savings" },
+  { id: "researcher", label: "Marine Scientist", icon: "🔬", desc: "Scientific telemetry, parameters, and bio-optical data" },
+  { id: "student", label: "Ocean Learner", icon: "🎓", desc: "Educational explanations of ocean phenomena" },
+  { id: "defense", label: "Defense Command", icon: "🛡️", desc: "Sovereign IMBL security & tactical surveillance" },
+];
+
 interface CommandPortalLayoutProps {
   currentTab: PortalTab;
   onTabChange: (tab: PortalTab) => void;
@@ -30,6 +39,8 @@ interface CommandPortalLayoutProps {
   onBasinChange: (basin: string) => void;
   selectedLanguage: string;
   onLanguageChange: (lang: string) => void;
+  userRole: UserRole;
+  onRoleChange: (role: UserRole) => void;
   children: React.ReactNode;
 }
 
@@ -57,10 +68,13 @@ export default function CommandPortalLayout({
   onBasinChange,
   selectedLanguage,
   onLanguageChange,
+  userRole,
+  onRoleChange,
   children,
 }: CommandPortalLayoutProps) {
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [basinMenuOpen, setBasinMenuOpen] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
 
   const navItems: { id: PortalTab; label: string; icon: any; badge?: string }[] = [
     { id: "tactical", label: "Tactical Command", icon: Compass },
@@ -159,8 +173,57 @@ export default function CommandPortalLayout({
             </div>
           </div>
 
-          {/* Right Controls (Basin, Language, View Info) */}
+          {/* Right Controls (Persona, Basin, Language, View Info) */}
           <div className="flex items-center gap-2 md:gap-3">
+            {/* User Persona / Role Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900/90 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
+              >
+                <span>{USER_ROLES.find((r) => r.id === userRole)?.icon}</span>
+                <span className="hidden sm:inline font-mono text-[11px]">{USER_ROLES.find((r) => r.id === userRole)?.label}</span>
+                <ChevronDown className="h-3 w-3 text-zinc-400" />
+              </button>
+              <AnimatePresence>
+                {roleMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="absolute right-0 top-10 w-56 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
+                  >
+                    <div className="px-2 py-1 text-[9px] font-mono text-zinc-400 uppercase tracking-widest border-b border-white/10 mb-1">
+                      Select User Persona
+                    </div>
+                    {USER_ROLES.map((role) => (
+                      <button
+                        key={role.id}
+                        onClick={() => {
+                          onRoleChange(role.id);
+                          setRoleMenuOpen(false);
+                        }}
+                        className={`flex flex-col items-start w-full px-2.5 py-1.5 rounded-lg text-xs transition cursor-pointer text-left ${
+                          userRole === role.id ? "bg-white text-black font-bold" : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="flex items-center gap-1.5">
+                            <span>{role.icon}</span>
+                            <span>{role.label}</span>
+                          </span>
+                          {userRole === role.id && <CheckCircle2 className="h-3.5 w-3.5 text-black" />}
+                        </div>
+                        <span className={`text-[9px] font-normal mt-0.5 ${userRole === role.id ? "text-zinc-800" : "text-zinc-400"}`}>
+                          {role.desc}
+                        </span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Active Basin Dropdown */}
             <div className="relative">
               <button
