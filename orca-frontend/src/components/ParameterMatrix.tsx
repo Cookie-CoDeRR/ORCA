@@ -107,20 +107,20 @@ export default function ParameterMatrix() {
   const [selectedPillar, setSelectedPillar] = useState<ParameterPillar>(PILLARS[0]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto rounded-3xl bg-zinc-950/80 border border-white/10 p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+    <div className="w-full max-w-6xl mx-auto rounded-3xl bg-white border border-zinc-200 p-6 md:p-8 shadow-xl text-zinc-900">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-zinc-800/80 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-zinc-200 pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 uppercase tracking-widest mb-1">
-            <Sliders className="w-3.5 h-3.5 text-white" />
+          <div className="flex items-center gap-2 text-xs font-mono text-blue-600 uppercase tracking-widest mb-1 font-semibold">
+            <Sliders className="w-3.5 h-3.5 text-blue-600" />
             <span>Comprehensive Telemetry Framework</span>
           </div>
-          <h3 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+          <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
             6 Multi-Scale Oceanographic Parameter Pillars
           </h3>
         </div>
 
-        <span className="text-xs font-mono text-zinc-400">
+        <span className="text-xs font-mono text-zinc-500">
           Click a parameter category to view active data sources and mathematical models.
         </span>
       </div>
@@ -138,9 +138,9 @@ export default function ParameterMatrix() {
               className={`p-3.5 rounded-2xl text-left transition-all duration-200 border cursor-pointer flex flex-col justify-between ${
                 isSelected
                   ? isDef
-                    ? "bg-rose-950/40 border-rose-500/50 shadow-lg shadow-rose-950/20 text-white"
-                    : "bg-white/10 border-white/40 shadow-lg shadow-white/5 text-white"
-                  : "bg-zinc-900/40 border-white/5 hover:bg-zinc-900/80 hover:border-white/20 text-zinc-400 hover:text-zinc-200"
+                    ? "bg-rose-50 border-rose-500 shadow-sm text-zinc-900"
+                    : "bg-blue-50/80 border-blue-600 shadow-sm text-zinc-900"
+                  : "bg-white border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -148,21 +148,21 @@ export default function ParameterMatrix() {
                   className={`p-2 rounded-xl border ${
                     isSelected
                       ? isDef
-                        ? "bg-rose-500 text-white border-rose-400"
-                        : "bg-white text-black border-white"
-                      : "bg-zinc-800 border-white/10"
+                        ? "bg-rose-600 text-white border-rose-600"
+                        : "bg-blue-600 text-white border-blue-600"
+                      : "bg-zinc-100 text-zinc-600 border-zinc-200"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                 </div>
                 {isDef && (
-                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 font-bold">
                     RESTRICTED
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold leading-tight">{p.name.split(" ")[0]}</p>
+                <p className="text-xs font-bold leading-tight text-zinc-900">{p.name.split(" ")[0]}</p>
                 <p className="text-[10px] font-mono text-zinc-500 mt-0.5">{p.clearanceLevel.split(" ")[0]}</p>
               </div>
             </button>
@@ -171,23 +171,23 @@ export default function ParameterMatrix() {
       </div>
 
       {/* Selected Pillar Detailed Grid */}
-      <div className="p-6 md:p-8 rounded-2xl bg-zinc-900/60 border border-white/10 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+      <div className="p-6 md:p-8 rounded-2xl bg-slate-50/80 border border-zinc-200 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-white text-black">
+            <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-xs">
               <selectedPillar.icon className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-xl font-bold text-white">{selectedPillar.name}</h4>
-              <p className="text-xs text-zinc-400 mt-0.5">{selectedPillar.shortDesc}</p>
+              <h4 className="text-xl font-bold text-zinc-900">{selectedPillar.name}</h4>
+              <p className="text-xs text-zinc-600 mt-0.5">{selectedPillar.shortDesc}</p>
             </div>
           </div>
 
           <span
-            className={`px-3 py-1 rounded-full text-xs font-mono border self-start sm:self-auto ${
+            className={`px-3 py-1 rounded-full text-xs font-mono border self-start sm:self-auto font-medium ${
               selectedPillar.clearanceLevel === "Restricted Defense"
-                ? "bg-rose-950/40 border-rose-500/40 text-rose-300"
-                : "bg-white/10 border-white/15 text-zinc-300"
+                ? "bg-rose-50 border-rose-200 text-rose-700"
+                : "bg-white border-zinc-200 text-zinc-700 shadow-xs"
             }`}
           >
             {selectedPillar.clearanceLevel}
@@ -197,14 +197,14 @@ export default function ParameterMatrix() {
         {/* 4 Parameter Cards */}
         <div className="grid sm:grid-cols-2 gap-4">
           {selectedPillar.parameters.map((param, idx) => (
-            <div key={idx} className="p-4 rounded-xl bg-black/60 border border-white/10 space-y-2">
+            <div key={idx} className="p-4 rounded-xl bg-white border border-zinc-200 space-y-2 shadow-xs">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-xs font-bold text-white">{param.title}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 shrink-0">
+                <span className="text-xs font-bold text-zinc-900">{param.title}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200 shrink-0">
                   {param.sensorSource}
                 </span>
               </div>
-              <p className="text-xs font-mono text-zinc-300 leading-relaxed bg-zinc-950/80 p-2 rounded-lg border border-white/5">
+              <p className="text-xs font-mono text-zinc-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-zinc-200">
                 {param.mathDesc}
               </p>
             </div>

@@ -52,13 +52,13 @@ function buildDefenseMapStyle(): any {
   return {
     version: 8,
     sources: {
-      "carto-dark": {
+      "carto-voyager": {
         type: "raster",
         tiles: [
-          `https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://d.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+          `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+          `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+          `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+          `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
         ],
         tileSize: 256,
         attribution: "© CARTO, © OpenStreetMap contributors",
@@ -71,9 +71,9 @@ function buildDefenseMapStyle(): any {
     },
     layers: [
       {
-        id: "carto-dark-tiles",
+        id: "carto-voyager-tiles",
         type: "raster",
-        source: "carto-dark",
+        source: "carto-voyager",
         minzoom: 0,
         maxzoom: 20,
       },
@@ -84,10 +84,10 @@ function buildDefenseMapStyle(): any {
         minzoom: 0,
         maxzoom: 18,
         paint: {
-          "hillshade-shadow-color": "#050000",
-          "hillshade-highlight-color": "#f43f5e",
-          "hillshade-accent-color": "#9f1239",
-          "hillshade-exaggeration": 0.85,
+          "hillshade-shadow-color": "#94a3b8",
+          "hillshade-highlight-color": "#ffffff",
+          "hillshade-accent-color": "#cbd5e1",
+          "hillshade-exaggeration": 0.45,
         },
       },
     ],
@@ -143,7 +143,7 @@ export default function DefenseDashboardPage() {
       {
         id: "msg_defense_init",
         role: "assistant",
-        content: `### 🛡️ PROJECT ORCA — RESTRICTED DEFENSE COMMAND
+        content: `### PROJECT ORCA — RESTRICTED DEFENSE COMMAND
 **Sovereign Coast Guard & Naval Maritime Surveillance Sector.**
 
 - **Active Border Grid:** Sir Creek & Pakistan IMBL Buffer Standoff.
@@ -298,7 +298,7 @@ Click any border coordinate or run tactical intercept simulations below.`,
           {
             id: assistantMsgId,
             role: "assistant",
-            content: "⚠️ Tactical Backend Connection Error. Confirm backend running on port 8000.",
+            content: "[ALERT] Tactical Gateway Connection Error. Confirm backend running on port 8000.",
             timestamp: new Date().toLocaleTimeString(),
           },
         ]);
@@ -345,7 +345,7 @@ Click any border coordinate or run tactical intercept simulations below.`,
 
   if (!mounted) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-black text-rose-400 font-mono">
+      <div className="flex h-screen w-screen items-center justify-center bg-white text-rose-600 font-mono">
         <ShieldAlert className="h-8 w-8 animate-spin" />
         <span className="ml-3">Authorizing Classified Defense Deck...</span>
       </div>
@@ -355,42 +355,42 @@ Click any border coordinate or run tactical intercept simulations below.`,
   const defenseMapStyle = buildDefenseMapStyle();
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-black text-white font-sans">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-slate-100 text-zinc-900 font-sans">
       {/* ===================================================================== */}
       {/* RETRACTABLE LEFT PANEL: TACTICAL CHAT & SURVEILLANCE FEED             */}
       {/* ===================================================================== */}
       <div
-        className={`relative z-20 flex flex-col border-r border-rose-500/30 bg-zinc-950/95 backdrop-blur-2xl transition-all duration-300 ${
+        className={`relative z-20 flex flex-col border-r border-zinc-200 bg-white/98 backdrop-blur-2xl transition-all duration-300 shadow-xl ${
           isChatOpen ? "w-full md:w-[420px] lg:w-[460px]" : "w-0 overflow-hidden border-r-0"
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-rose-500/30 px-4 py-3 bg-rose-950/40">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 bg-rose-50/70">
           <div className="flex items-center gap-2.5">
             <Link
-              href="/"
-              className="p-1.5 rounded-lg bg-black border border-rose-500/40 text-rose-300 hover:text-white transition"
-              title="Return to Mission Overview"
+              href="/dashboard?persona=defense"
+              className="p-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:text-black hover:bg-zinc-100 transition shadow-xs"
+              title="Return to 3D Globe Dashboard"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="p-1.5 rounded-lg bg-rose-600 text-white shadow-lg shadow-rose-950">
+            <div className="p-1.5 rounded-lg bg-rose-600 text-white shadow-md shadow-rose-600/20">
               <ShieldAlert className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-bold tracking-wide text-rose-300">DEFENSE COMMAND</h1>
-                <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/50">
+                <h1 className="text-sm font-bold tracking-wide text-rose-900">DEFENSE COMMAND</h1>
+                <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-200 font-semibold">
                   CLASSIFIED
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-400 font-mono">PostGIS Standoff & Intercept</p>
+              <p className="text-[10px] text-zinc-500 font-mono">PostGIS Standoff & Intercept</p>
             </div>
           </div>
 
           <button
             onClick={() => setIsChatOpen(false)}
-            className="p-1.5 rounded-lg bg-black border border-white/10 text-zinc-400 hover:text-white transition cursor-pointer"
+            className="p-1.5 rounded-lg bg-white border border-zinc-200 text-zinc-500 hover:text-black hover:bg-zinc-100 transition cursor-pointer shadow-xs"
             title="Collapse Panel for Fullscreen Radar"
           >
             <PanelLeftClose className="h-4 w-4" />
@@ -398,9 +398,9 @@ Click any border coordinate or run tactical intercept simulations below.`,
         </div>
 
         {/* Defense Tactical Quick Presets */}
-        <div className="border-b border-rose-500/20 p-2.5 bg-black/60 space-y-1.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-rose-400/90 px-1 flex items-center gap-1.5">
-            <Radio className="h-3 w-3 animate-pulse" />
+        <div className="border-b border-zinc-200 p-2.5 bg-zinc-50/70 space-y-1.5">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700 px-1 flex items-center gap-1.5">
+            <Radio className="h-3 w-3 animate-pulse text-rose-600" />
             <span>Classified Tactical Scenarios</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
@@ -411,13 +411,13 @@ Click any border coordinate or run tactical intercept simulations below.`,
                   [68.20, 23.15]
                 )
               }
-              className="p-2 rounded-xl border border-rose-500/30 bg-rose-950/30 hover:bg-rose-950/60 text-left text-[11px] text-rose-200 transition cursor-pointer"
+              className="p-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-left text-[11px] text-zinc-800 transition cursor-pointer shadow-xs"
             >
-              <div className="font-bold flex items-center gap-1">
-                <Crosshair className="h-3 w-3 text-rose-400" />
+              <div className="font-bold flex items-center gap-1 text-rose-700">
+                <Crosshair className="h-3 w-3 text-rose-600" />
                 <span>Sir Creek IMBL</span>
               </div>
-              <span className="text-[9px] text-zinc-400 truncate block">Drift Intercept Vector</span>
+              <span className="text-[9px] text-zinc-500 truncate block">Drift Intercept Vector</span>
             </button>
 
             <button
@@ -427,26 +427,26 @@ Click any border coordinate or run tactical intercept simulations below.`,
                   [79.315, 9.285]
                 )
               }
-              className="p-2 rounded-xl border border-rose-500/30 bg-rose-950/30 hover:bg-rose-950/60 text-left text-[11px] text-rose-200 transition cursor-pointer"
+              className="p-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-left text-[11px] text-zinc-800 transition cursor-pointer shadow-xs"
             >
-              <div className="font-bold flex items-center gap-1">
-                <Radar className="h-3 w-3 text-rose-400" />
+              <div className="font-bold flex items-center gap-1 text-rose-700">
+                <Radar className="h-3 w-3 text-rose-600" />
                 <span>Palk Strait Alert</span>
               </div>
-              <span className="text-[9px] text-zinc-400 truncate block">Sanctuary Standoff</span>
+              <span className="text-[9px] text-zinc-500 truncate block">Sanctuary Standoff</span>
             </button>
           </div>
         </div>
 
         {/* Message Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/50">
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role !== "user" && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-950/60 border border-rose-500/40 text-rose-400 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-xs">
                   <ShieldAlert className="h-4 w-4" />
                 </div>
               )}
@@ -454,8 +454,8 @@ Click any border coordinate or run tactical intercept simulations below.`,
               <div
                 className={`max-w-[88%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-rose-600 text-white rounded-br-none shadow-md shadow-rose-950/50 font-medium"
-                    : "bg-black/90 text-zinc-200 border border-rose-500/30 rounded-bl-none shadow-md"
+                    ? "bg-rose-600 text-white rounded-br-none shadow-sm font-medium"
+                    : "bg-white text-zinc-800 border border-zinc-200 rounded-bl-none shadow-xs"
                 }`}
               >
                 {msg.role === "user" ? (
@@ -467,20 +467,20 @@ Click any border coordinate or run tactical intercept simulations below.`,
                     </ReactMarkdown>
                   </div>
                 )}
-                <div className="mt-1.5 text-[9px] text-zinc-500 text-right">{msg.timestamp}</div>
+                <div className="mt-1.5 text-[9px] text-zinc-400 text-right">{msg.timestamp}</div>
               </div>
             </div>
           ))}
 
           {isStreaming && (
-            <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-950/20 text-xs text-rose-300 space-y-1.5">
-              <div className="flex items-center gap-2 font-bold text-rose-400">
+            <div className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-800 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-rose-700">
                 <Radar className="h-3.5 w-3.5 animate-spin" />
                 <span>Defense Swarm Intercept Processing...</span>
               </div>
-              <div className="space-y-1 pl-4 border-l border-rose-500/30">
+              <div className="space-y-1 pl-4 border-l border-rose-300">
                 {currentThoughts.map((t, i) => (
-                  <p key={i} className="text-[11px] font-mono text-zinc-300">{t}</p>
+                  <p key={i} className="text-[11px] font-mono text-zinc-600">{t}</p>
                 ))}
               </div>
             </div>
@@ -490,16 +490,16 @@ Click any border coordinate or run tactical intercept simulations below.`,
         </div>
 
         {/* Input Bar */}
-        <div className="border-t border-rose-500/30 bg-black p-3">
+        <div className="border-t border-zinc-200 bg-white p-3">
           {selectedCoordinates && (
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-rose-500/40 bg-rose-950/40 px-2.5 py-1 text-[11px] text-rose-300">
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] text-rose-800">
               <div className="flex items-center gap-1.5">
-                <Crosshair className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
+                <Crosshair className="h-3.5 w-3.5 text-rose-600 animate-pulse" />
                 <span>Target Locked: <strong>[{selectedCoordinates[1]}, {selectedCoordinates[0]}]</strong></span>
               </div>
               <button
                 onClick={() => setSelectedCoordinates(null)}
-                className="text-zinc-400 hover:text-rose-400 transition cursor-pointer"
+                className="text-zinc-400 hover:text-rose-600 transition cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -513,12 +513,12 @@ Click any border coordinate or run tactical intercept simulations below.`,
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Enter classified border standoff or vessel tracking query..."
               disabled={isStreaming}
-              className="flex-1 rounded-xl border border-rose-500/30 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-rose-500 focus:outline-none"
+              className="flex-1 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-rose-500 focus:bg-white focus:outline-none"
             />
             <button
               type="submit"
               disabled={!inputMessage.trim() || isStreaming}
-              className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition disabled:opacity-40 cursor-pointer shadow-lg shadow-rose-950/40"
+              className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition disabled:opacity-40 cursor-pointer shadow-sm"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -530,10 +530,10 @@ Click any border coordinate or run tactical intercept simulations below.`,
       {!isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
-          className="absolute top-4 left-4 z-30 flex items-center gap-2 p-2.5 rounded-xl bg-zinc-950/90 border border-rose-500/40 text-rose-300 hover:text-white shadow-2xl backdrop-blur-md transition cursor-pointer"
+          className="absolute top-4 left-4 z-30 flex items-center gap-2 p-2.5 rounded-xl bg-white/95 border border-rose-200 text-rose-700 hover:text-rose-900 shadow-xl backdrop-blur-md transition cursor-pointer"
           title="Expand Defense Tactical Panel"
         >
-          <PanelLeftOpen className="h-5 w-5 text-rose-400" />
+          <PanelLeftOpen className="h-5 w-5 text-rose-600" />
           <span className="text-xs font-bold font-mono">TACTICAL BRIEFING</span>
         </button>
       )}
@@ -541,11 +541,11 @@ Click any border coordinate or run tactical intercept simulations below.`,
       {/* ===================================================================== */}
       {/* 3D DEFENSE RADAR MAP (FULLSCREEN / RESPONSIVE)                         */}
       {/* ===================================================================== */}
-      <div className="relative flex-1 h-full w-full bg-black">
+      <div className="relative flex-1 h-full w-full bg-slate-100">
         {/* Floating Top Controls */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2.5">
-          <div className="flex items-center gap-2 rounded-xl border border-rose-500/40 bg-zinc-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-mono text-rose-300">
-            <Radio className="h-4 w-4 text-rose-400 animate-pulse" />
+          <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white/95 px-3.5 py-2 shadow-lg backdrop-blur-md text-xs font-mono text-rose-700 font-semibold">
+            <Radio className="h-4 w-4 text-rose-600 animate-pulse" />
             <span>SOVEREIGN BORDER RADAR</span>
           </div>
 
@@ -559,7 +559,7 @@ Click any border coordinate or run tactical intercept simulations below.`,
                 bearing: 20,
               })
             }
-            className="p-2 rounded-xl border border-white/10 bg-zinc-950/90 text-zinc-400 hover:text-white shadow-xl backdrop-blur-md transition cursor-pointer"
+            className="p-2 rounded-xl border border-zinc-200 bg-white/95 text-zinc-600 hover:text-black shadow-lg backdrop-blur-md transition cursor-pointer"
             title="Reset to Pakistan IMBL Sector"
           >
             <RotateCcw className="h-4 w-4" />
@@ -567,8 +567,8 @@ Click any border coordinate or run tactical intercept simulations below.`,
         </div>
 
         {/* Legend */}
-        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-1.5 rounded-2xl border border-rose-500/30 bg-zinc-950/90 p-3.5 shadow-2xl backdrop-blur-md text-[11px] text-zinc-300">
-          <div className="font-bold text-rose-400 flex items-center gap-1.5 mb-1">
+        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white/95 p-3.5 shadow-xl backdrop-blur-md text-[11px] text-zinc-700">
+          <div className="font-bold text-rose-700 flex items-center gap-1.5 mb-1">
             <ShieldAlert className="h-3.5 w-3.5" />
             <span>Defense Layer Identifiers</span>
           </div>

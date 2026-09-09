@@ -250,7 +250,8 @@ async def stream_chat_with_agent_swarm(req: ChatRequest):
             # Stream markdown chunks
             lines = markdown_text.split("\n")
             for line in lines:
-                yield f"data: {json.dumps({'type': 'chunk', 'text': line + '\n'})}\n\n"
+                chunk_data = json.dumps({"type": "chunk", "text": line + "\n"})
+                yield f"data: {chunk_data}\n\n"
                 await asyncio.sleep(0.03)
 
             # Final complete payload event

@@ -110,10 +110,10 @@ export default function LayerControlPanel({
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen((o) => !o)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-xl backdrop-blur-md transition-all cursor-pointer text-xs font-semibold ${
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-sm transition-all cursor-pointer text-xs font-semibold ${
           isOpen
-            ? "bg-white text-black border-white"
-            : "bg-zinc-950/90 text-white border-white/15 hover:border-white/40"
+            ? "bg-zinc-900 text-white border-zinc-900"
+            : "bg-white text-zinc-800 border-zinc-200 hover:bg-zinc-50"
         }`}
         title="Toggle Map Layers"
       >
@@ -122,7 +122,7 @@ export default function LayerControlPanel({
         {activeCount > 0 && (
           <span
             className={`flex items-center justify-center h-4 w-4 rounded-full text-[9px] font-bold ${
-              isOpen ? "bg-black text-white" : "bg-white text-black"
+              isOpen ? "bg-white text-zinc-900" : "bg-blue-600 text-white"
             }`}
           >
             {activeCount}
@@ -141,17 +141,17 @@ export default function LayerControlPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.18 }}
-            className="absolute right-0 top-12 w-72 max-h-[65vh] rounded-2xl border border-white/15 bg-zinc-950/98 shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col z-40"
+            className="absolute right-0 top-12 w-72 max-h-[65vh] rounded-2xl border border-zinc-200 bg-white shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col z-40"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 shrink-0 bg-zinc-50/60">
               <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-white" />
-                <span className="text-xs font-bold text-white">Map Layer Controls</span>
+                <Layers className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-bold text-zinc-900">Map Layer Controls</span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-zinc-400 hover:text-white transition cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -171,8 +171,8 @@ export default function LayerControlPanel({
                       isLocked
                         ? "opacity-50 cursor-not-allowed"
                         : isOn
-                        ? "bg-white/8 border border-white/10 cursor-pointer"
-                        : "cursor-pointer hover:bg-white/5"
+                        ? "bg-blue-50/70 border border-blue-100 cursor-pointer"
+                        : "cursor-pointer hover:bg-zinc-50"
                     }`}
                     onClick={() => !isLocked && onToggle(layer.id)}
                   >
@@ -181,7 +181,7 @@ export default function LayerControlPanel({
                       {layer.swatchStyle === "dot" ? (
                         <span
                           className={`h-2.5 w-2.5 rounded-full ${layer.color} ${
-                            isOn ? "ring-2 ring-white/20" : "opacity-40"
+                            isOn ? "ring-2 ring-blue-400" : "opacity-40"
                           }`}
                         />
                       ) : (
@@ -197,26 +197,26 @@ export default function LayerControlPanel({
                     <Icon
                       className={`h-3.5 w-3.5 shrink-0 ${
                         isLocked
-                          ? "text-zinc-500"
+                          ? "text-zinc-400"
                           : isOn
-                          ? "text-white"
-                          : "text-zinc-500"
+                          ? "text-blue-600"
+                          : "text-zinc-400"
                       }`}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`text-[11px] font-semibold truncate ${
-                            isLocked ? "text-zinc-500" : isOn ? "text-white" : "text-zinc-400"
+                            isLocked ? "text-zinc-400" : isOn ? "text-zinc-900" : "text-zinc-600"
                           }`}
                         >
                           {layer.label}
                         </span>
                         {isLocked && (
-                          <Lock className="h-2.5 w-2.5 text-rose-400 shrink-0" />
+                          <Lock className="h-2.5 w-2.5 text-rose-500 shrink-0" />
                         )}
                         {layer.requiresDefense && isDefenseUser && (
-                          <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
+                          <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-rose-50 text-rose-600 border border-rose-200 shrink-0">
                             DEFENSE
                           </span>
                         )}
@@ -227,19 +227,19 @@ export default function LayerControlPanel({
                     <div
                       className={`shrink-0 relative flex items-center h-5 w-9 rounded-full transition-colors ${
                         isLocked
-                          ? "bg-zinc-800"
+                          ? "bg-zinc-200"
                           : isOn
-                          ? "bg-white"
-                          : "bg-zinc-700"
+                          ? "bg-blue-600"
+                          : "bg-zinc-300"
                       }`}
                     >
                       <span
                         className={`absolute h-3.5 w-3.5 rounded-full shadow transition-all ${
                           isLocked
-                            ? "bg-zinc-600 left-[2px]"
+                            ? "bg-zinc-400 left-[2px]"
                             : isOn
-                            ? "bg-black left-[calc(100%-16px)]"
-                            : "bg-zinc-400 left-[2px]"
+                            ? "bg-white left-[calc(100%-16px)]"
+                            : "bg-white left-[2px]"
                         }`}
                       />
                     </div>
@@ -250,7 +250,7 @@ export default function LayerControlPanel({
                         e.stopPropagation();
                         setTooltip(tooltip === layer.id ? null : layer.id);
                       }}
-                      className="shrink-0 text-zinc-600 hover:text-zinc-300 transition cursor-pointer"
+                      className="shrink-0 text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
                     >
                       <Info className="h-3 w-3" />
                     </button>
@@ -267,15 +267,15 @@ export default function LayerControlPanel({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="border-t border-white/10 px-4 py-3 text-[11px] text-zinc-300 leading-relaxed bg-black/40"
+                  className="border-t border-zinc-200 px-4 py-3 text-[11px] text-zinc-600 leading-relaxed bg-zinc-50"
                 >
-                  <strong className="text-white text-xs block mb-0.5">
+                  <strong className="text-zinc-900 text-xs block mb-0.5">
                     {LAYER_DEFS.find((l) => l.id === tooltip)?.label}
                   </strong>
                   {LAYER_DEFS.find((l) => l.id === tooltip)?.description}
                   {LAYER_DEFS.find((l) => l.id === tooltip)?.requiresDefense && !isDefenseUser && (
-                    <p className="mt-1.5 text-rose-400 font-semibold">
-                      🔒 Requires Defense / Coast Guard authentication.
+                    <p className="mt-1.5 text-rose-600 font-semibold flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Requires Defense / Coast Guard authentication.
                     </p>
                   )}
                 </motion.div>
@@ -283,7 +283,7 @@ export default function LayerControlPanel({
             </AnimatePresence>
 
             {/* Footer hint */}
-            <div className="px-4 py-2 border-t border-white/10 text-[10px] text-zinc-500 font-mono">
+            <div className="px-4 py-2 border-t border-zinc-100 text-[10px] text-zinc-400 font-mono bg-zinc-50/60">
               {isDefenseUser
                 ? "Defense clearance active — all layers unlocked."
                 : "Military layer requires Defense portal login."}

@@ -18,6 +18,9 @@ import {
   Info,
   CheckCircle2,
   ExternalLink,
+  Microscope,
+  GraduationCap,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,11 +28,16 @@ export type PortalTab = "tactical" | "agents" | "data-hub" | "regulatory-vault";
 
 export type UserRole = "navigator" | "researcher" | "student" | "defense";
 
-export const USER_ROLES: { id: UserRole; label: string; icon: string; desc: string }[] = [
-  { id: "navigator", label: "Navigator & Fishery", icon: "🧭", desc: "Pragmatic safety, targeted catch, and fuel savings" },
-  { id: "researcher", label: "Marine Scientist", icon: "🔬", desc: "Scientific telemetry, parameters, and bio-optical data" },
-  { id: "student", label: "Ocean Learner", icon: "🎓", desc: "Educational explanations of ocean phenomena" },
-  { id: "defense", label: "Defense Command", icon: "🛡️", desc: "Sovereign IMBL security & tactical surveillance" },
+export const USER_ROLES: {
+  id: UserRole;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  desc: string;
+}[] = [
+  { id: "navigator", label: "Navigator & Fishery", icon: Compass, desc: "Pragmatic safety, targeted catch, and fuel savings" },
+  { id: "researcher", label: "Marine Scientist", icon: Microscope, desc: "Scientific telemetry, parameters, and bio-optical data" },
+  { id: "student", label: "Ocean Learner", icon: GraduationCap, desc: "Educational explanations of ocean phenomena" },
+  { id: "defense", label: "Defense Command", icon: ShieldCheck, desc: "Sovereign IMBL security & tactical surveillance" },
 ];
 
 interface CommandPortalLayoutProps {
@@ -84,21 +92,21 @@ export default function CommandPortalLayout({
   ];
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#f8fafc] text-zinc-900 font-sans">
       {/* ===================================================================== */}
       {/* UNIFIED NAVIGATION SIDEBAR (LEFTMOST ICON RAIL)                       */}
       {/* ===================================================================== */}
-      <aside className="relative z-30 flex flex-col items-center justify-between w-16 md:w-20 bg-zinc-950 border-r border-white/10 py-4 select-none shrink-0">
+      <aside className="relative z-30 flex flex-col items-center justify-between w-16 md:w-20 bg-white border-r border-zinc-200 py-4 select-none shrink-0 shadow-xs">
         {/* Top Brand Logo */}
         <div className="flex flex-col items-center gap-1">
           <Link
             href="/"
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-black font-black shadow-lg shadow-white/10 hover:scale-105 transition cursor-pointer"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white font-black shadow-md shadow-blue-500/25 hover:scale-105 transition cursor-pointer"
             title="Project ORCA — Home"
           >
             <Compass className="h-6 w-6" />
           </Link>
-          <span className="text-[9px] font-mono tracking-widest text-zinc-400 font-bold uppercase mt-1">
+          <span className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold uppercase mt-1">
             ORCA
           </span>
         </div>
@@ -114,18 +122,18 @@ export default function CommandPortalLayout({
                 onClick={() => onTabChange(item.id)}
                 className={`group relative flex flex-col items-center justify-center w-full py-2.5 rounded-2xl transition-all cursor-pointer ${
                   isActive
-                    ? "bg-white text-black shadow-xl shadow-white/15"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-900"
+                    ? "bg-blue-50 text-blue-700 shadow-xs border border-blue-200/60 font-semibold"
+                    : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
                 }`}
                 title={item.label}
               >
                 <Icon className="h-5 w-5" />
-                <span className={`text-[9px] font-semibold tracking-tight mt-1 text-center hidden md:block ${isActive ? "text-black" : "text-zinc-400 group-hover:text-zinc-200"}`}>
+                <span className={`text-[9px] font-semibold tracking-tight mt-1 text-center hidden md:block ${isActive ? "text-blue-700" : "text-zinc-500 group-hover:text-zinc-800"}`}>
                   {item.id === "tactical" ? "Command" : item.id === "agents" ? "Agents" : item.id === "data-hub" ? "Data EO" : "Policies"}
                 </span>
                 {item.badge && (
                   <span className={`absolute -top-1 -right-1 text-[7px] font-mono font-black px-1 rounded-full border ${
-                    isActive ? "bg-black text-white border-black" : "bg-zinc-800 text-zinc-300 border-white/20"
+                    isActive ? "bg-blue-600 text-white border-blue-600" : "bg-zinc-100 text-zinc-600 border-zinc-200"
                   }`}>
                     {item.badge}
                   </span>
@@ -139,10 +147,10 @@ export default function CommandPortalLayout({
         <div className="flex flex-col items-center gap-2 w-full px-2">
           <Link
             href="/defense"
-            className="flex flex-col items-center justify-center w-full py-2 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-300 hover:bg-rose-900/60 hover:text-white transition cursor-pointer"
+            className="flex flex-col items-center justify-center w-full py-2 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition cursor-pointer shadow-xs"
             title="Classified Defense Command"
           >
-            <ShieldAlert className="h-4 w-4 text-rose-400" />
+            <ShieldAlert className="h-4 w-4 text-rose-600" />
             <span className="text-[8px] font-mono font-bold mt-0.5 hidden md:block">DEFENSE</span>
           </Link>
 
@@ -153,9 +161,9 @@ export default function CommandPortalLayout({
       {/* ===================================================================== */}
       {/* MAIN PORTAL BODY (TOP BAR + ACTIVE VIEW CONTENT)                      */}
       {/* ===================================================================== */}
-      <div className="relative flex flex-col flex-1 h-full overflow-hidden bg-black">
+      <div className="relative flex flex-col flex-1 h-full overflow-hidden bg-[#f8fafc]">
         {/* TOP COMMAND BAR (GOVERNMENT OF INDIA & INCOIS OFFICIAL MARITIME PORTAL STYLE) */}
-        <header className="relative z-20 flex items-center justify-between h-16 px-4 md:px-6 bg-zinc-950 border-b border-white/10 select-none">
+        <header className="relative z-20 flex items-center justify-between h-16 px-4 md:px-6 bg-white border-b border-zinc-200 select-none shadow-xs text-zinc-900">
           {/* Left: Official Government of India & Ministry Branding */}
           <div className="flex items-center gap-3.5">
             {/* National Tri-Color Accent Pill */}
@@ -167,23 +175,23 @@ export default function CommandPortalLayout({
 
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-semibold">
+                <span className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase font-semibold">
                   GOVERNMENT OF INDIA • MINISTRY OF EARTH SCIENCES • INCOIS
                 </span>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>24x7 OPERATIONAL</span>
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm md:text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                <h1 className="text-sm md:text-base font-black tracking-tight text-zinc-900 flex items-center gap-1.5">
                   <span>PROJECT ORCA</span>
-                  <span className="text-zinc-500 font-normal">|</span>
-                  <span className="text-xs md:text-sm font-semibold text-zinc-300">
+                  <span className="text-zinc-300 font-normal">|</span>
+                  <span className="text-xs md:text-sm font-semibold text-zinc-600">
                     National Maritime Intelligence & Fisheries Portal
                   </span>
                 </h1>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/10 text-zinc-300 border border-white/15">
+                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
                   SIH-26176
                 </span>
               </div>
@@ -194,59 +202,68 @@ export default function CommandPortalLayout({
           <div className="flex items-center gap-2 md:gap-3">
             {/* User Persona / Role Dropdown */}
             <div className="relative">
-              <button
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer shadow-sm"
-                title="Change User Persona"
-              >
-                <span>{USER_ROLES.find((r) => r.id === userRole)?.icon}</span>
-                <span className="font-mono text-[11px]">
-                  {USER_ROLES.find((r) => r.id === userRole)?.label}
-                </span>
-                <ChevronDown className="h-3 w-3 text-zinc-400" />
-              </button>
+              {(() => {
+                const currentRoleObj = USER_ROLES.find((r) => r.id === userRole);
+                const CurrentRoleIcon = currentRoleObj ? currentRoleObj.icon : Compass;
+                return (
+                  <button
+                    onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-semibold transition cursor-pointer shadow-xs"
+                    title="Change User Persona"
+                  >
+                    <CurrentRoleIcon className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="font-mono text-[11px]">
+                      {currentRoleObj?.label}
+                    </span>
+                    <ChevronDown className="h-3 w-3 text-zinc-400" />
+                  </button>
+                );
+              })()}
               <AnimatePresence>
                 {roleMenuOpen && (
                   <motion.div
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-11 w-64 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50 font-sans"
+                    className="absolute right-0 top-11 w-64 rounded-xl border border-zinc-200 bg-white shadow-2xl p-1.5 z-50 font-sans text-zinc-900"
                   >
-                    <div className="px-2.5 py-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-widest border-b border-white/10 mb-1">
+                    <div className="px-2.5 py-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-widest border-b border-zinc-100 mb-1 font-semibold">
                       Select Operational Persona
                     </div>
-                    {USER_ROLES.map((role) => (
-                      <button
-                        key={role.id}
-                        onClick={() => {
-                          onRoleChange(role.id);
-                          setRoleMenuOpen(false);
-                        }}
-                        className={`flex flex-col items-start w-full px-2.5 py-2 rounded-lg text-xs transition cursor-pointer text-left ${
-                          userRole === role.id
-                            ? "bg-white text-black font-bold"
-                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="flex items-center gap-2">
-                            <span>{role.icon}</span>
-                            <span className="font-semibold">{role.label}</span>
-                          </span>
-                          {userRole === role.id && (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-black" />
-                          )}
-                        </div>
-                        <span
-                          className={`text-[10px] font-normal mt-0.5 ${
-                            userRole === role.id ? "text-zinc-700 font-medium" : "text-zinc-400"
+                    {USER_ROLES.map((role) => {
+                      const ItemRoleIcon = role.icon;
+                      return (
+                        <button
+                          key={role.id}
+                          onClick={() => {
+                            onRoleChange(role.id);
+                            setRoleMenuOpen(false);
+                          }}
+                          className={`flex flex-col items-start w-full px-2.5 py-2 rounded-lg text-xs transition cursor-pointer text-left ${
+                            userRole === role.id
+                              ? "bg-blue-600 text-white font-bold shadow-xs"
+                              : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
                           }`}
                         >
-                          {role.desc}
-                        </span>
-                      </button>
-                    ))}
+                          <div className="flex items-center justify-between w-full">
+                            <span className="flex items-center gap-2">
+                              <ItemRoleIcon className="h-4 w-4" />
+                              <span className="font-semibold">{role.label}</span>
+                            </span>
+                            {userRole === role.id && (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-[10px] font-normal mt-0.5 ${
+                              userRole === role.id ? "text-blue-100 font-medium" : "text-zinc-400"
+                            }`}
+                          >
+                            {role.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -256,9 +273,9 @@ export default function CommandPortalLayout({
             <div className="relative">
               <button
                 onClick={() => setBasinMenuOpen(!basinMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-semibold transition cursor-pointer shadow-xs"
               >
-                <Globe className="h-3.5 w-3.5 text-sky-400" />
+                <Globe className="h-3.5 w-3.5 text-blue-600" />
                 <span className="hidden sm:inline font-mono text-[11px]">
                   {BASINS.find((b) => b.id === activeBasin)?.label || "Arabian Sea"}
                 </span>
@@ -270,7 +287,7 @@ export default function CommandPortalLayout({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-11 w-48 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50 font-mono"
+                    className="absolute right-0 top-11 w-48 rounded-xl border border-zinc-200 bg-white shadow-2xl p-1.5 z-50 font-mono text-zinc-900"
                   >
                     {BASINS.map((basin) => (
                       <button
@@ -281,13 +298,13 @@ export default function CommandPortalLayout({
                         }}
                         className={`flex items-center justify-between w-full px-3 py-2 rounded-lg text-xs transition cursor-pointer ${
                           activeBasin === basin.id
-                            ? "bg-white text-black font-bold"
-                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                            ? "bg-blue-600 text-white font-bold shadow-xs"
+                            : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
                         }`}
                       >
                         <span>{basin.label}</span>
                         {activeBasin === basin.id && (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-black" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
                         )}
                       </button>
                     ))}
@@ -300,9 +317,9 @@ export default function CommandPortalLayout({
             <div className="relative">
               <button
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/15 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-semibold transition cursor-pointer shadow-xs"
               >
-                <Languages className="h-3.5 w-3.5 text-amber-400" />
+                <Languages className="h-3.5 w-3.5 text-amber-500" />
                 <span className="font-mono text-[11px]">{selectedLanguage}</span>
                 <ChevronDown className="h-3 w-3 text-zinc-400" />
               </button>
@@ -312,7 +329,7 @@ export default function CommandPortalLayout({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="absolute right-0 top-11 w-40 rounded-xl border border-white/15 bg-zinc-950 shadow-2xl p-1.5 z-50"
+                    className="absolute right-0 top-11 w-40 rounded-xl border border-zinc-200 bg-white shadow-2xl p-1.5 z-50 text-zinc-900"
                   >
                     {LANGUAGES.map((l) => (
                       <button
@@ -323,12 +340,12 @@ export default function CommandPortalLayout({
                         }}
                         className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-xs transition cursor-pointer ${
                           selectedLanguage === l.code
-                            ? "bg-white text-black font-bold"
-                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                            ? "bg-blue-600 text-white font-bold shadow-xs"
+                            : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
                         }`}
                       >
                         <span>{l.native}</span>
-                        <span className="text-[10px] font-mono text-zinc-500">{l.code}</span>
+                        <span className={`text-[10px] font-mono ${selectedLanguage === l.code ? "text-blue-200" : "text-zinc-400"}`}>{l.code}</span>
                       </button>
                     ))}
                   </motion.div>

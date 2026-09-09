@@ -25,3 +25,8 @@ uvicorn[standard]>=0.30.0
 pydantic>=2.8.0
 pydantic-settings>=2.4.0
 python-dotenv>=1.0.0
+
+# Scientific & Geospatial Array Processing
+xarray>=2024.1.0
+netcdf4>=1.6.5
+pandas>=2.0.0

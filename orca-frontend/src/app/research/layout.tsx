@@ -15,6 +15,7 @@ import {
   Radio,
   Cpu,
   Layers,
+  Microscope,
 } from "lucide-react";
 
 interface ResearchLayoutProps {
@@ -55,7 +56,7 @@ export default function ResearchLayout({ children }: ResearchLayoutProps) {
           <div className="h-14 flex items-center justify-between px-4 border-b border-slate-800 bg-[#090d16]/80">
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-mono font-bold text-sm">
-                🔬
+                <Microscope className="h-4 w-4 text-cyan-400" />
               </div>
               <div className="hidden md:block">
                 <div className="font-mono font-bold text-sm text-cyan-300 tracking-wider">

@@ -305,32 +305,32 @@ export default function AgentSynapseGraph({
 
   return (
     <div
-      className="relative w-full h-full min-h-[580px] bg-black select-none overflow-hidden rounded-2xl border border-white/10 flex flex-col justify-between p-4 md:p-6"
+      className="relative w-full h-full min-h-[580px] bg-[#f8fafc] select-none overflow-hidden rounded-2xl border border-zinc-200 flex flex-col justify-between p-4 md:p-6 shadow-sm"
       style={{
-        background: "radial-gradient(ellipse at 50% 40%, #080d16 0%, #000000 100%)",
+        background: "#f8fafc",
       }}
     >
       {/* ━━━ TOP CONTROLS & SCENARIO SELECTOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="relative z-20 flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-white/10">
+      <div className="relative z-20 flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-zinc-200">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-white text-black font-black">
-              <Zap className="h-4 w-4 fill-black" />
+            <div className="p-1.5 rounded-lg bg-blue-600 text-white font-black shadow-xs">
+              <Zap className="h-4 w-4 fill-white" />
             </div>
-            <h3 className="text-sm font-bold text-white tracking-wide">
+            <h3 className="text-sm font-bold text-zinc-900 tracking-wide">
               Deterministic Multi-Agent Synaptic Graph
             </h3>
             <span
               className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
                 backendLive
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                  : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
               }`}
             >
               {backendLive ? "● FASTAPI LIVE :8000" : "● STANDBY (Backend Offline - Client Simulation Active)"}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-400 font-mono mt-0.5">
+          <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
             Nodes and synapses activate strictly based on intent decomposition and active agent tasks.
           </p>
         </div>
@@ -341,8 +341,8 @@ export default function AgentSynapseGraph({
             onClick={handleReset}
             className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono transition cursor-pointer ${
               activeStep === -1
-                ? "bg-zinc-800 text-white border-white/40 font-bold"
-                : "bg-zinc-950 text-zinc-400 border-white/10 hover:text-white"
+                ? "bg-blue-600 text-white border-blue-600 font-bold"
+                : "bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900 hover:bg-zinc-50"
             }`}
             title="Reset to resting standby state"
           >
@@ -359,8 +359,8 @@ export default function AgentSynapseGraph({
                 }}
                 className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                   isSelected
-                    ? "bg-white text-black border-white shadow-md font-bold"
-                    : "bg-zinc-900/80 text-zinc-400 border-white/10 hover:text-white hover:bg-zinc-800"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm font-bold"
+                    : "bg-white text-zinc-600 border-zinc-200 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 {sc.title.split(". ")[1]}
@@ -546,39 +546,39 @@ export default function AgentSynapseGraph({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.15 }}
-              className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 w-full max-w-lg rounded-2xl border border-white/20 bg-zinc-950/98 p-3.5 shadow-2xl backdrop-blur-2xl text-xs font-mono"
+              className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 w-full max-w-lg rounded-2xl border border-zinc-200 bg-white/98 p-3.5 shadow-xl backdrop-blur-xl text-xs font-mono text-zinc-900"
             >
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                 <div className="flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-full animate-pulse"
-                    style={{ backgroundColor: DOMAIN_COLORS[hoveredNode.category]?.hex || "#fff" }}
+                    style={{ backgroundColor: DOMAIN_COLORS[hoveredNode.category]?.hex || "#2563eb" }}
                   />
-                  <span className="font-bold text-white text-xs">{hoveredNode.label}</span>
+                  <span className="font-bold text-zinc-900 text-xs">{hoveredNode.label}</span>
                   <span
                     className="text-[9px] px-2 py-0.5 rounded-md font-bold"
                     style={{
-                      backgroundColor: `rgba(${DOMAIN_COLORS[hoveredNode.category]?.rgb || "255,255,255"}, 0.2)`,
-                      color: DOMAIN_COLORS[hoveredNode.category]?.hex || "#fff",
+                      backgroundColor: `rgba(${DOMAIN_COLORS[hoveredNode.category]?.rgb || "37,99,235"}, 0.12)`,
+                      color: DOMAIN_COLORS[hoveredNode.category]?.hex || "#2563eb",
                     }}
                   >
                     {DOMAIN_COLORS[hoveredNode.category]?.label || hoveredNode.category}
                   </span>
                 </div>
-                <span className="text-[10px] text-zinc-400">
+                <span className="text-[10px] text-zinc-500">
                   {hoveredNode.agentRef ? `Agent: ${hoveredNode.agentRef}` : "Ingress/Egress Tensor"}
                 </span>
               </div>
 
               <div className="space-y-1.5 mt-2 text-[10px]">
                 {hoveredNode.mathFormula && (
-                  <div className="p-2 rounded-lg bg-black border border-white/10 text-emerald-300">
+                  <div className="p-2 rounded-lg bg-slate-50 border border-zinc-200 text-emerald-800">
                     <span className="text-zinc-500 block text-[8px] uppercase font-bold">Mathematical Formulation:</span>
                     <span>{hoveredNode.mathFormula}</span>
                   </div>
                 )}
                 {hoveredNode.activePayload && (
-                  <div className="p-2 rounded-lg bg-black border border-white/10 text-sky-200">
+                  <div className="p-2 rounded-lg bg-slate-50 border border-zinc-200 text-blue-800">
                     <span className="text-zinc-500 block text-[8px] uppercase font-bold">State Tensor:</span>
                     <span>{hoveredNode.activePayload}</span>
                   </div>
@@ -590,14 +590,14 @@ export default function AgentSynapseGraph({
       </div>
 
       {/* ━━━ BOTTOM LEGEND & DOMAIN COLOR GUIDE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="relative z-20 flex items-center justify-between pt-3 border-t border-white/10 text-[10px] font-mono text-zinc-400 flex-wrap gap-2">
+      <div className="relative z-20 flex items-center justify-between pt-3 border-t border-zinc-200 text-[10px] font-mono text-zinc-500 flex-wrap gap-2">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /><span>Sensory</span></div>
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-purple-500" /><span>Supervisor</span></div>
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /><span>Ocean AI</span></div>
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500" /><span>Risk Geo</span></div>
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-400" /><span>Nav A*</span></div>
-          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" /><span>Policy RAG</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-500" /><span>Sensory</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-purple-600" /><span>Supervisor</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-600" /><span>Ocean AI</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-600" /><span>Risk Geo</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-cyan-600" /><span>Nav A*</span></div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-600" /><span>Policy RAG</span></div>
           <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-indigo-400" /><span>Egress</span></div>
         </div>
 

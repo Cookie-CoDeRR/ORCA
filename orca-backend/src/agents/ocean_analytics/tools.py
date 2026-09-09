@@ -54,7 +54,7 @@ def get_sst_and_chlorophyll(lat: float, lon: float) -> dict[str, float]:
     }
 
 
-def get_regional_species_pool(lat: float, lon: float, sst: number) -> list[tuple[str, str, float]]:
+def get_regional_species_pool(lat: float, lon: float, sst: float) -> list[tuple[str, str, float]]:
     """
     Determines authentic regional pelagic and demersal marine taxonomy based on
     latitude, longitude, and thermal front profile.
