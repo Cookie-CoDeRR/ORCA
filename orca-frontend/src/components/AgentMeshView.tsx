@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   Terminal,
   Activity,
-  Code2,
+  Code,
   Database,
   ArrowRight,
   Clock,
@@ -469,7 +469,7 @@ export default function AgentMeshView() {
           <div className="space-y-2">
             <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-slate-300 font-semibold">
-                <Code2 className="h-3.5 w-3.5 text-cyan-400" />
+                <Code className="h-3.5 w-3.5 text-cyan-400" />
                 <span>Pydantic Input Payload</span>
               </span>
               <span>application/json</span>

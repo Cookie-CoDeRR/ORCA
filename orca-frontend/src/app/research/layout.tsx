@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Map,
-  BarChart2,
+  BarChart3,
   FileText,
   Settings,
   Database,
@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   {
     href: "/research/data",
     label: "Telemetry Hub",
-    icon: BarChart2,
+    icon: BarChart3,
     badge: "NetCDF4",
   },
   {

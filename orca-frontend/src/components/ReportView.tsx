@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Search, ArrowUpRight, BookOpen, FileText, ExternalLink,
   ChevronDown, ChevronUp, Download, Share2, Compass, Waves,
   Shield, Fish, Sparkles, Filter, Database, CheckCircle2,
   AlertTriangle, Info, Calendar, Clock, MapPin, BarChart3,
   Layers, Cpu, Zap, ArrowLeft, RefreshCw, Thermometer,
-  FlaskConical, Wind, Activity, Newspaper
+  FlaskConical, Wind, Activity, Newspaper, ChevronRight,
+  ArrowRight, ShieldCheck, Check, Plus, Minus
 } from "lucide-react";
 
 export interface ReportViewProps {
@@ -56,7 +56,7 @@ const SPECIES_LIST: SpeciesProfile[] = [
     ],
     category: "pelagic",
     iucnStatus: "Near Threatened",
-    iucnColor: "#ffd166",
+    iucnColor: "#C87B12",
     confidence: 93,
     optimalTemp: "25.0°C – 29.5°C",
     optimalSalinity: "34.5 – 36.0 PSU",
@@ -88,7 +88,7 @@ const SPECIES_LIST: SpeciesProfile[] = [
     ],
     category: "pelagic",
     iucnStatus: "Least Concern",
-    iucnColor: "#06d6a0",
+    iucnColor: "#228B5A",
     confidence: 88,
     optimalTemp: "26.0°C – 30.5°C",
     optimalSalinity: "33.5 – 35.8 PSU",
@@ -121,7 +121,7 @@ const SPECIES_LIST: SpeciesProfile[] = [
     ],
     category: "coastal",
     iucnStatus: "Abundant / Commercial",
-    iucnColor: "#06d6a0",
+    iucnColor: "#228B5A",
     confidence: 91,
     optimalTemp: "27.0°C – 29.2°C",
     optimalSalinity: "32.0 – 35.0 PSU",
@@ -153,7 +153,7 @@ const SPECIES_LIST: SpeciesProfile[] = [
     ],
     category: "demersal",
     iucnStatus: "Vulnerable",
-    iucnColor: "#ef233c",
+    iucnColor: "#C74343",
     confidence: 84,
     optimalTemp: "24.5°C – 28.0°C",
     optimalSalinity: "28.0 – 34.0 PSU",
@@ -185,7 +185,7 @@ const SPECIES_LIST: SpeciesProfile[] = [
     ],
     category: "migratory",
     iucnStatus: "Vulnerable",
-    iucnColor: "#ffd166",
+    iucnColor: "#C87B12",
     confidence: 95,
     optimalTemp: "26.0°C – 29.8°C",
     optimalSalinity: "12.0 – 28.0 PSU (Brackish delta)",
@@ -254,7 +254,7 @@ const GLOSSARY_TERMS: GlossaryTerm[] = [
     term: "International Maritime Boundary Line",
     acronym: "IMBL",
     category: "Maritime Law",
-    definition: "The sovereign international border separating Indian waters from neighboring nation states (Pakistan, Sri Lanka, Bangladesh). ORCA provides automated visual and acoustic proximity warnings.",
+    definition: "The sovereign international border separating Indian waters from neighboring nation states (Pakistan, Sri Lanka, Bangladesh). ORCA provides automated proximity warnings.",
     formulaOrStandard: "UNCLOS 1982 Bilateral Boundary Treaties & Cartographic Coordinates",
     importance: "Prevents accidental incursions into foreign waters, avoiding vessel seizure and crew detention.",
   },
@@ -296,9 +296,9 @@ const GLOSSARY_TERMS: GlossaryTerm[] = [
     importance: "Prevents at-sea collisions and enables ORCA's real-time detection of commercial cargo lanes.",
   },
   {
-    term: "RAG Multi-Agent Harness",
+    term: "RAG Multi-Agent Workflow",
     category: "AI & Architecture",
-    definition: "Retrieval-Augmented Generation pipeline where specialized sovereign agents (Ocean Worker, Geofence Worker, Synthesis Scholar) pull spatial rasters and academic corpora into vector embeddings for grounded AI advisories.",
+    definition: "Retrieval-Augmented Generation pipeline where specialized domain agents (Ocean Specialist, Geofence Analyst, Synthesis Engine) pull spatial rasters and academic corpora into vector embeddings for grounded advisories.",
     formulaOrStandard: "CosSim(q_emb, k_chunk) > threshold → Context Injection → LLM Chain",
     importance: "Ensures hallucination-free advisories with strict mathematical grounding in INCOIS and satellite telemetry.",
   },
@@ -313,6 +313,7 @@ interface ResearchPaper {
   year: number;
   doi: string;
   abstract: string;
+  relevanceSentence: string;
   keyFindings: string[];
   tags: string[];
   citationsCount: number;
@@ -323,10 +324,11 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     id: "paper-1",
     title: "Validation of Potential Fishing Zone (PFZ) Advisories in the Southeastern Arabian Sea using Multispectral Satellite Remote Sensing and In-Situ Catch Verification",
     authors: "Dr. T. M. Balakrishnan Nair, Dr. P. Shenoi, Dr. N. V. Vinithkumar",
-    institution: "INCOIS (Indian National Centre for Ocean Information Services) & CMFRI",
+    institution: "INCOIS & CMFRI",
     journal: "Journal of Marine Systems, Elsevier",
     year: 2024,
     doi: "10.1016/j.jmarsys.2024.103892",
+    relevanceSentence: "Validates satellite-derived thermal and chlorophyll-a fronts against 1,420 vessel logbooks, confirming a 2.8x catch rate increase.",
     abstract: "This multi-year study correlates satellite-derived thermal and chlorophyll-a frontal interfaces against 1,420 commercial vessel logbooks operating off the Malabar coast. Catch per unit effort (CPUE) for pelagic teleosts in validated PFZ zones demonstrated a 2.8-fold increase compared to non-advised control sectors, confirming high economic viability.",
     keyFindings: [
       "93.4% spatial correlation between satellite frontal boundaries and pelagic tuna schools",
@@ -340,10 +342,11 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     id: "paper-2",
     title: "Spatio-Temporal Modelling of Pelagic Tuna Aggregations using Chlorophyll-a Frontal Gradients and Thermal Boundaries off Gujarat Coast",
     authors: "Dr. S. K. Dwivedi, Dr. Rajeshwari Patel, Dr. Arvind Menon",
-    institution: "National Institute of Oceanography (CSIR-NIO), Goa",
+    institution: "CSIR-National Institute of Oceanography (NIO)",
     journal: "Journal of Oceanography & Fisheries Research",
     year: 2025,
     doi: "10.1007/s10872-024-00612-4",
+    relevanceSentence: "Demonstrates that cyclonic eddy cores off Saurashtra concentrate pelagic forage, boosting strike rates by 34%.",
     abstract: "Coupled oceanographic models incorporating Oceansat-3 OCM radiometry and in-situ Argo float profiles uncover strong seasonal migration pathways of Thunnus albacares across the northern Arabian Sea basin. Cyclonic eddy cores in the Saurashtra basin serve as prime forage hubs during the winter convective mixing phase.",
     keyFindings: [
       "Eddy dipole structures concentrate pelagic squid at 60–90m depth horizons",
@@ -357,11 +360,12 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     id: "paper-3",
     title: "Autonomous Multi-Agent AI Harness for Sovereign Maritime Geofencing and Eco-Routing in the Indian Ocean EEZ",
     authors: "ORCA Research Consortium, Ministry of Earth Sciences (MoES)",
-    institution: "Center for Marine Intelligence & Sovereign Defense Analytics",
+    institution: "Center for Marine Intelligence & Ocean Analytics",
     journal: "IEEE Oceanic Engineering Proceedings",
     year: 2025,
     doi: "10.1109/OCEANS.2025.1092314",
-    abstract: "We introduce the ORCA sovereign multi-agent architecture combining spatial PostGIS queries, real-time AIS vessel stream processing, and retrieval-augmented LLMs. The platform delivers millisecond-latency proximity breach warnings alongside current-assisted fuel-optimal navigational corridors.",
+    relevanceSentence: "Defines the core ORCA multi-agent architecture combining PostGIS spatial calculations, AIS telemetry, and current-assisted fuel routing.",
+    abstract: "We introduce the ORCA multi-agent architecture combining spatial PostGIS queries, real-time AIS vessel stream processing, and retrieval-augmented LLMs. The platform delivers millisecond-latency proximity breach warnings alongside current-assisted fuel-optimal navigational corridors.",
     keyFindings: [
       "Zero false-negative border proximity warnings across 14,000 simulated voyages",
       "Current assist route engine yielded an average of 14.2% net fuel reduction",
@@ -378,6 +382,7 @@ const RESEARCH_PAPERS: ResearchPaper[] = [
     journal: "CMFRI Special Bulletin No. 142",
     year: 2024,
     doi: "10.56042/ijms.v53i4.4281",
+    relevanceSentence: "Establishes that coastal SST above 29.5°C triggers offshore dispersal of Indian mackerel shoals, providing key baseline metrics.",
     abstract: "An examination of 30 years of coastal upwelling indices and chlorophyll anomalies reveals significant shifts in small pelagic spawning rhythms. Coastal sea surface warming above 29.5°C triggers offshore and poleward dispersal of Indian mackerel shoals.",
     keyFindings: [
       "Upwelling intensity index correlates linearly with post-monsoon ring seine catch",
@@ -394,57 +399,47 @@ interface MarineArticle {
   title: string;
   source: string;
   published: string;
-  readTime: string;
   summary: string;
-  category: "Advisory" | "Technology" | "Ecology" | "Policy";
+  category: string;
   url: string;
-  accent: string;
 }
 
 const MARINE_ARTICLES: MarineArticle[] = [
   {
     id: "art-1",
     title: "Monsoon Surge & Upwelling Alert: Southern Arabian Sea Chlorophyll-a Reaches 3-Year Peak",
-    source: "ORCA Oceanographic Bulletin",
-    published: "2 hours ago · Real-time",
-    readTime: "4 min read",
-    summary: "Intense southwesterly monsoon winds along the Kerala and Karnataka coasts have triggered strong Ekman upwelling. Chlorophyll-a concentrations exceeding 2.8 mg/m³ have been validated by Sentinel-3 OLCI over a 120 NM corridor, creating massive pelagic feeding clusters.",
-    category: "Advisory",
+    source: "INCOIS / ORCA Oceanographic Bulletin",
+    published: "2 hours ago · Cycle 06:00 IST",
+    summary: "Intense southwesterly monsoon winds along the Kerala and Karnataka coasts have triggered strong Ekman upwelling. Chlorophyll-a concentrations exceeding 2.8 mg/m³ have been observed by Sentinel-3 OLCI over a 120 NM corridor.",
+    category: "Ocean State",
     url: "#",
-    accent: "#2563eb",
   },
   {
     id: "art-2",
     title: "ISRO Oceansat-3 Ocean Color Monitor Transmits High-Resolution Imagery for Northern Bay of Bengal",
-    source: "National Earth Observation Gazette",
+    source: "National Earth Observation Centre / ISRO",
     published: "Yesterday · ISRO NRSC",
-    readTime: "6 min read",
-    summary: "The 13-band Ocean Color Monitor (OCM-3) has delivered ultra-sharp radiometric profiles of riverine sediment and chlorophyll discharge across the Sundarbans and Hooghly plume, significantly enhancing Hilsa migration models.",
-    category: "Technology",
+    summary: "The 13-band Ocean Color Monitor (OCM-3) has delivered radiometric profiles of riverine sediment and chlorophyll plumes across the Sundarbans, significantly enhancing seasonal Hilsa migration tracking.",
+    category: "Earth Observation",
     url: "#",
-    accent: "#4eaaff",
   },
   {
     id: "art-3",
-    title: "Marine Safety Directive: Arabian Sea Swell Warning — Significant Wave Height to Breach 2.8m",
+    title: "Marine Safety Advisory: Arabian Sea Swell Warning — Significant Wave Height to Breach 2.8m",
     source: "INCOIS / Indian Coast Guard Joint Bulletin",
-    published: "4 hours ago · Urgent",
-    readTime: "3 min read",
-    summary: "A deep low-pressure system situated 380 km southwest of Veraval is generating south-southwesterly swells of 2.4 to 3.0 meters. Artisanal non-mechanized craft are advised to suspend operations beyond 15 NM from shoreline.",
-    category: "Advisory",
+    published: "4 hours ago",
+    summary: "A low-pressure system situated 380 km southwest of Veraval is generating south-southwesterly swells of 2.4 to 3.0 meters. Artisanal non-mechanized craft are advised to observe caution beyond 15 NM.",
+    category: "Safety Advisory",
     url: "#",
-    accent: "#ef233c",
   },
   {
     id: "art-4",
-    title: "Sustainable Tuna Management: India Deepens Blue Economy Investments in Longline Fisheries",
-    source: "Ministry of Fisheries & Blue Economy Outlook",
-    published: "3 days ago · Policy",
-    readTime: "5 min read",
-    summary: "New central subsidy schemes support conversion of bottom trawlers into modern insulated pelagic longliners equipped with satellite transponders, real-time PFZ advisories, and chilled sea water (CSW) slurry tanks.",
-    category: "Policy",
+    title: "Sustainable Tuna Management: India Expands Blue Economy Investments in Longline Fisheries",
+    source: "Ministry of Fisheries & Blue Economy",
+    published: "3 days ago",
+    summary: "Central subsidy frameworks support modernization of pelagic longliners equipped with satellite transponders, real-time PFZ advisories, and chilled sea water (CSW) slurry preservation systems.",
+    category: "Fisheries Policy",
     url: "#",
-    accent: "#ffd166",
   },
 ];
 
@@ -452,70 +447,54 @@ interface ReferenceLink {
   name: string;
   organization: string;
   description: string;
-  category: "Government Portal" | "Satellite Feed" | "Academic Database" | "Maritime Safety";
+  category: string;
   href: string;
-  badge: string;
 }
 
 const REFERENCE_LINKS: ReferenceLink[] = [
   {
-    name: "INCOIS PFZ Mission Portal",
-    organization: "Ministry of Earth Sciences, Govt. of India",
-    description: "Official real-time dissemination system for Potential Fishing Zone (PFZ) maps, Ocean State Forecasts (OSF), and High Wave Alerts.",
-    category: "Government Portal",
+    name: "INCOIS Potential Fishing Zone (PFZ) Portal",
+    organization: "Indian National Centre for Ocean Information Services (MoES)",
+    description: "Official dissemination system for Potential Fishing Zone (PFZ) maps, Ocean State Forecasts (OSF), and High Wave Alerts.",
+    category: "Government Agency",
     href: "https://incois.gov.in/portal/PFS.jsp",
-    badge: "Sovereign Authority",
   },
   {
     name: "ISRO Bhuvan Ocean Geospatial Hub",
     organization: "Indian Space Research Organisation (ISRO)",
-    description: "Interactive satellite data visualization service hosting Oceansat-3, Cartosat, and coastal vulnerability GIS datasets.",
-    category: "Satellite Feed",
+    description: "Interactive satellite data visualization hosting Oceansat-3, Cartosat, and coastal vulnerability geospatial datasets.",
+    category: "Space Agency",
     href: "https://bhuvan.nrsc.gov.in",
-    badge: "Space Agency",
   },
   {
     name: "IndOBIS — Ocean Biodiversity Information System",
-    organization: "National Institute of Oceanography (NIO / UNESCO)",
+    organization: "CSIR-National Institute of Oceanography (NIO / UNESCO)",
     description: "Georeferenced biological database cataloging over 130,000 taxonomic occurrence records across the Indian Ocean basin.",
     category: "Academic Database",
     href: "https://www.indobis.in",
-    badge: "Biodiversity DB",
   },
   {
-    name: "CMFRI National Marine Fisheries Census",
-    organization: "Indian Council of Agricultural Research (ICAR)",
-    description: "Comprehensive statistical repository on marine fish landings, fishing fleet census, craft-gear inventory, and socio-economic indicators.",
-    category: "Government Portal",
+    name: "CMFRI Marine Fisheries Data Repository",
+    organization: "Central Marine Fisheries Research Institute (ICAR)",
+    description: "Comprehensive statistical repository on marine fish landings, fishing fleet census, and craft-gear inventories across Indian maritime states.",
+    category: "Fisheries Research",
     href: "https://www.cmfri.org.in",
-    badge: "Fisheries Research",
   },
   {
-    name: "Global Fishing Watch Vessel Activity Tracker",
-    organization: "Global Fishing Watch & Maritime Registry",
-    description: "Public tracking of commercial fishing vessel tracks, transshipment events, and exclusive economic zone boundary adherence.",
-    category: "Maritime Safety",
-    href: "https://globalfishingwatch.org",
-    badge: "AIS Tracking",
+    name: "Copernicus Marine Environment Monitoring Service",
+    organization: "European Union Earth Observation Programme",
+    description: "Global satellite altimetry, sea surface temperature, and ocean colour products utilized for cross-validation.",
+    category: "Earth Observation",
+    href: "https://marine.copernicus.eu",
   },
   {
     name: "Open Government Data Platform (data.gov.in)",
     organization: "National Informatics Centre (NIC)",
-    description: "National repository for open datasets including coastal weather stations, port traffic registers, and marine aquaculture statistics.",
-    category: "Government Portal",
+    description: "National repository for open datasets including coastal weather stations, port registers, and marine aquaculture metrics.",
+    category: "Open Data Portal",
     href: "https://data.gov.in",
-    badge: "Open Data",
   },
 ];
-
-// Glass styling helper (Clean Google Maps / NASA White Scientific Theme)
-const glassCard = {
-  background: "rgba(255, 255, 255, 0.96)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid #e2e8f0",
-  boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02)",
-} as React.CSSProperties;
 
 export default function ReportView({
   persona = "navigator",
@@ -528,9 +507,17 @@ export default function ReportView({
   const [activeSpeciesId, setActiveSpeciesId] = useState(selectedSpeciesId);
   const [glossarySearch, setGlossarySearch] = useState("");
   const [glossaryCategory, setGlossaryCategory] = useState<string>("All");
+  const [expandedGlossaryTerm, setExpandedGlossaryTerm] = useState<string | null>("Potential Fishing Zone");
   const [expandedPaperId, setExpandedPaperId] = useState<string | null>("paper-1");
+  const [showTechDetails, setShowTechDetails] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
-  const [activeNavSection, setActiveNavSection] = useState("sec-overview");
+  const [activeNavSection, setActiveNavSection] = useState("sec-advisory");
+  const [liveSST, setLiveSST] = useState(28.49);
+
+  useEffect(() => {
+    const t = setInterval(() => setLiveSST((v) => +(v + (Math.random() - 0.5) * 0.04).toFixed(2)), 3000);
+    return () => clearInterval(t);
+  }, []);
 
   const activeSpecies = useMemo(() => {
     return SPECIES_LIST.find((s) => s.id === activeSpeciesId) || SPECIES_LIST[0];
@@ -558,7 +545,7 @@ export default function ReportView({
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(window.location.href);
       setCopiedNotification(true);
-      setTimeout(() => setCopiedNotification(false), 2400);
+      setTimeout(() => setCopiedNotification(false), 2200);
     }
   };
 
@@ -571,902 +558,938 @@ export default function ReportView({
   };
 
   return (
-    <div id="orca-report-section" className="relative w-full bg-[#f8fafc] text-zinc-900 pt-8 pb-24 select-none">
-      {/* Background ambient subtle tint */}
-      <div
-        className="pointer-events-none absolute top-10 left-1/4 w-[600px] h-[600px] rounded-full opacity-40 blur-[140px]"
-        style={{ background: "radial-gradient(circle, #e0f2fe 0%, transparent 70%)" }}
-      />
-      <div
-        className="pointer-events-none absolute top-1/2 right-10 w-[500px] h-[500px] rounded-full opacity-40 blur-[130px]"
-        style={{ background: "radial-gradient(circle, #f1f5f9 0%, transparent 70%)" }}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* TOP COMMAND BAR & SECTION JUMP RAIL                                     */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div
-          className="sticky top-16 z-30 mb-8 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm bg-white/95 backdrop-blur-xl border border-zinc-200"
-        >
-          {/* Left: Back to Globe & Breadcrumb */}
+    <div id="orca-report-section" className="relative w-full bg-white text-[#202124] pt-6 pb-28 font-sans select-text">
+      
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* STICKY SCIENTIFIC JUMP RAIL                                            */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="sticky top-14 z-30 bg-white/95 backdrop-blur-md border-b border-[#E1E5EA] shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+          {/* Left: Back to 3D Globe & Breadcrumb */}
           <div className="flex items-center gap-3">
             {showBackToGlobeButton && onBackToGlobe && (
               <button
                 onClick={onBackToGlobe}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all hover:bg-zinc-100 text-zinc-800 bg-zinc-50 border border-zinc-200"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-sans font-medium transition text-[#1F4E8C] bg-[#F0F4FA] hover:bg-[#E2ECF8] border border-[#CBD5E1]"
               >
-                <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
+                <ArrowLeft className="h-3 w-3" />
                 <span>3D Earth</span>
               </button>
             )}
 
-            <div className="hidden md:flex items-center gap-2 text-xs font-mono text-zinc-500">
-              <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
-              <span>ORCA Mission Dossier</span>
+            <div className="hidden lg:flex items-center gap-2 text-xs text-[#667085]">
+              <span className="font-semibold text-[#202124]">ORCA Marine Advisory</span>
               <span>/</span>
-              <span className="text-zinc-800 font-semibold">{basinName}</span>
+              <span>{basinName}</span>
               <span>/</span>
-              <span className="text-blue-600 font-medium">{activeSpecies.commonName}</span>
+              <span className="text-[#1F4E8C] font-medium">{activeSpecies.commonName}</span>
             </div>
           </div>
 
-          {/* Center: Section Jump Buttons */}
-          <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full text-xs font-mono">
+          {/* Center: Numbered Scientific Jump Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-full text-xs">
             {[
-              { id: "sec-overview", label: "Overview", icon: BarChart3 },
-              { id: "sec-species", label: "Species Profile", icon: Fish },
-              { id: "sec-rag-harness", label: "3D AI Harness", icon: Cpu },
-              { id: "sec-glossary", label: "Glossary", icon: BookOpen },
-              { id: "sec-papers", label: "Papers", icon: FileText },
-              { id: "sec-articles", label: "Articles", icon: Newspaper },
-              { id: "sec-references", label: "References", icon: ExternalLink },
-            ].map((btn) => {
-              const BtnIcon = btn.icon;
-              const isSelected = activeNavSection === btn.id;
+              { id: "sec-advisory",   label: "01 Advisory" },
+              { id: "sec-conditions", label: "02 Conditions" },
+              { id: "sec-species",    label: "03 Species" },
+              { id: "sec-habitat",    label: "04 Habitat" },
+              { id: "sec-guidance",   label: "05 Guidance" },
+              { id: "sec-system",     label: "06 System" },
+              { id: "sec-research",   label: "07 Research" },
+              { id: "sec-glossary",   label: "08 Sources" },
+            ].map((tab) => {
+              const isSelected = activeNavSection === tab.id;
               return (
                 <button
-                  key={btn.id}
-                  onClick={() => scrollToSection(btn.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-[11px] ${
+                  key={tab.id}
+                  onClick={() => scrollToSection(tab.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-sans whitespace-nowrap transition ${
                     isSelected
-                      ? "bg-blue-50 text-blue-600 border border-blue-200 font-bold"
-                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border border-transparent"
+                      ? "text-[#1F4E8C] bg-[#F0F4FA] font-semibold border border-[#CBD5E1]"
+                      : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA] border border-transparent"
                   }`}
                 >
-                  <BtnIcon className="h-3 w-3" />
-                  <span>{btn.label}</span>
+                  {tab.label}
                 </button>
               );
             })}
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          {/* Right Actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={handleCopyLink}
-              title="Copy link to dossier"
-              className="p-2 rounded-xl text-zinc-600 hover:text-zinc-900 transition border border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
+              title="Copy share link"
+              className="p-1.5 rounded-md text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA] border border-[#E1E5EA] transition"
             >
               <Share2 className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold font-mono text-white transition shadow-sm bg-blue-600 hover:bg-blue-700"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium text-white transition bg-[#1F4E8C] hover:bg-[#173F72] shadow-xs"
             >
               <Download className="h-3.5 w-3.5" />
-              <span>Export Dossier</span>
+              <span className="hidden sm:inline">Export Report</span>
             </button>
           </div>
         </div>
+      </div>
 
-        {copiedNotification && (
-          <div className="fixed top-20 right-8 z-50 px-4 py-2 rounded-xl bg-[#2563eb] text-[#020508] font-mono text-xs font-bold shadow-2xl flex items-center gap-2 animate-bounce">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Report link copied to clipboard!</span>
-          </div>
-        )}
+      {copiedNotification && (
+        <div className="fixed top-20 right-6 z-50 px-4 py-2 rounded-lg bg-[#1F4E8C] text-white text-xs font-sans font-medium shadow-lg flex items-center gap-2">
+          <Check className="h-4 w-4 text-[#E87524]" />
+          <span>Advisory link copied to clipboard</span>
+        </div>
+      )}
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 1: REPORT HERO & EXECUTIVE TELEMETRY SUMMARY                   */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-overview" className="mb-14 scroll-mt-24">
-          <div className="rounded-3xl p-6 sm:p-8 relative overflow-hidden bg-white border border-zinc-200 shadow-sm" style={glassCard}>
-            {/* Top badge bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-6 border-b border-zinc-200">
-              <div className="flex items-center gap-3">
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wider uppercase bg-blue-50 text-blue-700 border border-blue-200">
-                  <Sparkles className="h-3.5 w-3.5 inline mr-1 text-blue-600" /> Sovereign Ocean Intelligence Dossier
-                </span>
-                <span className="text-xs font-mono text-zinc-500 flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-blue-600" />
-                  Updated {new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })} · 06:00 IST Cycle
-                </span>
+      {/* Main Centered Editorial Container */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 space-y-24">
+
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 01 — ADVISORY                                                */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-advisory" className="scroll-mt-28">
+          <div className="space-y-6">
+            {/* Numbered Section Header */}
+            <div>
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                01 — Advisory
               </div>
-
-              {/* Persona / Security Clearance */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-zinc-500">Clearance:</span>
-                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border bg-amber-50 text-amber-800 border-amber-200">
-                  Tier-1 National Maritime Access
-                </span>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#202124]">
+                {activeSpecies.commonName} Fishing Advisory
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs text-[#667085]">
+                <span className="font-mono text-[#202124] font-medium">{basinName}</span>
+                <span>·</span>
+                <span className="font-mono text-[#1F4E8C] font-semibold">{coordinates.lat.toFixed(3)}°N, {coordinates.lon.toFixed(3)}°E</span>
+                <span>·</span>
+                <span>Observation: Today 06:00 IST Cycle</span>
+                <span>·</span>
+                <span>Source: INCOIS & Oceansat-3</span>
               </div>
             </div>
 
-            {/* Main title & coordinates */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
-              <div className="lg:col-span-2 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-mono text-blue-600">
-                  <MapPin className="h-4 w-4" />
-                  <span>{coordinates.lat.toFixed(3)}°N, {coordinates.lon.toFixed(3)}°E · {basinName}</span>
+            {/* Scientific Telemetry Strip (Institutional Sensor Feed) */}
+            <div className="w-full h-10 flex items-center px-4 gap-0 overflow-x-auto bg-[#F6F8FA] rounded-lg border border-[#E1E5EA] divide-x divide-[#E1E5EA] shadow-xs">
+              {[
+                { label: "RESOLUTION", value: "6 km × 5 km", dot: true },
+                { label: "SST",        value: `${liveSST}°C` },
+                { label: "WAVES",      value: "1.6 m" },
+                { label: "WIND",       value: "12 kt WNW" },
+                { label: "IMBL",       value: "74.2 km SAFE", statusColor: "#228B5A" },
+                { label: "CHL-A",      value: "1.26 mg/m³" },
+                { label: "BASIN",      value: basinName.replace(" Basin", "").replace(" (Northeastern Basin)", "") || "Arabian Sea" },
+                { label: "REFRESH",    value: "2.0 s" },
+              ].map((item, idx) => (
+                <div key={item.label} className={`flex items-center gap-1.5 flex-shrink-0 px-3.5 text-[11px] ${idx === 0 ? "pl-1" : ""}`}>
+                  {item.dot && <span className="h-1.5 w-1.5 rounded-full bg-[#228B5A] flex-shrink-0 animate-pulse" />}
+                  <span className="text-[10px] text-[#667085] font-sans font-medium tracking-wide uppercase">{item.label}:</span>
+                  <span className="font-mono font-semibold text-[#202124]" style={item.statusColor ? { color: item.statusColor } : undefined}>
+                    {item.value}
+                  </span>
                 </div>
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900">
-                  Potential Fishing Zone & Ocean State Synthesis
-                </h1>
-                <p className="text-sm text-zinc-600 leading-relaxed max-w-2xl">
-                  Automated bio-physical fusion report generated by Project ORCA. Combining INCOIS Potential Fishing Zone (PFZ) advisory vectors, Copernicus Sentinel-3 OLCI ocean color telemetry, and real-time sovereign geofence parameters.
+              ))}
+            </div>
+
+            {/* Species Selection Filter Chips */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E1E5EA]">
+              <span className="text-xs font-sans text-[#667085] mr-1">Target Species:</span>
+              {SPECIES_LIST.map((sp) => {
+                const isActive = sp.id === activeSpeciesId;
+                return (
+                  <button
+                    key={sp.id}
+                    onClick={() => setActiveSpeciesId(sp.id)}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-sans transition ${
+                      isActive
+                        ? "bg-[#1F4E8C] text-white font-medium shadow-xs"
+                        : "bg-[#F6F8FA] text-[#202124] hover:bg-[#E1E5EA] border border-[#E1E5EA]"
+                    }`}
+                  >
+                    <span>{sp.commonName}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isActive ? "bg-white/20 text-white" : "bg-white text-[#667085]"}`}>
+                      {sp.confidence}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Advisory Overview Card with Indian Basin Radar */}
+            <div className="rounded-lg border border-[#E1E5EA] bg-[#F6F8FA] p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+              {/* Left 2 Cols: Main Advisory Content */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-baseline gap-3">
+                  <div className="text-4xl sm:text-5xl font-bold font-mono text-[#1F4E8C]">
+                    {activeSpecies.confidence}%
+                  </div>
+                  <div className="text-sm font-sans font-semibold text-[#202124]">
+                    Habitat Suitability Index
+                    <span className="block text-xs font-normal text-[#667085]">Verified against INCOIS Potential Fishing Zone (PFZ) criteria</span>
+                  </div>
+                </div>
+
+                <p className="text-base text-[#202124] leading-relaxed max-w-xl">
+                  Ocean conditions in the selected region currently align with the preferred habitat range for {activeSpecies.commonName}. Thermal divergence and chlorophyll concentrations indicate active pelagic forage aggregation in this sector.
                 </p>
 
-                {/* Species selection tabs */}
-                <div className="pt-2">
-                  <div className="text-xs font-mono text-zinc-500 mb-2 flex items-center gap-1.5">
-                    <Filter className="h-3 w-3 text-blue-600" />
-                    <span>Select Target Marine Species / Filter:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs font-sans text-[#667085]">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#228B5A] flex-shrink-0 mt-0.5" />
+                    <span><strong>Thermal Corridor:</strong> Optimal SST gradient supporting high strike frequency</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {SPECIES_LIST.map((sp) => {
-                      const isActive = sp.id === activeSpeciesId;
-                      return (
-                        <button
-                          key={sp.id}
-                          onClick={() => setActiveSpeciesId(sp.id)}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-                            isActive
-                              ? "bg-blue-600 text-white shadow-xs"
-                              : "bg-zinc-50 text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
-                          }`}
-                        >
-                          <Fish className={`h-3.5 w-3.5 ${isActive ? "text-white" : "text-zinc-500"}`} />
-                          <span className="font-semibold">{sp.commonName}</span>
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded ${isActive ? "bg-white/20 text-white" : "bg-zinc-200 text-zinc-700"}`}>
-                            {sp.confidence}%
-                          </span>
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#228B5A] flex-shrink-0 mt-0.5" />
+                    <span><strong>Sovereign Standoff:</strong> 74.2 km clear from International Maritime Boundary Line</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Mini Map Card / Indian Ocean context */}
-              <div className="rounded-2xl p-5 border border-zinc-200 bg-zinc-50 relative flex flex-col justify-between shadow-xs">
-                <div className="flex items-center justify-between mb-3 text-xs font-mono">
-                  <span className="text-zinc-600 flex items-center gap-1.5">
-                    <Compass className="h-3.5 w-3.5 text-blue-600" />
-                    Indian Basin Radar
+              {/* Right Col: Indian Basin Radar SVG */}
+              <div className="rounded-lg border border-[#E1E5EA] bg-white p-4 flex flex-col justify-between shadow-xs">
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="font-semibold text-[#202124] flex items-center gap-1.5">
+                    <Compass className="h-3.5 w-3.5 text-[#1F4E8C]" />
+                    Basin Radar
                   </span>
-                  <span className="text-emerald-600 font-bold">LIVE TELEMETRY</span>
+                  <span className="text-[11px] font-sans font-medium text-[#228B5A]">Latest Observation</span>
                 </div>
 
-                {/* SVG Mini Map Representation of India & Coasts */}
-                <div className="relative h-44 w-full rounded-xl overflow-hidden border border-zinc-200 bg-[#e0f2fe] flex items-center justify-center">
+                <div className="relative h-36 w-full rounded border border-[#E1E5EA] bg-[#F0F4FA] overflow-hidden">
                   <svg viewBox="0 0 300 200" className="w-full h-full">
-                    {/* Ocean base water */}
-                    <rect width="300" height="200" fill="#e0f2fe" />
-                    {/* Graticule grid */}
-                    <line x1="50" y1="0" x2="50" y2="200" stroke="#bae6fd" strokeWidth="0.8" />
-                    <line x1="150" y1="0" x2="150" y2="200" stroke="#bae6fd" strokeWidth="0.8" />
-                    <line x1="250" y1="0" x2="250" y2="200" stroke="#bae6fd" strokeWidth="0.8" />
-                    <line x1="0" y1="50" x2="300" y2="50" stroke="#bae6fd" strokeWidth="0.8" />
-                    <line x1="0" y1="100" x2="300" y2="100" stroke="#bae6fd" strokeWidth="0.8" />
-                    <line x1="0" y1="150" x2="300" y2="150" stroke="#bae6fd" strokeWidth="0.8" />
+                    <rect width="300" height="200" fill="#F0F4FA" />
+                    <line x1="50" y1="0" x2="50" y2="200" stroke="#E1E5EA" strokeWidth="0.8" />
+                    <line x1="150" y1="0" x2="150" y2="200" stroke="#E1E5EA" strokeWidth="0.8" />
+                    <line x1="250" y1="0" x2="250" y2="200" stroke="#E1E5EA" strokeWidth="0.8" />
+                    <line x1="0" y1="50" x2="300" y2="50" stroke="#E1E5EA" strokeWidth="0.8" />
+                    <line x1="0" y1="100" x2="300" y2="100" stroke="#E1E5EA" strokeWidth="0.8" />
+                    <line x1="0" y1="150" x2="300" y2="150" stroke="#E1E5EA" strokeWidth="0.8" />
 
-                    {/* Stylized Indian Subcontinent coastline */}
+                    {/* Subcontinent Coastline */}
                     <path
                       d="M 60 10 Q 80 40 100 50 L 115 70 Q 125 110 150 170 Q 155 180 160 165 Q 185 115 210 75 Q 230 60 250 50 L 260 20 Z"
-                      fill="#ffffff"
-                      stroke="#0284c7"
-                      strokeWidth="1.5"
+                      fill="#FFFFFF"
+                      stroke="#1F4E8C"
+                      strokeWidth="1.4"
                     />
 
-                    {/* IMBL line representation (Northwest Arabian Sea) */}
-                    <line x1="50" y1="60" x2="90" y2="90" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <text x="45" y="55" fill="#dc2626" fontSize="7" fontWeight="bold" fontFamily="monospace">IMBL BORDER</text>
+                    {/* IMBL Standoff */}
+                    <line x1="50" y1="60" x2="90" y2="90" stroke="#C74343" strokeWidth="1.2" strokeDasharray="3 3" />
+                    <text x="45" y="55" fill="#C74343" fontSize="8" fontWeight="bold" fontFamily="sans-serif">IMBL</text>
 
-                    {/* EEZ boundary representation */}
+                    {/* EEZ Boundary */}
                     <path
                       d="M 35 70 Q 80 120 120 185 Q 160 210 210 170 Q 240 130 270 70"
                       fill="none"
-                      stroke="#f59e0b"
+                      stroke="#E87524"
                       strokeWidth="1"
                       strokeDasharray="4 2"
                     />
 
                     {/* Active Target Beacon */}
-                    <circle cx="95" cy="85" r="4" fill="#0284c7" />
-                    <circle cx="95" cy="85" r="10" fill="none" stroke="#0284c7" strokeWidth="1.2">
-                      <animate attributeName="r" values="4;18;4" dur="2.5s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="1;0;1" dur="2.5s" repeatCount="indefinite" />
-                    </circle>
+                    <circle cx="95" cy="85" r="4" fill="#1F4E8C" />
+                    <circle cx="95" cy="85" r="10" fill="none" stroke="#1F4E8C" strokeWidth="1.2" opacity="0.6" />
 
-                    {/* Port nodes */}
-                    <circle cx="108" cy="80" r="2.5" fill="#0f172a" />
-                    <text x="114" y="82" fill="#334155" fontSize="7" fontWeight="bold" fontFamily="monospace">Veraval</text>
-
-                    <circle cx="138" cy="142" r="2.5" fill="#0f172a" />
-                    <text x="144" y="144" fill="#334155" fontSize="7" fontWeight="bold" fontFamily="monospace">Kochi</text>
-
-                    <circle cx="185" cy="120" r="2.5" fill="#0f172a" />
-                    <text x="191" y="122" fill="#334155" fontSize="7" fontWeight="bold" fontFamily="monospace">Chennai</text>
+                    {/* Port Labels */}
+                    <circle cx="108" cy="80" r="2.5" fill="#202124" />
+                    <text x="114" y="82" fill="#202124" fontSize="7" fontWeight="bold" fontFamily="sans-serif">Veraval</text>
+                    <circle cx="138" cy="142" r="2.5" fill="#202124" />
+                    <text x="144" y="144" fill="#202124" fontSize="7" fontWeight="bold" fontFamily="sans-serif">Kochi</text>
                   </svg>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs font-mono">
-                  <div className="p-2 rounded-lg bg-white border border-blue-200">
-                    <div className="text-[10px] text-zinc-500">IMBL Clearance</div>
-                    <div className="font-bold text-blue-600">74.2 km (SAFE)</div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-white border border-amber-200">
-                    <div className="text-[10px] text-zinc-500">PFZ Confidence</div>
-                    <div className="font-bold text-amber-600">{activeSpecies.confidence}%</div>
-                  </div>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] font-sans text-[#667085]">
+                  <span>IMBL Distance: <strong className="text-[#202124] font-mono font-medium">74.2 km</strong></span>
+                  <span className="text-[#228B5A] font-medium">EEZ Safe</span>
                 </div>
               </div>
-            </div>
-
-            {/* 6 Key Telemetry Data Cards */}
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                { label: "SST Reading", val: "28.4°C", sub: "Optimal range", icon: Thermometer, color: "#d97706" },
-                { label: "Chlorophyll-a", val: "1.26 mg/m³", sub: "+18.4% anomaly", icon: FlaskConical, color: "#0284c7" },
-                { label: "Significant Waves", val: "1.6m SWH", sub: "Safe operating window", icon: Waves, color: "#2563eb" },
-                { label: "Surface Current", val: "1.2 kts", sub: "Direction 215° SW", icon: Wind, color: "#0284c7" },
-                { label: "Sea Surface Wind", val: "12 kts WNW", sub: "Moderate breeze", icon: Wind, color: "#64748b" },
-                { label: "Salinity Level", val: "35.4 PSU", sub: "Normal marine", icon: Activity, color: "#d97706" },
-              ].map((item) => {
-                const TelemetryIcon = item.icon;
-                return (
-                  <div
-                    key={item.label}
-                    className="rounded-2xl p-3.5 border border-zinc-200 bg-white shadow-xs transition-all hover:border-blue-400 hover:shadow-sm"
-                  >
-                    <div className="mb-2">
-                      <TelemetryIcon className="h-4 w-4" style={{ color: item.color }} />
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{item.label}</div>
-                    <div className="text-base font-bold font-mono my-0.5" style={{ color: item.color }}>{item.val}</div>
-                    <div className="text-[10px] font-mono text-zinc-400">{item.sub}</div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 2: TARGET ANIMAL / SELECTED FILTER DEEP-DIVE                   */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-species" className="mb-14 scroll-mt-24">
-          <div className="flex items-center justify-between mb-6">
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 02 — OCEAN CONDITIONS                                        */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-conditions" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-6">
             <div>
-              <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                <Fish className="h-3.5 w-3.5" />
-                Biological & Fisheries Profile
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                02 — Ocean Conditions
               </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                {activeSpecies.commonName} <span className="text-lg font-normal italic text-zinc-500">({activeSpecies.scientificName})</span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                Observed Oceanographic Parameters
               </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Current atmospheric and hydrographic readings retrieved from multi-mission Earth observation satellites and in-situ buoy telemetry.
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-zinc-500">IUCN Red List:</span>
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full border" style={{ borderColor: activeSpecies.iucnColor, color: activeSpecies.iucnColor, background: `${activeSpecies.iucnColor}15` }}>
-                {activeSpecies.iucnStatus}
-              </span>
+
+            {/* Unified 6-Item Clean Information Group */}
+            <div className="border border-[#E1E5EA] rounded-lg divide-y divide-[#E1E5EA] bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#E1E5EA]">
+                {/* 1. SST */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Sea Surface Temperature</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">28.4 °C</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    Sentinel-3 SLSTR · 06:00 IST
+                  </div>
+                  <div className="text-[11px] font-sans text-[#228B5A] font-medium">Within optimal thermal envelope</div>
+                </div>
+
+                {/* 2. Chlorophyll-a */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Chlorophyll-a Concentration</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">1.26 mg/m³</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    Sentinel-3 OLCI Radiometer
+                  </div>
+                  <div className="text-[11px] font-sans text-[#228B5A] font-medium">+18.4% seasonal anomaly</div>
+                </div>
+
+                {/* 3. Waves */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Significant Wave Height</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">1.6 m</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    INCOIS Wave Energy Model
+                  </div>
+                  <div className="text-[11px] font-sans text-[#228B5A] font-medium">Safe operating envelope</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#E1E5EA]">
+                {/* 4. Surface Current */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Surface Current Velocity</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">1.2 kt</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    Direction 215° SW · Hydrodynamic Radar
+                  </div>
+                  <div className="text-[11px] font-sans text-[#1F4E8C] font-medium">+14.2% tailcurrent fuel assist</div>
+                </div>
+
+                {/* 5. Wind */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Sea Surface Wind</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">12 kt WNW</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    Coastal Weather Radar Network
+                  </div>
+                  <div className="text-[11px] font-sans text-[#667085] font-medium">Moderate breeze (Beaufort 4)</div>
+                </div>
+
+                {/* 6. Salinity */}
+                <div className="p-5 space-y-1">
+                  <div className="text-xs font-sans text-[#667085] font-medium">Oceanic Salinity</div>
+                  <div className="text-2xl font-bold font-mono text-[#202124]">35.4 PSU</div>
+                  <div className="text-[11px] text-[#667085] pt-1">
+                    Argo Float Profiling Array #290142
+                  </div>
+                  <div className="text-[11px] font-sans text-[#228B5A] font-medium">Normal marine baseline</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#667085] flex flex-wrap items-center justify-between gap-2 pt-1">
+              <span>Data Provenance: Indian National Centre for Ocean Information Services (INCOIS) & Copernicus Marine</span>
+              <span>Updated 06:00 IST Cycle</span>
             </div>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 Cols: Biology, Behaviour, Environmental Envelopes */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Scientific Visual Reference Card */}
-              <div className="rounded-2xl overflow-hidden border border-zinc-200 bg-white shadow-sm">
-                <div className="relative w-full h-64 sm:h-80 overflow-hidden bg-zinc-100">
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 03 — SPECIES PROFILE                                         */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-species" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                03 — Species Profile
+              </div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                  {activeSpecies.commonName} <span className="text-lg sm:text-xl font-normal italic text-[#667085]">({activeSpecies.scientificName})</span>
+                </h2>
+                <span className="text-xs font-sans px-2.5 py-1 rounded border border-[#E1E5EA] text-[#667085] bg-[#F6F8FA]">
+                  IUCN Status: <strong className="font-semibold text-[#202124]">{activeSpecies.iucnStatus}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Editorial Split Layout: Image on one side, Information on other */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: Scientific Reference Plate (5 cols) */}
+              <div className="lg:col-span-5 space-y-2">
+                <div className="rounded-lg overflow-hidden border border-[#E1E5EA] bg-[#F6F8FA]">
                   <img
                     src="/images/yellowfin_tuna.jpg"
-                    alt="Yellowfin Tuna (Thunnus albacares) Scientific Reference"
-                    className="w-full h-full object-cover"
+                    alt={`${activeSpecies.commonName} scientific reference`}
+                    className="w-full h-72 object-cover"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-end justify-between">
-                    <div>
-                      <div className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
-                        <Fish className="h-3.5 w-3.5 text-white" />
-                        Scientific Reference Plate: {activeSpecies.commonName}
-                      </div>
-                      <div className="text-[11px] font-mono text-zinc-200 mt-0.5">
-                        Optimum Sea Surface Temperature: {activeSpecies.optimalTemp} · Feeding Depth: {activeSpecies.depthRange}
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white text-zinc-900 font-semibold shadow-xs">
-                      INCOIS Validated
-                    </span>
+                  <div className="p-3 border-t border-[#E1E5EA] text-[11px] text-[#667085] flex items-center justify-between">
+                    <span>Fig 1.1: {activeSpecies.commonName} morphology</span>
+                    <span className="font-mono text-[#1F4E8C]">INCOIS Catalog</span>
                   </div>
                 </div>
               </div>
 
-              {/* Overview & Vernacular Names */}
-              <div className="rounded-2xl p-6 border border-zinc-200 space-y-4" style={glassCard}>
-                <h3 className="text-sm font-mono font-bold text-blue-600 uppercase tracking-wider flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Ecological Overview & Local Nomenclature
-                </h3>
-                <p className="text-sm text-zinc-700 leading-relaxed">
-                  {activeSpecies.description}
-                </p>
+              {/* Right Column: Structured Information (7 cols) */}
+              <div className="lg:col-span-7 space-y-5">
+                <div>
+                  <h3 className="text-xs font-sans font-semibold text-[#667085] uppercase tracking-wide mb-1">
+                    Species Overview
+                  </h3>
+                  <p className="text-sm text-[#202124] leading-relaxed">
+                    {activeSpecies.description}
+                  </p>
+                </div>
 
-                <div className="pt-2">
-                  <div className="text-xs font-mono text-zinc-500 mb-2">Recognized Regional Coastal Names:</div>
-                  <div className="flex flex-wrap gap-2">
+                <div className="border-t border-[#E1E5EA] pt-4">
+                  <h3 className="text-xs font-sans font-semibold text-[#667085] uppercase tracking-wide mb-2">
+                    Key Biological Parameters
+                  </h3>
+                  <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                    <div>
+                      <dt className="text-[#667085]">Preferred SST</dt>
+                      <dd className="font-mono font-bold text-[#202124] mt-0.5">{activeSpecies.optimalTemp}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#667085]">Preferred Depth</dt>
+                      <dd className="font-mono font-bold text-[#202124] mt-0.5">{activeSpecies.depthRange}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#667085]">Chlorophyll-a</dt>
+                      <dd className="font-mono font-bold text-[#202124] mt-0.5">{activeSpecies.optimalChl}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[#667085]">Salinity Range</dt>
+                      <dd className="font-mono font-bold text-[#202124] mt-0.5">{activeSpecies.optimalSalinity}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="border-t border-[#E1E5EA] pt-4">
+                  <h3 className="text-xs font-sans font-semibold text-[#667085] uppercase tracking-wide mb-2">
+                    Regional Coastal Nomenclature
+                  </h3>
+                  <div className="flex flex-wrap gap-2 text-xs">
                     {activeSpecies.localNames.map((ln) => (
-                      <span key={ln.lang} className="px-3 py-1 rounded-lg text-xs font-mono bg-zinc-50 border border-zinc-200 text-zinc-800">
-                        <span className="text-blue-600 font-semibold">{ln.lang}:</span> {ln.name}
+                      <span key={ln.lang} className="px-2.5 py-1 rounded border border-[#E1E5EA] bg-[#F6F8FA] text-[#202124]">
+                        <span className="text-[#667085]">{ln.lang}:</span> <strong>{ln.name}</strong>
                       </span>
                     ))}
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200">
-                  <div className="text-xs font-mono text-zinc-500 mb-1">Foraging & Aggregation Dynamics:</div>
-                  <p className="text-xs text-zinc-600 leading-relaxed">
+                <div className="border-t border-[#E1E5EA] pt-4">
+                  <h3 className="text-xs font-sans font-semibold text-[#667085] uppercase tracking-wide mb-1">
+                    Aggregation & Foraging Dynamics
+                  </h3>
+                  <p className="text-xs text-[#667085] leading-relaxed">
                     {activeSpecies.behavior}
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              {/* Environmental Envelopes (NASA/Google Maps Data Matrix) */}
-              <div className="rounded-2xl p-6 border border-zinc-200" style={glassCard}>
-                <h3 className="text-sm font-mono font-bold text-amber-600 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Bio-Physical Environmental Tolerance Envelope
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-zinc-500">Optimal SST Corridor:</span>
-                      <span className="text-amber-600 font-bold">{activeSpecies.optimalTemp}</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-gradient-to-r from-blue-500 via-amber-500 to-rose-500 h-full rounded-full w-4/5" />
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-400">Current in-situ reading: 28.4°C (Peak Metabolic Window)</div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-zinc-500">Depth Horizon:</span>
-                      <span className="text-blue-600 font-bold">{activeSpecies.depthRange}</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-full rounded-full w-3/5" />
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-400">Target zone aligns with sub-surface thermocline shear</div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-zinc-500">Chlorophyll-a Preference:</span>
-                      <span className="text-emerald-600 font-bold">{activeSpecies.optimalChl}</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full w-2/3" />
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-400">Current satellite anomaly indicates strong forage presence</div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-zinc-500">Salinity Optimum:</span>
-                      <span className="text-amber-600 font-bold">{activeSpecies.optimalSalinity}</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full w-5/6" />
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-400">Fully marine oceanic salinity, no freshwater dilution risk</div>
-                  </div>
-                </div>
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 04 — HABITAT CONDITIONS                                      */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-habitat" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                04 — Habitat Conditions
               </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                Habitat Suitability Comparison
+              </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Comparison of optimal physiological tolerance thresholds against observed in-situ measurements at this geodetic coordinate.
+              </p>
             </div>
 
-            {/* Right Col: Commercial Mandi Rates & Gear Recommendations */}
-            <div className="space-y-6">
-              {/* Real-time Mandi Rates */}
-              <div className="rounded-2xl p-6 border border-zinc-200 space-y-4" style={glassCard}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-mono font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
-                    <Zap className="h-4 w-4" />
-                    Live Mandi Wholesales
+            {/* Scientific Comparison Table */}
+            <div className="border border-[#E1E5EA] rounded-lg overflow-x-auto bg-white">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#F6F8FA] border-b border-[#E1E5EA] text-[#667085] font-sans uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-4 font-semibold">Parameter</th>
+                    <th className="py-3 px-4 font-semibold">Preferred Range</th>
+                    <th className="py-3 px-4 font-semibold">Observed In-Situ</th>
+                    <th className="py-3 px-4 font-semibold">Evaluation Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E1E5EA]">
+                  <tr>
+                    <td className="py-3 px-4 font-medium text-[#202124]">Sea Surface Temperature</td>
+                    <td className="py-3 px-4 font-mono text-[#667085]">{activeSpecies.optimalTemp}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-[#202124]">28.4 °C</td>
+                    <td className="py-3 px-4 font-sans font-medium text-[#228B5A]">Within Range ✓</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium text-[#202124]">Chlorophyll-a Concentration</td>
+                    <td className="py-3 px-4 font-mono text-[#667085]">{activeSpecies.optimalChl}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-[#202124]">1.26 mg/m³</td>
+                    <td className="py-3 px-4 font-sans font-medium text-[#228B5A]">Within Range ✓</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium text-[#202124]">Oceanic Salinity</td>
+                    <td className="py-3 px-4 font-mono text-[#667085]">{activeSpecies.optimalSalinity}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-[#202124]">35.4 PSU</td>
+                    <td className="py-3 px-4 font-sans font-medium text-[#228B5A]">Within Range ✓</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium text-[#202124]">Depth Horizon</td>
+                    <td className="py-3 px-4 font-mono text-[#667085]">{activeSpecies.depthRange}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-[#202124]">65 m (Thermocline shear)</td>
+                    <td className="py-3 px-4 font-sans font-medium text-[#228B5A]">Suitable Zone ✓</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="text-[11px] text-[#667085] flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 text-[#1F4E8C]" />
+              <span>Evaluated through coupled bio-physical tolerance curves compiled by Central Marine Fisheries Research Institute (CMFRI).</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 05 — FISHERIES ADVISORY                                      */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-guidance" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-6">
+            <div>
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                05 — Fisheries Advisory
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                Fishing Guidance & Market Snapshot
+              </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Operational recommendations for commercial and artisanal fishers, alongside wholesale landing prices at major coastal ports.
+              </p>
+            </div>
+
+            {/* Two-Column Editorial Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column: Fishing Guidance */}
+              <div className="border border-[#E1E5EA] rounded-lg p-6 bg-[#F6F8FA] space-y-5">
+                <div>
+                  <h3 className="text-base font-bold text-[#202124] mb-1">
+                    Fishing Guidance
                   </h3>
-                  <span className="text-[10px] font-mono text-zinc-500">Today</span>
+                  <p className="text-xs text-[#667085]">
+                    Recommended fishing methods and calculated peak biological feeding intervals.
+                  </p>
                 </div>
 
                 <div className="space-y-3">
+                  <div className="p-3 bg-white rounded border border-[#E1E5EA]">
+                    <div className="text-xs text-[#667085]">Suggested Feeding Windows (Solunar Peak)</div>
+                    <div className="text-sm font-mono font-bold text-[#1F4E8C] mt-0.5">
+                      {activeSpecies.solunarPeak}
+                    </div>
+                    <div className="text-[11px] text-[#667085] mt-1">
+                      Calculated from lunar zenith transit at {coordinates.lat.toFixed(2)}°N, {coordinates.lon.toFixed(2)}°E
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-sans font-semibold text-[#202124] mb-2">Recommended Gear & Sustainable Methods:</div>
+                    <ul className="space-y-1.5 text-xs text-[#202124]">
+                      {activeSpecies.gearRecommendation.map((gear, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-[#1F4E8C] flex-shrink-0 mt-0.5" />
+                          <span>{gear}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Market Snapshot */}
+              <div className="border border-[#E1E5EA] rounded-lg p-6 bg-[#F6F8FA] space-y-5">
+                <div>
+                  <h3 className="text-base font-bold text-[#202124] mb-1">
+                    Market Snapshot
+                  </h3>
+                  <p className="text-xs text-[#667085]">
+                    Recent wholesale mandi rates for Grade-A fresh landing across key regional ports.
+                  </p>
+                </div>
+
+                <div className="divide-y divide-[#E1E5EA] border border-[#E1E5EA] rounded bg-white">
                   {activeSpecies.mandiRate.map((mr) => (
-                    <div key={mr.port} className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
+                    <div key={mr.port} className="p-3.5 flex items-center justify-between text-xs">
                       <div>
-                        <div className="text-xs font-semibold text-zinc-900">{mr.port}</div>
-                        <div className="text-[10px] font-mono text-zinc-500">Grade-A Fresh Catch</div>
+                        <div className="font-semibold text-[#202124]">{mr.port}</div>
+                        <div className="text-[11px] text-[#667085]">Grade-A Fresh Catch</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs font-bold font-mono text-blue-600">{mr.rate}</div>
-                        <div className="text-[10px] font-mono" style={{ color: mr.trend === "up" ? "#059669" : mr.trend === "down" ? "#dc2626" : "#64748b" }}>
-                          {mr.trend === "up" ? "▲ +4.2%" : mr.trend === "down" ? "▼ -2.1%" : "━ Stable"}
+                        <div className="font-mono font-bold text-[#1F4E8C]">{mr.rate}</div>
+                        <div className="text-[10px] font-sans" style={{ color: mr.trend === "up" ? "#228B5A" : mr.trend === "down" ? "#C74343" : "#667085" }}>
+                          {mr.trend === "up" ? "▲ Upward Trend" : mr.trend === "down" ? "▼ Downward" : "━ Stable"}
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-mono text-emerald-800">
-                  <Sparkles className="h-3.5 w-3.5 inline mr-1 text-emerald-600" /> <strong>Market Intel:</strong> High overseas export demand for chilled yellowfin loins at Kochi Air Cargo terminal.
-                </div>
-              </div>
-
-              {/* Fishing Gear & Solunar Window */}
-              <div className="rounded-2xl p-6 border border-zinc-200 space-y-4" style={glassCard}>
-                <h3 className="text-sm font-mono font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Compass className="h-4 w-4" />
-                  Tactical Fishing Guidance
-                </h3>
-
-                <div>
-                  <div className="text-xs font-mono text-zinc-500 mb-1">Recommended Sustainable Gear:</div>
-                  <ul className="space-y-1.5 text-xs text-zinc-800">
-                    {activeSpecies.gearRecommendation.map((gear, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <span>{gear}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="pt-2 border-t border-zinc-200">
-                  <div className="text-xs font-mono text-zinc-500 mb-1">Solunar Feeding Window:</div>
-                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs font-mono text-amber-800 font-semibold flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-amber-600" />
-                    <span>{activeSpecies.solunarPeak}</span>
-                  </div>
-                  <div className="text-[10px] font-mono text-zinc-400 mt-1">Calculated via lunar transit at {coordinates.lat}°N / {coordinates.lon}°E</div>
-                </div>
+                <p className="text-[11px] text-[#667085]">
+                  Note: Mandi prices are indicative and subject to daily landing volume, ice availability, and export consignment demand.
+                </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 3: 3D AI RAG HARNESS & PIPELINE EXPLAINABILITY                 */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 3: 3D AI RAG HARNESS & PIPELINE EXPLAINABILITY                 */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-rag-harness" className="mb-14 scroll-mt-24">
-          <div className="rounded-3xl p-6 sm:p-8 border border-zinc-200 bg-white relative overflow-hidden shadow-sm" style={glassCard}>
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-              <div>
-                <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                  <Cpu className="h-3.5 w-3.5" />
-                  Architecture & Explainability Layer
-                </div>
-                <h2 className="text-2xl font-bold text-zinc-900">
-                  Sovereign Multi-Agent AI Harness (RAG Pipeline)
-                </h2>
-                <p className="text-xs text-zinc-600 mt-1 max-w-xl">
-                  Visual representation of how real-time satellite telemetry, oceanic vector embeddings, and multi-agent consensus synthesize this advisory without hallucinations.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-xl border bg-blue-50 border-blue-200 text-blue-700">
-                <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                <span>Consensus Latency: 412ms</span>
-              </div>
-            </div>
-
-            {/* Interactive Pipeline Nodes Diagram */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
-              {/* Node 1: Ingest */}
-              <div className="rounded-2xl p-4 bg-zinc-50 border border-zinc-200 relative group hover:border-blue-500 hover:bg-white transition shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-blue-600 uppercase font-bold">Layer 1: Telemetry Ingest</span>
-                  <Database className="h-4 w-4 text-blue-600" />
-                </div>
-                <h4 className="text-sm font-bold text-zinc-900 mb-1">Spatial Rasters & Feeds</h4>
-                <p className="text-[11px] text-zinc-600 leading-normal mb-3">
-                  Streams 9km SST grids, Sentinel-3 Chlorophyll rasters, and live VHF AIS vessel coordinates into spatial cache.
-                </p>
-                <div className="space-y-1 text-[10px] font-mono text-blue-700 font-medium">
-                  <div>• INCOIS NetCDF Slices</div>
-                  <div>• NOAA VIIRS IR 11µm</div>
-                  <div>• AISHub NMEA VHF Stream</div>
-                </div>
-              </div>
-
-              {/* Node 2: Vectorization */}
-              <div className="rounded-2xl p-4 bg-zinc-50 border border-zinc-200 relative group hover:border-blue-500 hover:bg-white transition shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-blue-600 uppercase font-bold">Layer 2: RAG Embedding</span>
-                  <Layers className="h-4 w-4 text-blue-600" />
-                </div>
-                <h4 className="text-sm font-bold text-zinc-900 mb-1">Vector DB & Knowledge</h4>
-                <p className="text-[11px] text-zinc-600 leading-normal mb-3">
-                  Index of 1,200+ peer-reviewed oceanographic papers, CMFRI marine census bulletins, and sovereign maritime acts.
-                </p>
-                <div className="space-y-1 text-[10px] font-mono text-blue-700 font-medium">
-                  <div>• pgvector Hybrid Search</div>
-                  <div>• Solunar Astro Ephemeris</div>
-                  <div>• UNCLOS IMBL Polygons</div>
-                </div>
-              </div>
-
-              {/* Node 3: Multi-Agent Consensus */}
-              <div className="rounded-2xl p-4 bg-zinc-50 border border-zinc-200 relative group hover:border-blue-500 hover:bg-white transition shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-amber-600 uppercase font-bold">Layer 3: Agents Consensus</span>
-                  <Sparkles className="h-4 w-4 text-amber-600" />
-                </div>
-                <h4 className="text-sm font-bold text-zinc-900 mb-1">4 Sovereign Agents</h4>
-                <p className="text-[11px] text-zinc-600 leading-normal mb-3">
-                  Supervisor agent delegates sub-tasks to specialized domain models before validating results against safety constraints.
-                </p>
-                <div className="space-y-1 text-[10px] font-mono text-amber-700 font-medium">
-                  <div>• Ocean Worker (SST/Chl)</div>
-                  <div>• Geofence Worker (ST_Distance)</div>
-                  <div>• Route Optimizer (Fuel/Current)</div>
-                </div>
-              </div>
-
-              {/* Node 4: Synthesis */}
-              <div className="rounded-2xl p-4 bg-zinc-50 border border-zinc-200 relative group hover:border-blue-500 hover:bg-white transition shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-mono text-emerald-600 uppercase font-bold">Layer 4: Sovereign Output</span>
-                  <Shield className="h-4 w-4 text-emerald-600" />
-                </div>
-                <h4 className="text-sm font-bold text-zinc-900 mb-1">Multilingual Advisory</h4>
-                <p className="text-[11px] text-zinc-600 leading-normal mb-3">
-                  Final synthesis formulated in 6 Indian coastal languages (Hindi, Gujarati, Marathi, Malayalam, Tamil, Telugu).
-                </p>
-                <div className="space-y-1 text-[10px] font-mono text-emerald-700 font-medium">
-                  <div>• Zero Hallucination Guarantee</div>
-                  <div>• Instant Audio / TTS Synthesis</div>
-                  <div>• Offline Cache Ready</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 4: INTERACTIVE MARINE SCIENCE GLOSSARY                          */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-glossary" className="mb-14 scroll-mt-24">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 06 — HOW ORCA WORKS                                          */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-system" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-6">
             <div>
-              <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                <BookOpen className="h-3.5 w-3.5" />
-                Knowledge Base
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                06 — ORCA System
               </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                Oceanographic & Maritime Glossary
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                How ORCA Generates an Advisory
               </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Multi-agent reasoning pipeline combining spaceborne remote sensing, spatial PostGIS queries, and domain-specialized validation agents.
+              </p>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-              <input
-                type="text"
-                value={glossarySearch}
-                onChange={(e) => setGlossarySearch(e.target.value)}
-                placeholder="Search terms, formulas, acronyms..."
-                className="w-full bg-white border border-zinc-300 rounded-xl pl-9 pr-4 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 outline-none focus:border-blue-600 shadow-xs"
-              />
-            </div>
-          </div>
+            {/* Scientific Process Diagram */}
+            <div className="border border-[#E1E5EA] rounded-lg p-6 bg-white space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-3 relative">
+                {[
+                  { step: "1", title: "Satellite & Ocean Data", desc: "INCOIS NetCDF, Sentinel-3, AIS streams" },
+                  { step: "2", title: "Data Processing", desc: "Spatial indexing & 5km grid reprojection" },
+                  { step: "3", title: "Knowledge Retrieval", desc: "CMFRI census & oceanographic corpora" },
+                  { step: "4", title: "Specialist Agents", desc: "Ocean, Weather, Species & Safety agents" },
+                  { step: "5", title: "Agent Validation", desc: "Cross-agent consensus & safety envelope check" },
+                  { step: "6", title: "Marine Advisory", desc: "Synthesized multi-lingual advisory brief" },
+                ].map((item, idx) => (
+                  <div key={item.step} className="p-3.5 rounded border border-[#E1E5EA] bg-[#F6F8FA] space-y-1 relative">
+                    <div className="flex items-center justify-between text-[10px] text-[#E87524] font-bold">
+                      <span>STEP 0{item.step}</span>
+                      {idx < 5 && <ArrowRight className="hidden md:block h-3 w-3 text-[#98A2B3] -mr-1" />}
+                    </div>
+                    <div className="text-xs font-bold text-[#202124]">{item.title}</div>
+                    <div className="text-[11px] text-[#667085] leading-snug">{item.desc}</div>
+                  </div>
+                ))}
+              </div>
 
-          {/* Filter Chips */}
-          <div className="flex flex-wrap gap-1.5 mb-6">
-            {glossaryCategories.map((cat) => {
-              const isSelected = glossaryCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setGlossaryCategory(cat)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all ${
-                    isSelected
-                      ? "bg-blue-600 text-white font-bold shadow-xs"
-                      : "bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50"
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Glossary Terms Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredGlossary.map((item) => (
-              <div
-                key={item.term}
-                className="rounded-2xl p-5 border border-zinc-200 bg-white space-y-3 transition-all hover:border-blue-400 shadow-xs"
-                style={glassCard}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
-                      <span>{item.term}</span>
-                      {item.acronym && (
-                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                          {item.acronym}
-                        </span>
-                      )}
-                    </h3>
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">{item.category}</span>
+              {/* Specialist Agents Breakdown */}
+              <div className="border-t border-[#E1E5EA] pt-4">
+                <div className="text-xs font-semibold text-[#202124] mb-3">Specialist Domain Agents:</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded border border-[#E1E5EA] bg-white">
+                    <div className="font-semibold text-[#1F4E8C]">Ocean Agent</div>
+                    <div className="text-[11px] text-[#667085] mt-0.5">Analyzes SST thermal divergence, chlorophyll anomalies, and upwelling boundaries.</div>
+                  </div>
+                  <div className="p-3 rounded border border-[#E1E5EA] bg-white">
+                    <div className="font-semibold text-[#1F4E8C]">Weather Agent</div>
+                    <div className="text-[11px] text-[#667085] mt-0.5">Evaluates significant wave height (SWH), swell periods, and surface wind stress.</div>
+                  </div>
+                  <div className="p-3 rounded border border-[#E1E5EA] bg-white">
+                    <div className="font-semibold text-[#1F4E8C]">Species Agent</div>
+                    <div className="text-[11px] text-[#667085] mt-0.5">Maps bio-physical tolerance curves against target species feeding horizons.</div>
+                  </div>
+                  <div className="p-3 rounded border border-[#E1E5EA] bg-white">
+                    <div className="font-semibold text-[#1F4E8C]">Safety & Geofence Agent</div>
+                    <div className="text-[11px] text-[#667085] mt-0.5">Calculates ST_Distance to sovereign borders (IMBL) and marine protected reserves.</div>
                   </div>
                 </div>
+              </div>
 
-                <p className="text-xs text-zinc-600 leading-relaxed">
-                  {item.definition}
-                </p>
+              {/* Collapsible Technical Details */}
+              <div className="border-t border-[#E1E5EA] pt-2">
+                <button
+                  onClick={() => setShowTechDetails((p) => !p)}
+                  className="text-xs text-[#1F4E8C] hover:underline font-medium flex items-center gap-1"
+                >
+                  <span>{showTechDetails ? "Hide" : "View"} Technical Implementation Details</span>
+                  {showTechDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
 
-                {item.formulaOrStandard && (
-                  <div className="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200 font-mono text-[11px] text-amber-800">
-                    <span className="text-zinc-500 text-[10px] block font-sans">Standard / Mathematical Definition:</span>
-                    {item.formulaOrStandard}
+                {showTechDetails && (
+                  <div className="mt-3 p-4 bg-[#F6F8FA] rounded border border-[#E1E5EA] text-xs font-mono text-[#667085] space-y-2">
+                    <div>• Vector Engine: pgvector with cosine distance metric (&gt;0.82 threshold)</div>
+                    <div>• Spatial Query: PostGIS ST_DWithin against Indian EEZ baseline polygon</div>
+                    <div>• LLM Runtime: Local 4-bit AWQ quantized multi-agent graph checkpointer</div>
+                    <div>• Verification Latency: ~412 ms end-to-end consensus turn</div>
                   </div>
                 )}
-
-                <div className="text-[11px] font-mono text-blue-700 flex items-start gap-1.5 pt-1">
-                  <Sparkles className="h-3.5 w-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <span><strong>Operational Value:</strong> {item.importance}</span>
-                </div>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 5: PEER-REVIEWED RESEARCH PAPERS                                */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-papers" className="mb-14 scroll-mt-24">
-          <div className="flex items-center justify-between mb-6">
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 07 — RESEARCH & EVIDENCE                                     */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-research" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-8">
             <div>
-              <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Scientific Grounding
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                07 — Research & Evidence
               </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                Peer-Reviewed Research & Citations
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                Featured Research & Publications
               </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Peer-reviewed literature and institutional validations backing ORCA's oceanographic reasoning engine.
+              </p>
             </div>
-            <span className="text-xs font-mono text-zinc-500">4 Indexed Studies</span>
-          </div>
 
-          <div className="space-y-4">
-            {RESEARCH_PAPERS.map((paper) => {
-              const isExpanded = expandedPaperId === paper.id;
-              return (
-                <div
-                  key={paper.id}
-                  className="rounded-2xl border border-zinc-200 bg-white transition-all shadow-xs hover:border-blue-400"
-                  style={glassCard}
-                >
-                  <div
-                    onClick={() => setExpandedPaperId(isExpanded ? null : paper.id)}
-                    className="p-5 sm:p-6 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none"
-                  >
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
-                          {paper.institution}
-                        </span>
-                        <span className="text-zinc-500">· {paper.journal} ({paper.year})</span>
-                        <span className="text-amber-700 text-[11px] font-mono font-medium">{paper.citationsCount} Citations</span>
+            {/* Clean Structured Research List with Separators */}
+            <div className="divide-y divide-[#E1E5EA] border-t border-b border-[#E1E5EA]">
+              {RESEARCH_PAPERS.map((paper) => {
+                const isExpanded = expandedPaperId === paper.id;
+                return (
+                  <div key={paper.id} className="py-5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-semibold text-[#1F4E8C]">{paper.institution}</span>
+                        <span className="text-[#98A2B3]">·</span>
+                        <span className="text-[#667085]">{paper.journal} ({paper.year})</span>
                       </div>
-                      <h3 className="text-base sm:text-lg font-bold text-zinc-900 hover:text-blue-600 transition">
-                        {paper.title}
-                      </h3>
-                      <div className="text-xs text-zinc-500 font-mono">
-                        Authors: {paper.authors}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
                       <a
                         href={`https://doi.org/${paper.doi}`}
                         target="_blank"
                         rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs font-mono px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 transition"
+                        className="text-xs text-[#1F4E8C] hover:underline flex items-center gap-1 font-medium"
                       >
-                        <span>DOI Link</span>
+                        <span>Read Paper</span>
                         <ExternalLink className="h-3 w-3" />
                       </a>
-                      <button className="p-2 text-zinc-400 hover:text-zinc-900">
-                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                      </button>
                     </div>
-                  </div>
 
-                  {isExpanded && (
-                    <div className="px-5 pb-6 sm:px-6 space-y-4 border-t border-zinc-200 pt-4">
-                      <div>
-                        <div className="text-xs font-mono text-blue-600 uppercase font-bold mb-1">Abstract:</div>
-                        <p className="text-xs sm:text-sm text-zinc-700 leading-relaxed">
-                          {paper.abstract}
-                        </p>
-                      </div>
+                    <h3 className="text-base font-bold text-[#202124] hover:text-[#1F4E8C] cursor-pointer" onClick={() => setExpandedPaperId(isExpanded ? null : paper.id)}>
+                      {paper.title}
+                    </h3>
 
-                      <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
-                        <div className="text-xs font-mono text-amber-800 uppercase font-bold mb-2">Key Empirical Findings:</div>
-                        <ul className="space-y-1.5 text-xs text-zinc-800">
-                          {paper.keyFindings.map((finding, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
-                              <span>{finding}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    <p className="text-xs text-[#667085] leading-relaxed">
+                      {paper.relevanceSentence}
+                    </p>
 
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          {paper.tags.map((t) => (
-                            <span key={t} className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
-                              #{t}
-                            </span>
-                          ))}
+                    <button
+                      onClick={() => setExpandedPaperId(isExpanded ? null : paper.id)}
+                      className="text-xs text-[#667085] hover:text-[#202124] flex items-center gap-1 pt-1"
+                    >
+                      <span>{isExpanded ? "Hide Abstract & Key Findings" : "Show Abstract & Key Findings"}</span>
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="pt-3 space-y-3 text-xs bg-[#F6F8FA] p-4 rounded border border-[#E1E5EA] mt-2">
+                        <div>
+                          <span className="font-semibold text-[#202124]">Abstract: </span>
+                          <span className="text-[#667085]">{paper.abstract}</span>
                         </div>
-                        <span className="text-[11px] font-mono text-zinc-400">DOI: {paper.doi}</span>
+                        <div>
+                          <div className="font-semibold text-[#202124] mb-1">Key Findings:</div>
+                          <ul className="list-disc list-inside space-y-1 text-[#667085]">
+                            {paper.keyFindings.map((f, i) => (
+                              <li key={i}>{f}</li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Compact Marine Bulletins Grid */}
+            <div>
+              <h3 className="text-base font-bold text-[#202124] mb-3">
+                Marine News & Bulletins
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {MARINE_ARTICLES.map((art) => (
+                  <div key={art.id} className="p-4 rounded border border-[#E1E5EA] bg-white space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-[#667085]">
+                        <span className="font-medium text-[#1F4E8C]">{art.category}</span>
+                        <span>{art.published}</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-[#202124] line-clamp-2">
+                        {art.title}
+                      </h4>
+                      <p className="text-[11px] text-[#667085] line-clamp-3">
+                        {art.summary}
+                      </p>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 6: MARINE ADVISORIES & ARTICLES                                */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-articles" className="mb-14 scroll-mt-24">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5" />
-                Live Bulletins
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                Marine Advisories & Ocean News
-              </h2>
-            </div>
-            <span className="text-xs font-mono text-emerald-600 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Real-time Ingest
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {MARINE_ARTICLES.map((art) => (
-              <div
-                key={art.id}
-                className="rounded-2xl p-5 border border-zinc-200 bg-white flex flex-col justify-between transition-all hover:-translate-y-1 hover:border-blue-400 shadow-xs"
-                style={glassCard}
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="px-2 py-0.5 rounded font-bold" style={{ background: `${art.accent}15`, color: art.accent, border: `1px solid ${art.accent}30` }}>
-                      {art.category}
-                    </span>
-                    <span className="text-zinc-400">{art.readTime}</span>
+                    <div className="pt-2 text-xs font-medium text-[#1F4E8C] flex items-center gap-1">
+                      <span>Read bulletin</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </div>
                   </div>
-
-                  <h3 className="text-sm font-bold text-zinc-900 leading-snug hover:text-blue-600 transition">
-                    {art.title}
-                  </h3>
-
-                  <p className="text-xs text-zinc-600 leading-relaxed line-clamp-4">
-                    {art.summary}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-zinc-100 mt-4 flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-zinc-400">{art.published}</span>
-                  <a href={art.url} className="text-blue-600 hover:underline flex items-center gap-1 font-semibold">
-                    Read <ArrowUpRight className="h-3 w-3" />
-                  </a>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* SECTION 7: EXTRA REFERENCE LINKS & GOVERNMENT DATABASES                */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <section id="sec-references" className="mb-14 scroll-mt-24">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="text-xs font-mono text-blue-600 tracking-wider uppercase mb-1 flex items-center gap-1.5">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Official Portals
-              </div>
-              <h2 className="text-2xl font-bold text-zinc-900">
-                Sovereign Marine Repositories & External Links
-              </h2>
             </div>
-            <span className="text-xs font-mono text-zinc-500">Authorized Redirection</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {REFERENCE_LINKS.map((ref) => (
-              <a
-                key={ref.name}
-                href={ref.href}
-                target="_blank"
-                rel="noreferrer"
-                className="group rounded-2xl p-5 border border-zinc-200 bg-white flex flex-col justify-between transition-all hover:border-blue-500 hover:bg-blue-50/20 shadow-xs"
-                style={glassCard}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-zinc-500">{ref.category}</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
-                      {ref.badge}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition flex items-center justify-between">
-                    <span>{ref.name}</span>
-                    <ExternalLink className="h-3.5 w-3.5 text-zinc-400 group-hover:text-blue-600 transition" />
-                  </h3>
-                  <div className="text-[11px] font-mono text-amber-700 font-medium">{ref.organization}</div>
-                  <p className="text-xs text-zinc-600 leading-relaxed">
-                    {ref.description}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-zinc-100 text-[11px] font-mono text-blue-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform font-semibold">
-                  <span>Open Official Gateway</span>
-                  <ArrowUpRight className="h-3 w-3" />
-                </div>
-              </a>
-            ))}
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* FOOTER CALLOUT / SOVEREIGN GUARANTEE                                   */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div className="rounded-2xl p-6 border border-zinc-200 bg-white text-center space-y-3 shadow-xs" style={glassCard}>
-          <div className="flex items-center justify-center gap-2 text-xs font-mono text-blue-600 font-semibold">
-            <Shield className="h-4 w-4" />
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* SECTION 08 — GLOSSARY & DATA SOURCES                                 */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <section id="sec-glossary" className="scroll-mt-28 border-t border-[#E1E5EA] pt-14">
+          <div className="space-y-8">
+            <div>
+              <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
+                08 — Glossary & Data Sources
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
+                Marine Science Glossary & Official Repositories
+              </h2>
+              <p className="text-sm text-[#667085] mt-1 max-w-xl">
+                Definitions of standardized oceanographic indicators and primary data repositories feeding ORCA.
+              </p>
+            </div>
+
+            {/* Glossary Search & Filters */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#98A2B3]" />
+                  <input
+                    type="text"
+                    value={glossarySearch}
+                    onChange={(e) => setGlossarySearch(e.target.value)}
+                    placeholder="Search terms, formulas, acronyms..."
+                    className="w-full pl-9 pr-3 py-1.5 rounded border border-[#E1E5EA] text-xs font-sans text-[#202124] placeholder-[#98A2B3] outline-none focus:border-[#1F4E8C]"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {glossaryCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setGlossaryCategory(cat)}
+                      className={`px-2.5 py-1 rounded text-xs font-sans transition ${
+                        glossaryCategory === cat
+                          ? "bg-[#1F4E8C] text-white font-medium"
+                          : "bg-[#F6F8FA] text-[#667085] hover:bg-[#E1E5EA]"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Accordion Glossary List */}
+              <div className="border border-[#E1E5EA] rounded-lg divide-y divide-[#E1E5EA] bg-white">
+                {filteredGlossary.map((item) => {
+                  const isOpen = expandedGlossaryTerm === item.term;
+                  return (
+                    <div key={item.term}>
+                      <button
+                        onClick={() => setExpandedGlossaryTerm(isOpen ? null : item.term)}
+                        className="w-full py-3.5 px-4 text-left flex items-center justify-between gap-4 hover:bg-[#F6F8FA] transition"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#202124]">{item.term}</span>
+                          {item.acronym && (
+                            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[#F0F4FA] text-[#1F4E8C]">
+                              {item.acronym}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-[#667085] uppercase tracking-wide ml-2">({item.category})</span>
+                        </div>
+                        <span className="text-[#667085] text-xs">
+                          {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                        </span>
+                      </button>
+
+                      {isOpen && (
+                        <div className="px-4 pb-4 pt-1 text-xs space-y-2 bg-[#F6F8FA] border-t border-[#E1E5EA]">
+                          <p className="text-[#202124] leading-relaxed">{item.definition}</p>
+                          {item.formulaOrStandard && (
+                            <div className="p-2 bg-white rounded border border-[#E1E5EA] font-mono text-[11px] text-[#202124]">
+                              <span className="text-[#667085] font-sans text-[10px] block">Standard Formula:</span>
+                              {item.formulaOrStandard}
+                            </div>
+                          )}
+                          <div className="text-[#1F4E8C]">
+                            <strong>Operational Relevance: </strong>
+                            <span>{item.importance}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Official Data Sources Table */}
+            <div className="space-y-3 pt-4">
+              <h3 className="text-base font-bold text-[#202124]">
+                Authoritative Data Sources & Repositories
+              </h3>
+              <div className="divide-y divide-[#E1E5EA] border border-[#E1E5EA] rounded-lg bg-white">
+                {REFERENCE_LINKS.map((ref) => (
+                  <div key={ref.name} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#202124]">{ref.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#F0F4FA] text-[#1F4E8C] font-medium">{ref.category}</span>
+                      </div>
+                      <div className="text-[11px] text-[#667085] font-medium">{ref.organization}</div>
+                      <p className="text-xs text-[#667085] max-w-2xl">{ref.description}</p>
+                    </div>
+                    <a
+                      href={ref.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-[#1F4E8C] hover:underline font-medium whitespace-nowrap"
+                    >
+                      <span>Visit Source</span>
+                      <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        {/* INSTITUTIONAL FOOTER                                                 */}
+        {/* ═════════════════════════════════════════════════════════════════════ */}
+        <footer className="border-t border-[#E1E5EA] pt-10 text-center space-y-4">
+          <div className="text-xs font-semibold text-[#1F4E8C] uppercase tracking-wide flex items-center justify-center gap-2">
+            <ShieldCheck className="h-4 w-4" />
             <span>PROJECT ORCA · MINISTRY OF EARTH SCIENCES · SMART INDIA HACKATHON 2024</span>
           </div>
-          <p className="text-xs text-zinc-600 max-w-2xl mx-auto">
-            This advisory dossier is formulated for peaceful maritime navigation, scientific inquiry, and coastal community sustenance. All geographic boundaries comply with the Territorial Waters, Continental Shelf, Exclusive Economic Zone and other Maritime Zones Act of India.
+          <p className="text-xs text-[#667085] max-w-2xl mx-auto leading-relaxed">
+            Formulated for maritime navigation safety, oceanographic research, and coastal community sustenance. All geographic boundaries comply with the Territorial Waters, Continental Shelf, Exclusive Economic Zone and other Maritime Zones Act of India.
           </p>
           {showBackToGlobeButton && onBackToGlobe && (
             <div className="pt-2">
               <button
                 onClick={onBackToGlobe}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-mono text-xs font-bold transition-all shadow-sm hover:scale-105 active:scale-95 bg-blue-600 hover:bg-blue-700 text-white"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-md font-sans text-xs font-medium transition bg-[#1F4E8C] hover:bg-[#173F72] text-white shadow-xs"
               >
                 <span>▲ Return to 3D Earth Globe</span>
               </button>
             </div>
           )}
-        </div>
+        </footer>
 
       </div>
     </div>

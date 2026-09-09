@@ -100,18 +100,16 @@ const studioGlass = {
   boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.08)",
 } as React.CSSProperties;
 
-// Google Maps Style Toggle Switch (Light Blue)
+// ISRO Scientific Toggle Switch
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <button
       onClick={onChange}
-      className="relative flex-shrink-0 h-5 w-9 rounded-full transition-colors duration-200 focus:outline-none"
-      style={{ background: on ? "#2563eb" : "rgba(228, 228, 231, 0.9)" }}
+      className="relative flex-shrink-0 h-5 w-9 rounded-full transition-colors duration-150 focus:outline-none"
+      style={{ background: on ? "#1F4E8C" : "#E1E5EA" }}
     >
       <span
-        className={`absolute top-0.5 h-4 w-4 rounded-full shadow transition-all duration-200 ${
-          on ? "bg-white" : "bg-zinc-400"
-        }`}
+        className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-all duration-150"
         style={{ left: on ? "calc(100% - 18px)" : "2px" }}
       />
     </button>
@@ -569,16 +567,16 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className="absolute left-0 top-0 h-full w-60 flex flex-col overflow-hidden shadow-2xl bg-white/98 border-r border-zinc-200"
           >
-            {/* Persona Badge */}
-            <div className="px-4 pt-20 pb-3 flex-shrink-0 border-b border-zinc-200">
-              <div className="text-xs font-mono font-bold flex items-center gap-1.5 text-zinc-900">
-                <PersonaIcon className="h-3.5 w-3.5" />
-                {pm.agent.toUpperCase()}
+            {/* Persona & Platform Badge */}
+            <div className="px-4 pt-20 pb-3 flex-shrink-0 border-b border-[#E1E5EA]">
+              <div className="text-xs font-sans font-bold flex items-center gap-1.5 text-[#202124]">
+                <PersonaIcon className="h-3.5 w-3.5 text-[#1F4E8C]" />
+                <span>{pm.agent}</span>
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{pm.name} Operational Matrix</div>
-              <div className="mt-2 flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded bg-zinc-100 text-zinc-900 border border-zinc-200 font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                SOVEREIGN AIR-GAPPED
+              <div className="text-[11px] text-[#667085] font-sans mt-0.5">{pm.name} GIS Console</div>
+              <div className="mt-2 flex items-center gap-1.5 text-[10px] font-sans px-2 py-1 rounded bg-[#F6F8FA] text-[#202124] border border-[#E1E5EA]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#228B5A]" />
+                <span>INCOIS & ISRO Synchronized</span>
               </div>
             </div>
 
@@ -586,18 +584,18 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
               {/* Layers */}
               <div>
-                <div className="text-[10px] font-mono font-bold tracking-widest uppercase mb-2 pb-1 border-b border-zinc-100 text-zinc-500 flex items-center justify-between">
-                  <span>Layers</span>
-                  <span className="text-zinc-900">{activeCount} ACTIVE</span>
+                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085] flex items-center justify-between">
+                  <span>GIS Telemetry Layers</span>
+                  <span className="text-[#1F4E8C] font-mono font-bold">{activeCount} ACTIVE</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {layers.map((l) => {
                     const LayerIcon = l.icon;
                     return (
-                      <div key={l.id} className="flex items-center gap-2">
-                        <LayerIcon className={`h-3.5 w-3.5 flex-shrink-0 ${l.on ? "text-zinc-900" : "text-zinc-400"}`} />
+                      <div key={l.id} className="flex items-center gap-2 py-0.5">
+                        <LayerIcon className={`h-3.5 w-3.5 flex-shrink-0 ${l.on ? "text-[#1F4E8C]" : "text-[#98A2B3]"}`} />
                         <span
-                          className={`flex-1 text-[11px] font-mono truncate ${l.on ? "text-zinc-900 font-medium" : "text-zinc-400"}`}
+                          className={`flex-1 text-[11px] font-sans truncate ${l.on ? "text-[#202124] font-medium" : "text-[#667085]"}`}
                         >
                           {l.label}
                         </span>
@@ -610,32 +608,32 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
 
               {/* Sensor Thresholds */}
               <div>
-                <div className="text-[10px] font-mono font-bold tracking-widest uppercase mb-2 pb-1 border-b border-zinc-100 text-zinc-500">
+                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085]">
                   Sensor Thresholds
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 pt-1">
                   <div>
-                    <div className="flex justify-between text-[10px] font-mono text-zinc-600 mb-1">
+                    <div className="flex justify-between text-[11px] font-sans text-[#667085] mb-1">
                       <span>SST Range</span>
-                      <span className="text-zinc-900 font-bold">{sstRange[0]}–{sstRange[1]}°C</span>
+                      <span className="text-[#202124] font-mono font-semibold">{sstRange[0]}–{sstRange[1]}°C</span>
                     </div>
                     <input
                       type="range" min={20} max={35} step={0.5}
                       value={sstRange[1]}
                       onChange={(e) => setSstRange([sstRange[0], Number(e.target.value)])}
-                      className="w-full h-1.5 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-black"
+                      className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[10px] font-mono text-zinc-600 mb-1">
+                    <div className="flex justify-between text-[11px] font-sans text-[#667085] mb-1">
                       <span>Max SWH (Swell)</span>
-                      <span className="text-zinc-900 font-bold">{waveMax}m</span>
+                      <span className="text-[#202124] font-mono font-semibold">{waveMax}m</span>
                     </div>
                     <input
                       type="range" min={0} max={8} step={0.5}
                       value={waveMax}
                       onChange={(e) => setWaveMax(Number(e.target.value))}
-                      className="w-full h-1.5 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-black"
+                      className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
                     />
                   </div>
                 </div>
@@ -643,22 +641,22 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
 
               {/* Basemap Switcher */}
               <div>
-                <div className="text-[10px] font-mono font-bold tracking-widest uppercase mb-2 pb-1 border-b border-zinc-100 text-zinc-500">
-                  Cartographic Mode
+                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085]">
+                  Basemap Imagery
                 </div>
                 <div className="space-y-1">
                   {(["satellite", "dark", "nautical"] as const).map((b) => (
                     <button
                       key={b}
                       onClick={() => setBasemap(b)}
-                      className={`w-full flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded-lg transition ${
+                      className={`w-full flex items-center justify-between text-xs font-sans px-2.5 py-1.5 rounded-lg transition ${
                         basemap === b
-                          ? "bg-zinc-100 text-zinc-900 font-semibold border border-zinc-200"
-                          : "text-zinc-500 hover:text-black border border-transparent"
+                          ? "bg-[#F0F4FA] text-[#1F4E8C] font-semibold border border-[#CBD5E1]"
+                          : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA] border border-transparent"
                       }`}
                     >
-                      <span className="capitalize">{b} Imagery</span>
-                      {basemap === b && <CheckCircle2 className="h-3 w-3 text-zinc-900" />}
+                      <span className="capitalize">{b} Mode</span>
+                      {basemap === b && <CheckCircle2 className="h-3 w-3 text-[#1F4E8C]" />}
                     </button>
                   ))}
                 </div>
@@ -704,11 +702,7 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const [liveSST, setLiveSST] = useState(28.4);
-  useEffect(() => {
-    const t = setInterval(() => setLiveSST((v) => +(v + (Math.random() - 0.5) * 0.05).toFixed(2)), 3000);
-    return () => clearInterval(t);
-  }, []);
+
 
   const pm = PERSONA_META[persona];
   const PersonaIcon = pm.icon;
@@ -829,7 +823,7 @@ function AppContent() {
               </AnimatePresence>
 
               {/* Scroll Cue to Report Button (Compact White Capsule) */}
-              <div className="absolute bottom-11 left-1/2 -translate-x-1/2 z-20">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
                 <button
                   onClick={scrollToReport}
                   className="group flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm bg-white/95 hover:bg-white text-zinc-800 border-zinc-200 hover:border-zinc-300 backdrop-blur-md"
@@ -840,30 +834,6 @@ function AppContent() {
                   </span>
                   <ArrowDown className="h-3 w-3 text-zinc-500 group-hover:translate-y-0.5 transition-transform" />
                 </button>
-              </div>
-
-              {/* Bottom Status Bar (Clean White Mission Control Ribbon) */}
-              <div
-                className="absolute bottom-0 left-0 right-0 z-20 h-9 flex items-center px-4 gap-4 overflow-x-auto bg-white/95 border-t border-zinc-200 shadow-sm"
-              >
-                {[
-                  { label: "GRID RESOLUTION", value: "6km × 5km EEZ", color: "#09090b", dot: true },
-                  { label: "SST",             value: `${liveSST}°C`,   color: "#09090b" },
-                  { label: "SWH",             value: "1.6m",           color: "#18181b" },
-                  { label: "WIND",            value: "12 kts",         color: "#52525b" },
-                  { label: "IMBL",            value: currentBasinInfo.isEEZ ? `${currentBasinInfo.imblDistanceKm} km SAFE` : "INTERNATIONAL", color: currentBasinInfo.isEEZ ? "#059669" : "#dc2626" },
-                  { label: "CHL-A",           value: "1.26 mg/m³",     color: "#18181b" },
-                  { label: "BASIN",           value: currentBasinInfo.short, color: "#09090b" },
-                  { label: "GROUND REFRESH",  value: "2.0s",           color: "#71717a" },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-1.5 flex-shrink-0 font-mono text-[10px]">
-                    {item.dot && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                    <span className="text-zinc-500">{item.label}:</span>
-                    <span className="font-bold" style={{ color: item.color }}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
               </div>
             </>
           );
@@ -888,35 +858,39 @@ function AppContent() {
 
       {/* ══════════════════════════════ TOP FIXED HEADER (Google Maps Style) ═════ */}
       <header
-        className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-4 gap-3 bg-white/95 backdrop-blur-xl border-b border-zinc-200 shadow-sm"
+        className="fixed top-0 left-0 right-0 z-40 h-14 flex items-center px-4 sm:px-6 gap-3 sm:gap-4 bg-white/95 backdrop-blur-md border-b border-[#E1E5EA] shadow-xs"
       >
-        {/* Sovereign ORCA Emblem */}
+        {/* National Scientific Platform Branding */}
         <Link
           href="/"
-          className="flex items-center gap-2.5 flex-shrink-0"
-          title="Back to Landing Page"
+          className="flex items-center gap-2.5 flex-shrink-0 group"
+          title="Project ORCA Home"
         >
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center bg-blue-600 text-white font-bold shadow-sm">
+          <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-[#1F4E8C] text-white shadow-xs group-hover:bg-[#173F72] transition">
             <Globe className="h-4 w-4" />
           </div>
-          <span className="font-mono font-bold text-sm hidden sm:block text-zinc-900 tracking-wider">
-            ORCA
-          </span>
+          <div className="hidden sm:flex flex-col">
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="font-bold text-sm text-[#202124] tracking-tight">ORCA</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-[#E87524]" />
+            </div>
+            <span className="text-[10px] text-[#667085] font-sans font-medium mt-0.5 tracking-normal">Marine Intelligence Platform</span>
+          </div>
         </Link>
 
-        {/* Google Maps Styled Search Bar (White Elevated) */}
-        <div className="flex-1 relative max-w-xl mx-auto">
+        {/* Clean Scientific Search Bar */}
+        <div className="flex-1 relative max-w-lg mx-auto">
           <div className="relative">
             <Search
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#98A2B3]"
             />
             <input
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
               onFocus={() => setSearchFocus(true)}
               onBlur={() => setTimeout(() => setSearchFocus(false), 180)}
-              placeholder="Search Indian harbors, coordinates, 5km fishing zones..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl text-xs outline-none transition-all bg-zinc-100/90 hover:bg-zinc-100 border border-zinc-200 focus:border-zinc-400 focus:bg-white text-zinc-900 placeholder-zinc-400 shadow-sm"
+              placeholder="Search ports, coordinates (e.g. 20.75°N, 70.19°E), or zones..."
+              className="w-full pl-9 pr-4 py-1.5 rounded-lg text-xs font-sans outline-none transition bg-[#F6F8FA] hover:bg-[#F1F5F9] border border-[#E1E5EA] focus:border-[#1F4E8C] focus:bg-white text-[#202124] placeholder-[#98A2B3]"
             />
           </div>
 
@@ -924,11 +898,11 @@ function AppContent() {
           <AnimatePresence>
             {searchFocus && (
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
-                className="absolute top-full mt-2 left-0 right-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-zinc-200"
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full mt-1.5 left-0 right-0 rounded-lg overflow-hidden shadow-lg bg-white border border-[#E1E5EA]"
               >
                 {SEARCH_SUGGESTIONS.map((s, i) => {
                   const SugIcon = s.icon;
@@ -953,14 +927,14 @@ function AppContent() {
                         }
                         setChatOpen(true);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 transition border-b border-zinc-100 last:border-b-0"
+                      className="w-full flex items-center gap-3 px-3.5 py-2 text-left hover:bg-[#F6F8FA] transition border-b border-[#F1F5F9] last:border-b-0"
                     >
-                      <div className="p-1.5 rounded-lg bg-zinc-100 text-zinc-800">
+                      <div className="p-1 rounded bg-[#F1F5F9] text-[#1F4E8C]">
                         <SugIcon className="h-3.5 w-3.5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs text-zinc-900 font-medium truncate">{s.label}</div>
-                        <div className="text-[10px] text-zinc-500 font-mono">{s.sub}</div>
+                        <div className="text-xs text-[#202124] font-medium truncate">{s.label}</div>
+                        <div className="text-[10px] text-[#667085] font-mono">{s.sub}</div>
                       </div>
                     </button>
                   );
@@ -974,11 +948,11 @@ function AppContent() {
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setNavOpen((p) => !p)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono border transition-all text-zinc-800 bg-white border-zinc-200 hover:border-zinc-400 shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-sans border transition text-[#202124] bg-white border-[#E1E5EA] hover:border-[#1F4E8C] hover:bg-[#F6F8FA]"
           >
-            <Compass className="h-3.5 w-3.5 text-zinc-700" />
+            <Compass className="h-3.5 w-3.5 text-[#1F4E8C]" />
             <span className="hidden sm:inline font-medium">{BASINS.find((b) => b.id === basin)?.short}</span>
-            <ChevronDown className="h-3 w-3 text-zinc-400" />
+            <ChevronDown className="h-3 w-3 text-[#98A2B3]" />
           </button>
           <AnimatePresence>
             {navOpen && (
@@ -986,16 +960,16 @@ function AppContent() {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="absolute right-0 top-11 rounded-xl overflow-hidden z-50 shadow-xl bg-white border border-zinc-200 w-44"
+                className="absolute right-0 top-10 rounded-lg overflow-hidden z-50 shadow-lg bg-white border border-[#E1E5EA] w-48"
               >
                 {BASINS.map((b) => (
                   <button
                     key={b.id}
                     onClick={() => { setBasin(b.id); setNavOpen(false); }}
-                    className="w-full px-4 py-2 text-left text-xs font-mono hover:bg-zinc-50 transition flex items-center justify-between text-zinc-700 hover:text-black"
+                    className="w-full px-3.5 py-2 text-left text-xs font-sans hover:bg-[#F6F8FA] transition flex items-center justify-between text-[#202124]"
                   >
-                    {b.label}
-                    {basin === b.id && <CheckCircle2 className="h-3.5 w-3.5 text-black" />}
+                    <span>{b.label}</span>
+                    {basin === b.id && <CheckCircle2 className="h-3.5 w-3.5 text-[#1F4E8C]" />}
                   </button>
                 ))}
               </motion.div>
@@ -1003,44 +977,44 @@ function AppContent() {
           </AnimatePresence>
         </div>
 
-        {/* Navigation Control Pills */}
-        <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+        {/* Navigation Actions - Subtle Neutral with Active Blue */}
+        <div className="hidden md:flex items-center gap-0.5 flex-shrink-0">
           {[
-            { icon: Map,      label: "Globe",   onClick: scrollToGlobe },
+            { icon: Map,      label: "Globe",   onClick: scrollToGlobe, active: true },
             { icon: Database, label: "Data",    href: "/research/data" },
-            { icon: FileText, label: "Dossier", onClick: scrollToReport },
+            { icon: FileText, label: "Advisory",onClick: scrollToReport },
             { icon: BookOpen, label: "Vault",   href: "/report" },
             { icon: Network,  label: "Swarm",   href: "/dashboard/agents" },
-          ].map((pill: any) => {
-            const PillIcon = pill.icon;
-            return pill.href ? (
-              <Link
-                key={pill.label}
-                href={pill.href}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all text-zinc-600 hover:text-black bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-300 shadow-sm"
-              >
-                <PillIcon className="h-3.5 w-3.5 text-zinc-700" /> {pill.label}
+          ].map((item: any) => {
+            const ItemIcon = item.icon;
+            const itemClasses = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+              item.active
+                ? "text-[#1F4E8C] bg-[#F0F4FA] font-semibold"
+                : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA]"
+            }`;
+
+            return item.href ? (
+              <Link key={item.label} href={item.href} className={itemClasses}>
+                <ItemIcon className="h-3.5 w-3.5" />
+                <span>{item.label}</span>
               </Link>
             ) : (
-              <button
-                key={pill.label}
-                onClick={pill.onClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all text-zinc-600 hover:text-black bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-300 shadow-sm"
-              >
-                <PillIcon className="h-3.5 w-3.5 text-zinc-700" /> {pill.label}
+              <button key={item.label} onClick={item.onClick} className={itemClasses}>
+                <ItemIcon className="h-3.5 w-3.5" />
+                <span>{item.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Persona Mode Indicator */}
+        {/* Persona Indicator */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <Link
             href="/signup"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs border transition-all bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-sm font-semibold"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans font-medium transition bg-[#1F4E8C] text-white hover:bg-[#173F72] shadow-xs"
           >
             <PersonaIcon className="h-3.5 w-3.5" />
-            <span className="hidden md:inline font-mono">{pm.name}</span>
+            <span className="hidden md:inline">{pm.name}</span>
           </Link>
         </div>
       </header>
