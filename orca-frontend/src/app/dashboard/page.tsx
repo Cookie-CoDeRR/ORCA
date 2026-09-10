@@ -16,7 +16,7 @@ import {
   MapPin, Wind, Ship, Activity, Grid, GraduationCap, Microscope,
   FlaskConical, Cpu, ArrowDown, Image as ImageIcon
 } from "lucide-react";
-import ThreeGlobe from "@/components/ThreeGlobe";
+import ThreeGlobe, { EnvironmentalRasterType, VectorOverlayToggles } from "@/components/ThreeGlobe";
 import ReportView from "@/components/ReportView";
 import { sendMultiAgentMessage } from "@/lib/api";
 import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
@@ -69,17 +69,122 @@ const BASINS: { id: Basin; label: string; short: string }[] = [
   { id: "andaman", label: "Andaman & Nicobar", short: "Andaman" },
 ];
 
-const DEFAULT_LAYERS: LayerItem[] = [
-  { id: "sst", label: "SST Thermal Raster", icon: Thermometer, on: true, color: "#09090b" },
-  { id: "currents", label: "Ocean Currents", icon: Wind, on: true, color: "#27272a" },
-  { id: "pfz", label: "PFZ Hotspots", icon: Fish, on: true, color: "#d97706" },
-  { id: "imbl", label: "IMBL Sovereign Zone", icon: ShieldAlert, on: true, color: "#dc2626" },
-  { id: "ais", label: "AIS Vessel Vectors", icon: Ship, on: true, color: "#52525b" },
-  { id: "route", label: "Optimal Route Line", icon: Navigation, on: false, color: "#2563eb" },
-  { id: "bathy", label: "Bathymetric Contour", icon: Layers, on: false, color: "#0284c7" },
-  { id: "shelf", label: "Continental Shelf", icon: Activity, on: false, color: "#71717a" },
-  { id: "graticule", label: "Polar Graticule", icon: Grid, on: false, color: "#a1a1aa" },
-  { id: "mesh", label: "5x5 km Tactical Mesh", icon: LayoutGrid, on: true, color: "#09090b" },
+export interface EnvironmentalRasterDef {
+  id: EnvironmentalRasterType;
+  label: string;
+  subtitle: string;
+  gradient: string;
+  rangeText: string;
+  badge: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+export const ENVIRONMENTAL_RASTERS: EnvironmentalRasterDef[] = [
+  {
+    id: "none",
+    label: "Natural Satellite",
+    subtitle: "NASA Blue Marble 5400x2700 True-Color Bedrock",
+    gradient: "linear-gradient(90deg, #1e3a8a 0%, #065f46 50%, #ca8a04 100%)",
+    rangeText: "Visible Spectrum Bedrock",
+    badge: "TRUE COLOR",
+    icon: Globe,
+  },
+  {
+    id: "sst",
+    label: "SST Thermal Raster",
+    subtitle: "Sea Surface Temp & Coastal Fronts (NOAA/INCOIS)",
+    gradient: "linear-gradient(90deg, #1d4ed8 0%, #06b6d4 25%, #22c55e 50%, #eab308 75%, #ef4444 100%)",
+    rangeText: "24.0°C – 32.5°C Thermal Envelope",
+    badge: "THERMAL FRONTS",
+    icon: Thermometer,
+  },
+  {
+    id: "chlorophyll",
+    label: "Chlorophyll-a Plumes",
+    subtitle: "OceanSat-3 OCM Phytoplankton Bloom Density",
+    gradient: "linear-gradient(90deg, #1e1b4b 0%, #0891b2 25%, #10b981 60%, #84cc16 85%, #f59e0b 100%)",
+    rangeText: "0.08 – 4.80 mg/m³ Upwelling Plumes",
+    badge: "FEEDING GROUNDS",
+    icon: Fish,
+  },
+  {
+    id: "currents",
+    label: "Currents Velocity Heatmap",
+    subtitle: "Eulerian Hydrodynamic Velocity Field (uo, vo)",
+    gradient: "linear-gradient(90deg, #0284c7 0%, #38bdf8 40%, #c084fc 80%, #ec4899 100%)",
+    rangeText: "0.15 – 2.05 m/s Somali Jet Drift",
+    badge: "HYDRODYNAMICS",
+    icon: Wind,
+  },
+  {
+    id: "bathymetry",
+    label: "Bathymetric Depth Relief",
+    subtitle: "GEBCO Seafloor Topography & Shelf Break",
+    gradient: "linear-gradient(90deg, #064e3b 0%, #0891b2 40%, #1e40af 80%, #0f172a 100%)",
+    rangeText: "0m – 4,500m Abyssal Plain",
+    badge: "BATHYMETRY",
+    icon: Layers,
+  },
+];
+
+export interface VectorOverlayDef {
+  id: keyof VectorOverlayToggles;
+  label: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  color: string;
+}
+
+export const VECTOR_OVERLAYS_DEF: VectorOverlayDef[] = [
+  {
+    id: "pfz",
+    label: "PFZ Hotspots",
+    subtitle: "14 INCOIS Verified Fish Clusters & Confidence",
+    icon: Fish,
+    color: "#f59e0b",
+  },
+  {
+    id: "imbl",
+    label: "IMBL Sovereign Zone",
+    subtitle: "Border Standoff & 5nm Safety Buffer",
+    icon: ShieldAlert,
+    color: "#ef4444",
+  },
+  {
+    id: "ais",
+    label: "AIS Vessel Fleet",
+    subtitle: "Real-Time Fleet AIS & Kinematic Courses",
+    icon: Ship,
+    color: "#38bdf8",
+  },
+  {
+    id: "route",
+    label: "Optimal Route Line",
+    subtitle: "Hydrodynamic Fuel-Efficient A* Path",
+    icon: Navigation,
+    color: "#2563eb",
+  },
+  {
+    id: "currentsFlow",
+    label: "Current Flow Vectors",
+    subtitle: "Directional Streamline Flow Arrows",
+    icon: Wind,
+    color: "#06b6d4",
+  },
+  {
+    id: "mesh",
+    label: "5x5 km Tactical Mesh",
+    subtitle: "Geodetic Sector Grid with Reticle Lock",
+    icon: LayoutGrid,
+    color: "#09090b",
+  },
+  {
+    id: "graticule",
+    label: "Global Graticule",
+    subtitle: "10° / 2° Parallels & Meridians",
+    icon: Grid,
+    color: "#71717a",
+  },
 ];
 
 const SEARCH_SUGGESTIONS = [
@@ -689,21 +794,38 @@ function AIChatDrawer({
 
 
 // ─── Left Layer Dock (Crisp White Theme) ───────────────────────────────────────
-function LayerDock({ persona, visible }: { persona: Persona; visible: boolean }) {
+// ─── Left Layer Dock (Crisp White Theme) ───────────────────────────────────────
+function LayerDock({
+  persona,
+  visible,
+  activeRaster,
+  onSelectRaster,
+  vectorOverlays,
+  onToggleVectorOverlay,
+  sstRange,
+  setSstRange,
+  waveMax,
+  setWaveMax,
+}: {
+  persona: Persona;
+  visible: boolean;
+  activeRaster: EnvironmentalRasterType;
+  onSelectRaster: (raster: EnvironmentalRasterType) => void;
+  vectorOverlays: VectorOverlayToggles;
+  onToggleVectorOverlay: (key: keyof VectorOverlayToggles) => void;
+  sstRange: [number, number];
+  setSstRange: (range: [number, number]) => void;
+  waveMax: number;
+  setWaveMax: (val: number) => void;
+}) {
   const pm = PERSONA_META[persona];
   const PersonaIcon = pm.icon;
 
   const [expanded, setExpanded] = useState(false);
-  const [layers, setLayers] = useState<LayerItem[]>(DEFAULT_LAYERS);
-  const [basemap, setBasemap] = useState<"satellite" | "dark" | "nautical">("satellite");
-  const [sstRange, setSstRange] = useState([24, 32]);
-  const [waveMax, setWaveMax] = useState(4.0);
 
-  const toggleLayer = (id: string) => {
-    setLayers((prev) => prev.map((l) => l.id === id ? { ...l, on: !l.on } : l));
-  };
-
-  const activeCount = layers.filter((l) => l.on).length;
+  const activeVectorsCount = Object.values(vectorOverlays).filter(Boolean).length;
+  const currentRasterDef = ENVIRONMENTAL_RASTERS.find((r) => r.id === activeRaster) || ENVIRONMENTAL_RASTERS[0];
+  const CurrentRasterIcon = currentRasterDef.icon;
 
   return (
     <div
@@ -716,15 +838,24 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
       <motion.div
         animate={{ width: expanded ? 0 : 42 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-col items-center gap-3.5 py-20 overflow-hidden flex-shrink-0 bg-white/95 border-r border-zinc-200 shadow-md backdrop-blur-md"
+        className="flex flex-col items-center gap-3 py-20 overflow-hidden flex-shrink-0 bg-white/95 border-r border-zinc-200 shadow-md backdrop-blur-md"
       >
-        {layers.filter((l) => l.on).slice(0, 8).map((l) => {
-          const LayerIcon = l.icon;
+        {/* Active Raster indicator in collapsed bar */}
+        <div
+          className="p-1.5 rounded-lg bg-blue-50 border border-blue-200 text-[#1F4E8C]"
+          title={`Active Environmental Raster: ${currentRasterDef.label}`}
+        >
+          <CurrentRasterIcon className="h-3.5 w-3.5" />
+        </div>
+        <div className="w-4 h-[1px] bg-zinc-200" />
+        {/* Active Vector indicators */}
+        {VECTOR_OVERLAYS_DEF.filter((v) => vectorOverlays[v.id]).slice(0, 6).map((v) => {
+          const LayerIcon = v.icon;
           return (
             <div
-              key={l.id}
+              key={v.id}
               className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-800"
-              title={l.label}
+              title={`Active Overlay: ${v.label}`}
             >
               <LayerIcon className="h-3.5 w-3.5" />
             </div>
@@ -736,11 +867,11 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
       <AnimatePresence>
         {expanded && (
           <motion.div
-            initial={{ x: -240, opacity: 0 }}
+            initial={{ x: -280, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -240, opacity: 0 }}
+            exit={{ x: -280, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-0 h-full w-60 flex flex-col overflow-hidden shadow-2xl bg-white/98 border-r border-zinc-200"
+            className="absolute left-0 top-0 h-full w-72 flex flex-col overflow-hidden shadow-2xl bg-white/98 border-r border-zinc-200"
           >
             {/* Persona & Platform Badge */}
             <div className="px-4 pt-20 pb-3 flex-shrink-0 border-b border-[#E1E5EA]">
@@ -756,44 +887,141 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
             </div>
 
             {/* Scrollable Controls */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-              {/* Layers */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
+              {/* ── SECTION 1: ENVIRONMENTAL COLOR RASTERS (MUTUALLY EXCLUSIVE) ── */}
               <div>
-                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085] flex items-center justify-between">
-                  <span>GIS Telemetry Layers</span>
-                  <span className="text-[#1F4E8C] font-mono font-bold">{activeCount} ACTIVE</span>
+                <div className="flex items-center justify-between pb-1.5 border-b border-[#E1E5EA]">
+                  <div>
+                    <div className="text-[10px] font-sans font-bold tracking-wider uppercase text-[#202124]">
+                      Environmental Rasters
+                    </div>
+                    <div className="text-[9px] text-[#667085]">Mutually exclusive · 1 active</div>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                    {activeRaster === "none" ? "Satellite" : activeRaster}
+                  </span>
                 </div>
-                <div className="space-y-1.5">
-                  {layers.map((l) => {
-                    const LayerIcon = l.icon;
+
+                <div className="space-y-1.5 pt-2">
+                  {ENVIRONMENTAL_RASTERS.map((r) => {
+                    const RasterIcon = r.icon;
+                    const isActive = activeRaster === r.id;
                     return (
-                      <div key={l.id} className="flex items-center gap-2 py-0.5">
-                        <LayerIcon className={`h-3.5 w-3.5 flex-shrink-0 ${l.on ? "text-[#1F4E8C]" : "text-[#98A2B3]"}`} />
-                        <span
-                          className={`flex-1 text-[11px] font-sans truncate ${l.on ? "text-[#202124] font-medium" : "text-[#667085]"}`}
-                        >
-                          {l.label}
-                        </span>
-                        <Toggle on={l.on} onChange={() => toggleLayer(l.id)} />
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => onSelectRaster(r.id)}
+                        className={`w-full text-left p-2 rounded-xl transition border text-xs flex flex-col gap-1.5 ${
+                          isActive
+                            ? "bg-[#F0F5FF] border-[#1F4E8C] shadow-xs"
+                            : "bg-white hover:bg-[#F8FAFC] border-zinc-200 text-zinc-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`p-1 rounded-md ${
+                                isActive ? "bg-[#1F4E8C] text-white" : "bg-zinc-100 text-zinc-600"
+                              }`}
+                            >
+                              <RasterIcon className="h-3 w-3" />
+                            </div>
+                            <div>
+                              <div
+                                className={`font-semibold leading-tight text-[11px] ${
+                                  isActive ? "text-[#1F4E8C]" : "text-zinc-800"
+                                }`}
+                              >
+                                {r.label}
+                              </div>
+                              <div className="text-[9.5px] text-zinc-500 leading-tight">
+                                {r.rangeText}
+                              </div>
+                            </div>
+                          </div>
+                          {isActive && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-[#1F4E8C] flex-shrink-0" />
+                          )}
+                        </div>
+
+                        {/* Color Ramp Gradient Bar */}
+                        <div
+                          className="w-full h-1.5 rounded-full overflow-hidden border border-black/5"
+                          style={{ background: r.gradient }}
+                          title={r.rangeText}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── SECTION 2: DIRECT MAP OVERLAYS (MULTI-SELECT TOGGLES) ── */}
+              <div>
+                <div className="flex items-center justify-between pb-1.5 border-b border-[#E1E5EA]">
+                  <div>
+                    <div className="text-[10px] font-sans font-bold tracking-wider uppercase text-[#202124]">
+                      Direct Map Overlays
+                    </div>
+                    <div className="text-[9px] text-[#667085]">Independent point & vector layers</div>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold text-[#1F4E8C]">
+                    {activeVectorsCount} ACTIVE
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  {VECTOR_OVERLAYS_DEF.map((v) => {
+                    const LayerIcon = v.icon;
+                    const isOn = vectorOverlays[v.id];
+                    return (
+                      <div
+                        key={v.id}
+                        className="flex items-center justify-between py-1 px-1 rounded-lg hover:bg-zinc-50 transition"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <LayerIcon
+                            className="h-3.5 w-3.5 flex-shrink-0"
+                            style={{ color: isOn ? v.color : "#9ca3af" }}
+                          />
+                          <div className="truncate">
+                            <div
+                              className={`text-[11px] leading-tight truncate ${
+                                isOn ? "text-zinc-900 font-medium" : "text-zinc-500"
+                              }`}
+                            >
+                              {v.label}
+                            </div>
+                            <div className="text-[9px] text-zinc-400 truncate leading-tight">
+                              {v.subtitle}
+                            </div>
+                          </div>
+                        </div>
+                        <Toggle on={isOn} onChange={() => onToggleVectorOverlay(v.id)} />
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Sensor Thresholds */}
+              {/* ── SECTION 3: SENSOR THRESHOLDS ── */}
               <div>
-                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085]">
+                <div className="text-[10px] font-sans font-bold tracking-wider uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#202124]">
                   Sensor Thresholds
                 </div>
                 <div className="space-y-3 pt-1">
                   <div>
                     <div className="flex justify-between text-[11px] font-sans text-[#667085] mb-1">
                       <span>SST Range</span>
-                      <span className="text-[#202124] font-mono font-semibold">{sstRange[0]}–{sstRange[1]}°C</span>
+                      <span className="text-[#202124] font-mono font-semibold">
+                        {sstRange[0]}–{sstRange[1]}°C
+                      </span>
                     </div>
                     <input
-                      type="range" min={20} max={35} step={0.5}
+                      type="range"
+                      min={20}
+                      max={35}
+                      step={0.5}
                       value={sstRange[1]}
                       onChange={(e) => setSstRange([sstRange[0], Number(e.target.value)])}
                       className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
@@ -805,7 +1033,10 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
                       <span className="text-[#202124] font-mono font-semibold">{waveMax}m</span>
                     </div>
                     <input
-                      type="range" min={0} max={8} step={0.5}
+                      type="range"
+                      min={0}
+                      max={8}
+                      step={0.5}
                       value={waveMax}
                       onChange={(e) => setWaveMax(Number(e.target.value))}
                       className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
@@ -814,27 +1045,6 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
                 </div>
               </div>
 
-              {/* Basemap Switcher */}
-              <div>
-                <div className="text-[10px] font-sans font-semibold tracking-wide uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#667085]">
-                  Basemap Imagery
-                </div>
-                <div className="space-y-1">
-                  {(["satellite", "dark", "nautical"] as const).map((b) => (
-                    <button
-                      key={b}
-                      onClick={() => setBasemap(b)}
-                      className={`w-full flex items-center justify-between text-xs font-sans px-2.5 py-1.5 rounded-lg transition ${basemap === b
-                          ? "bg-[#F0F4FA] text-[#1F4E8C] font-semibold border border-[#CBD5E1]"
-                          : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA] border border-transparent"
-                        }`}
-                    >
-                      <span className="capitalize">{b} Mode</span>
-                      {basemap === b && <CheckCircle2 className="h-3 w-3 text-[#1F4E8C]" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </motion.div>
         )}
@@ -865,6 +1075,23 @@ function AppContent() {
     });
     return unsub;
   }, []);
+
+  const [activeRaster, setActiveRaster] = useState<EnvironmentalRasterType>("sst");
+  const [vectorOverlays, setVectorOverlays] = useState<VectorOverlayToggles>({
+    pfz: true,
+    imbl: true,
+    ais: true,
+    route: true,
+    currentsFlow: true,
+    mesh: true,
+    graticule: false,
+  });
+  const [sstRange, setSstRange] = useState<[number, number]>([24, 32]);
+  const [waveMax, setWaveMax] = useState(4.0);
+
+  const toggleVectorOverlay = (key: keyof VectorOverlayToggles) => {
+    setVectorOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -959,6 +1186,8 @@ function AppContent() {
             showControls={true}
             targetCoords={selectedCoord}
             chatOpen={chatOpen}
+            activeRaster={activeRaster}
+            vectorLayers={vectorOverlays}
             onLocationSelect={(coords) => {
               if (coords) {
                 setSelectedCoord(coords);
@@ -982,7 +1211,18 @@ function AppContent() {
         />
 
         {/* Left Layer Dock */}
-        <LayerDock persona={persona} visible={!scrolledPastGlobe} />
+        <LayerDock
+          persona={persona}
+          visible={!scrolledPastGlobe}
+          activeRaster={activeRaster}
+          onSelectRaster={setActiveRaster}
+          vectorOverlays={vectorOverlays}
+          onToggleVectorOverlay={toggleVectorOverlay}
+          sstRange={sstRange}
+          setSstRange={setSstRange}
+          waveMax={waveMax}
+          setWaveMax={setWaveMax}
+        />
 
         {/* Dynamic Basin Computation */}
         {(() => {

@@ -4,6 +4,18 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Plus, Minus, Compass, RotateCcw, Grid } from "lucide-react";
 
+export type EnvironmentalRasterType = "none" | "sst" | "chlorophyll" | "currents" | "bathymetry";
+
+export interface VectorOverlayToggles {
+  pfz: boolean;
+  imbl: boolean;
+  ais: boolean;
+  route: boolean;
+  currentsFlow: boolean;
+  mesh: boolean;
+  graticule: boolean;
+}
+
 export interface ThreeGlobeProps {
   className?: string;
   /** If true the globe auto-rotates very slowly when idle. Default: true */
@@ -22,7 +34,11 @@ export interface ThreeGlobeProps {
   onLocationSelect?: (coords: { lat: number; lon: number } | null) => void;
   /** Whether the right chat drawer is open (shifts controls out from under drawer) */
   chatOpen?: boolean;
-  /** Layer toggles */
+  /** Mutually exclusive environmental color field raster */
+  activeRaster?: EnvironmentalRasterType;
+  /** Direct map vector & point overlays */
+  vectorLayers?: Partial<VectorOverlayToggles>;
+  /** Layer toggles (legacy support) */
   layers?: {
     currents?: boolean;
     pfz?: boolean;
@@ -135,6 +151,8 @@ export default function ThreeGlobe({
   targetCoords = null,
   onLocationSelect,
   chatOpen = false,
+  activeRaster = "none",
+  vectorLayers,
   layers,
 }: ThreeGlobeProps) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -148,6 +166,21 @@ export default function ThreeGlobe({
   const toggleGridRef = useRef<() => void>(() => {});
 
   const [gridActive, setGridActive] = useState(true);
+
+  // Sync prop changes via refs so Three.js NEVER re-mounts or jitters
+  const activeRasterRef = useRef(activeRaster);
+  const vectorLayersRef = useRef(vectorLayers);
+  const updateLayersRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    activeRasterRef.current = activeRaster;
+    updateLayersRef.current();
+  }, [activeRaster]);
+
+  useEffect(() => {
+    vectorLayersRef.current = vectorLayers;
+    updateLayersRef.current();
+  }, [vectorLayers]);
 
   // Sync prop changes via refs so Three.js NEVER re-mounts or jitters
   const autoRotateRef = useRef(autoRotate);
@@ -250,6 +283,29 @@ export default function ThreeGlobe({
     });
     const earthMesh = new THREE.Mesh(earthGeo, earthMat);
     globeGroup.add(earthMesh);
+
+    // ── 4b. Environmental Color Raster Layer (Mutually Exclusive) ──
+    // Continuous colour field rasters: SST Thermal, Chlorophyll-a, Ocean Currents velocity, Bathymetry relief.
+    // Strictly ONE raster mode active at a time so colors never mix or muddy each other.
+    const sstTexture = textureLoader.load("/textures/sst_raster.png");
+    const chlTexture = textureLoader.load("/textures/chlorophyll_raster.png");
+    const currentsRasterTexture = textureLoader.load("/textures/currents_raster.png");
+    const bathyTexture = textureLoader.load("/textures/bathymetry_raster.png");
+    [sstTexture, chlTexture, currentsRasterTexture, bathyTexture].forEach((t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+    });
+
+    const rasterGeo = new THREE.SphereGeometry(radius + 0.045, 64, 64);
+    const rasterMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      side: THREE.FrontSide,
+    });
+    const rasterMesh = new THREE.Mesh(rasterGeo, rasterMat);
+    rasterMesh.visible = false;
+    globeGroup.add(rasterMesh);
 
     // Delicate Real Clouds Layer (slight elevation + independent drift)
     const cloudsGeo = new THREE.SphereGeometry(radius * 1.006, 64, 64);
@@ -610,7 +666,13 @@ export default function ThreeGlobe({
       gridMeshGroup.add(targetBoxMesh);
     };
 
-    // ── 8. Indian EEZ Sovereign Boundary Line (IMBL) ───────────────
+    // ── 8. DIRECT MAP VECTOR OVERLAYS (Can be combined simultaneously) ──
+    // Point, line, and polyline layers that render cleanly on top of ANY raster or satellite bedrock
+
+    // ── 8a. IMBL Sovereign Zone & 5nm Standoff Safety Buffer ───────────────
+    const imblGroup = new THREE.Group();
+    globeGroup.add(imblGroup);
+
     const EEZ_COORDS = [
       [23.5, 68.0], [22.0, 67.5], [20.0, 68.5], [18.0, 70.0],
       [15.0, 71.5], [12.0, 73.0], [9.0, 75.0], [7.0, 77.5],
@@ -624,11 +686,254 @@ export default function ThreeGlobe({
       dashSize: 1.8,
       gapSize: 1.2,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.85,
     });
     const eezLine = new THREE.Line(eezGeo, eezMat);
     eezLine.computeLineDistances();
-    globeGroup.add(eezLine);
+    imblGroup.add(eezLine);
+
+    // 5nm Standoff Buffer line (red dashed line offset seaward)
+    const bufferPoints = EEZ_COORDS.map(([lat, lon]) => latLonToVec3(lat, lon - 0.25, radius + 0.26));
+    const bufferGeo = new THREE.BufferGeometry().setFromPoints(bufferPoints);
+    const bufferMat = new THREE.LineDashedMaterial({
+      color: 0xef4444,
+      dashSize: 1.4,
+      gapSize: 1.0,
+      transparent: true,
+      opacity: 0.90,
+    });
+    const bufferLine = new THREE.Line(bufferGeo, bufferMat);
+    bufferLine.computeLineDistances();
+    imblGroup.add(bufferLine);
+
+    // ── 8b. PFZ Hotspots & Beacons (Potential Fishing Zones) ───────────────
+    const pfzGroup = new THREE.Group();
+    globeGroup.add(pfzGroup);
+
+    interface PulseRing {
+      mesh: THREE.Mesh;
+      mat: THREE.MeshBasicMaterial;
+      phase: number;
+    }
+    const pulseRings: PulseRing[] = [];
+
+    const PFZ_HOTSPOTS = [
+      { name: "Veraval Swell Front", lat: 20.75, lon: 70.19, color: 0xf59e0b },
+      { name: "Mumbai Shelf Deep", lat: 18.88, lon: 71.29, color: 0x10b981 },
+      { name: "Konkan Upwelling", lat: 16.12, lon: 72.85, color: 0x10b981 },
+      { name: "Goa Continental Drop", lat: 14.80, lon: 73.50, color: 0xf59e0b },
+      { name: "Mangalore Thermal Edge", lat: 12.85, lon: 74.20, color: 0x10b981 },
+      { name: "Kochi Bank Upwelling", lat: 9.93, lon: 75.80, color: 0xf59e0b },
+      { name: "Wadge Bank Sanctuary", lat: 7.60, lon: 77.20, color: 0xef4444 },
+      { name: "Gulf of Mannar Plume", lat: 8.80, lon: 78.80, color: 0x10b981 },
+      { name: "Chennai Pelagic Loop", lat: 13.08, lon: 80.80, color: 0xf59e0b },
+      { name: "Godavari Delta Shelf", lat: 16.50, lon: 82.60, color: 0x10b981 },
+      { name: "Visakhapatnam Deep Front", lat: 17.68, lon: 83.80, color: 0xf59e0b },
+      { name: "Paradip Bengal Front", lat: 20.10, lon: 87.20, color: 0x10b981 },
+      { name: "Lakshadweep Coral Ridge", lat: 10.56, lon: 72.64, color: 0xef4444 },
+      { name: "Andaman Trench Basin", lat: 11.62, lon: 92.72, color: 0xf59e0b },
+    ];
+
+    const beaconCoreGeo = new THREE.SphereGeometry(0.35, 16, 16);
+    const ringGeo = new THREE.RingGeometry(0.25, 0.95, 32);
+
+    PFZ_HOTSPOTS.forEach((loc, idx) => {
+      const pos = latLonToVec3(loc.lat, loc.lon, radius + 0.18);
+      const normal = pos.clone().normalize();
+
+      // Core Beacon marker
+      const bMat = new THREE.MeshBasicMaterial({ color: loc.color, depthWrite: false });
+      const bMesh = new THREE.Mesh(beaconCoreGeo, bMat);
+      bMesh.position.copy(pos);
+      pfzGroup.add(bMesh);
+
+      // Vertical pin stalk
+      const stalkPts = [latLonToVec3(loc.lat, loc.lon, radius), pos];
+      const stalkGeo = new THREE.BufferGeometry().setFromPoints(stalkPts);
+      const stalkMat = new THREE.LineBasicMaterial({ color: loc.color, transparent: true, opacity: 0.7 });
+      pfzGroup.add(new THREE.Line(stalkGeo, stalkMat));
+
+      // Concentric pulsing ring
+      const rMat = new THREE.MeshBasicMaterial({
+        color: loc.color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+      });
+      const rMesh = new THREE.Mesh(ringGeo, rMat);
+      rMesh.position.copy(pos.clone().add(normal.clone().multiplyScalar(0.02)));
+      rMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      pfzGroup.add(rMesh);
+
+      pulseRings.push({
+        mesh: rMesh,
+        mat: rMat,
+        phase: (idx / PFZ_HOTSPOTS.length) * Math.PI * 2,
+      });
+    });
+
+    // ── 8c. AIS Vessel Fleet Vectors ──────────────────────────────────────
+    const aisGroup = new THREE.Group();
+    globeGroup.add(aisGroup);
+
+    const AIS_VESSELS = [
+      { lat: 19.12, lon: 71.40, hdg: 215, type: "trawler" },
+      { lat: 18.60, lon: 70.80, hdg: 190, type: "cargo" },
+      { lat: 20.40, lon: 69.80, hdg: 130, type: "tanker" },
+      { lat: 15.20, lon: 72.90, hdg: 165, type: "trawler" },
+      { lat: 10.15, lon: 75.30, hdg: 340, type: "cargo" },
+      { lat: 8.10,  lon: 76.80, hdg: 110, type: "container" },
+      { lat: 6.80,  lon: 79.20, hdg: 270, type: "tanker" },
+      { lat: 12.60, lon: 81.20, hdg: 45,  type: "trawler" },
+      { lat: 14.50, lon: 82.80, hdg: 30,  type: "cargo" },
+      { lat: 18.20, lon: 85.00, hdg: 200, type: "tanker" },
+      { lat: 21.10, lon: 88.40, hdg: 180, type: "trawler" },
+      { lat: 9.20,  lon: 73.10, hdg: 310, type: "patrol" },
+      { lat: 22.20, lon: 68.10, hdg: 150, type: "trawler" },
+      { lat: 11.40, lon: 91.80, hdg: 60,  type: "cargo" },
+    ];
+
+    AIS_VESSELS.forEach((v) => {
+      const pos = latLonToVec3(v.lat, v.lon, radius + 0.18);
+      const normal = pos.clone().normalize();
+
+      const coneGeo = new THREE.ConeGeometry(0.24, 0.58, 3);
+      const coneMat = new THREE.MeshBasicMaterial({
+        color: v.type === "patrol" ? 0xef4444 : v.type === "trawler" ? 0x22c55e : 0x38bdf8,
+        depthWrite: false,
+      });
+      const cone = new THREE.Mesh(coneGeo, coneMat);
+      cone.position.copy(pos);
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+      aisGroup.add(cone);
+
+      const headingRad = (v.hdg * Math.PI) / 180;
+      const dLat = Math.cos(headingRad) * 0.55;
+      const dLon = Math.sin(headingRad) * 0.55;
+      const endPos = latLonToVec3(v.lat + dLat, v.lon + dLon, radius + 0.18);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([pos, endPos]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false,
+      });
+      aisGroup.add(new THREE.Line(lineGeo, lineMat));
+    });
+
+    // ── 8d. Optimal Hydrodynamic Navigation Route ─────────────────────────
+    const routeGroup = new THREE.Group();
+    globeGroup.add(routeGroup);
+
+    const ROUTE_NODES = [
+      [20.902, 70.368], // Veraval Commercial Harbor
+      [20.865, 70.320],
+      [20.820, 70.260],
+      [20.750, 70.190], // Prime PFZ Hotspot
+    ];
+    const rPts = ROUTE_NODES.map(([lat, lon]) => latLonToVec3(lat, lon, radius + 0.26));
+    const rGeo = new THREE.BufferGeometry().setFromPoints(rPts);
+    const rMat = new THREE.LineBasicMaterial({
+      color: 0x2563eb,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    });
+    routeGroup.add(new THREE.Line(rGeo, rMat));
+
+    ROUTE_NODES.forEach(([lat, lon], i) => {
+      const pt = latLonToVec3(lat, lon, radius + 0.27);
+      const wpGeo = new THREE.SphereGeometry(i === 0 || i === ROUTE_NODES.length - 1 ? 0.32 : 0.20, 12, 12);
+      const wpMat = new THREE.MeshBasicMaterial({ color: i === 0 ? 0x22c55e : 0x2563eb, depthWrite: false });
+      const wp = new THREE.Mesh(wpGeo, wpMat);
+      wp.position.copy(pt);
+      routeGroup.add(wp);
+    });
+
+    // ── 8e. Ocean Currents Flow Vectors (Directional Streamline Arrows) ───
+    const currentsFlowGroup = new THREE.Group();
+    globeGroup.add(currentsFlowGroup);
+
+    const flowPoints: THREE.Vector3[] = [];
+    for (let lat = 4; lat <= 20; lat += 2.5) {
+      for (let lon = 55; lon <= 88; lon += 3.5) {
+        if (lat > 12 && lat < 26 && lon > 74 && lon < 85) continue; // Skip mainland India
+
+        const p1 = latLonToVec3(lat, lon, radius + 0.19);
+        let angle = 0.2;
+        if (lon < 65) angle = 0.7; // Somali Jet heading NE
+        if (lon > 80 && lat < 12) angle = 0.1; // South Indian Ocean eastbound drift
+        if (lon > 82 && lat > 12) angle = 1.3; // Bay of Bengal anticyclonic turn
+
+        const arrowLen = 0.85;
+        const dLat = Math.sin(angle) * arrowLen;
+        const dLon = Math.cos(angle) * arrowLen;
+        const p2 = latLonToVec3(lat + dLat, lon + dLon, radius + 0.19);
+
+        const leftLat = lat + dLat - Math.sin(angle - 0.45) * 0.3;
+        const leftLon = lon + dLon - Math.cos(angle - 0.45) * 0.3;
+        const rightLat = lat + dLat - Math.sin(angle + 0.45) * 0.3;
+        const rightLon = lon + dLon - Math.cos(angle + 0.45) * 0.3;
+
+        flowPoints.push(p1, p2);
+        flowPoints.push(p2, latLonToVec3(leftLat, leftLon, radius + 0.19));
+        flowPoints.push(p2, latLonToVec3(rightLat, rightLon, radius + 0.19));
+      }
+    }
+
+    const flowGeo = new THREE.BufferGeometry().setFromPoints(flowPoints);
+    const flowMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.80,
+      depthWrite: false,
+    });
+    currentsFlowGroup.add(new THREE.LineSegments(flowGeo, flowMat));
+
+    // ── 9. DYNAMIC LAYER SYNC CALLBACK (No WebGL context recreation) ─────
+    updateLayersRef.current = () => {
+      // 1. Environmental Color Raster (MUTUALLY EXCLUSIVE)
+      const raster = activeRasterRef.current;
+      if (!raster || raster === "none") {
+        rasterMesh.visible = false;
+      } else if (raster === "sst") {
+        rasterMat.map = sstTexture;
+        rasterMat.opacity = 0.85;
+        rasterMesh.visible = true;
+        rasterMat.needsUpdate = true;
+      } else if (raster === "chlorophyll") {
+        rasterMat.map = chlTexture;
+        rasterMat.opacity = 0.88;
+        rasterMesh.visible = true;
+        rasterMat.needsUpdate = true;
+      } else if (raster === "currents") {
+        rasterMat.map = currentsRasterTexture;
+        rasterMat.opacity = 0.85;
+        rasterMesh.visible = true;
+        rasterMat.needsUpdate = true;
+      } else if (raster === "bathymetry") {
+        rasterMat.map = bathyTexture;
+        rasterMat.opacity = 0.88;
+        rasterMesh.visible = true;
+        rasterMat.needsUpdate = true;
+      }
+
+      // 2. Direct Map Vector & Point Overlays (INDEPENDENT MULTI-SELECT)
+      const vl = vectorLayersRef.current;
+      if (vl) {
+        pfzGroup.visible = vl.pfz !== false;
+        imblGroup.visible = vl.imbl !== false;
+        aisGroup.visible = vl.ais !== false;
+        routeGroup.visible = vl.route !== false;
+        currentsFlowGroup.visible = vl.currentsFlow !== false;
+        gridMeshGroup.visible = vl.mesh !== false || vl.graticule !== false;
+      }
+    };
+
+    // Initial layer sync
+    updateLayersRef.current();
 
     // ── 10. Initial Orientation: Focused on India / Arabian Sea ─────
     const DEFAULT_ROT_X = (19.0 * Math.PI) / 180;
@@ -904,6 +1209,16 @@ export default function ThreeGlobe({
       // Delicate cloud atmospheric drift
       cloudsMesh.rotation.y += 0.00015;
 
+      // Animate PFZ beacon pulsing rings
+      pulseRings.forEach((pr) => {
+        const s = 1.0 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.8 + pr.phase));
+        pr.mesh.scale.set(s, s, s);
+        pr.mat.opacity = Math.max(0.12, 0.85 - 0.45 * (s - 1.0));
+      });
+
+      // Animate subtle flow on currents streamline arrows
+      flowMat.opacity = 0.60 + 0.25 * Math.sin(t * 2.2);
+
       // Direct DOM update for Compass needle and tooltip
       const headingDeg = Math.round((-globeGroup.rotation.y * 180 / Math.PI) % 360);
       const normalizedHeading = headingDeg < 0 ? headingDeg + 360 : headingDeg;
@@ -974,6 +1289,10 @@ export default function ThreeGlobe({
       earthDayMap.dispose();
       earthSpecularMap.dispose();
       earthCloudsMap.dispose();
+      sstTexture.dispose();
+      chlTexture.dispose();
+      currentsRasterTexture.dispose();
+      bathyTexture.dispose();
 
       // Dispose all active tile cache meshes and textures
       for (const [, item] of tileCache.entries()) {
