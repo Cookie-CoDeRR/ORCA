@@ -164,7 +164,8 @@ interface TileCacheItem {
   mesh: THREE.Mesh;
   geo: THREE.BufferGeometry;
   mat: THREE.MeshBasicMaterial;
-  texture: THREE.Texture;
+  texture: THREE.Texture | null;
+  loaded: boolean;
   lastUsed: number;
   z: number;
 }
@@ -475,8 +476,8 @@ export default function ThreeGlobe({
       depthWrite: false,
     });
 
-    const dLat = 0.045; // 5.0 km
-    const dLon = 0.054; // 6.0 km
+    const dLat = 0.18; // ~20.0 km tactical sector grid
+    const dLon = 0.20; // ~22.0 km tactical sector grid
     const finePoints: THREE.Vector3[] = [];
 
     for (let lat = -3.0; lat <= 27.0001; lat += dLat) {
@@ -892,8 +893,8 @@ export default function ThreeGlobe({
 
       const n = Math.pow(2, z);
       const centerTile = latLonToTile(centerLat, centerLon, z);
-      // span 3 creates a 7x7 tile cluster (49 tiles) which strictly covers 3x+ viewport FOV
-      const span = 3;
+      // span 2 creates a 5x5 tile cluster (25 tiles) which covers 2.5x viewport FOV with minimal GPU payload
+      const span = 2;
 
       const requiredKeys = new Set<string>();
 
@@ -909,7 +910,9 @@ export default function ThreeGlobe({
           const existing = tileCache.get(key);
           if (existing) {
             existing.lastUsed = Date.now();
-            existing.mesh.visible = true;
+            if (existing.loaded) {
+              existing.mesh.visible = true;
+            }
           } else {
             const { latMin, latMax, lonMin, lonMax } = tileToBounds(x, y, z);
             const geo = createTileGeometry(latMin, latMax, lonMin, lonMax, radius + 0.002, 6);
@@ -923,10 +926,22 @@ export default function ThreeGlobe({
             });
 
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.visible = false;
+            mesh.visible = false; // strictly false until texture is downloaded
             tiledSatelliteGroup.add(mesh);
 
-            const texture = tileLoader.load(
+            const item: TileCacheItem = {
+              key,
+              mesh,
+              geo,
+              mat,
+              texture: null,
+              loaded: false,
+              lastUsed: Date.now(),
+              z,
+            };
+            tileCache.set(key, item);
+
+            tileLoader.load(
               url,
               (t) => {
                 t.colorSpace = THREE.SRGBColorSpace;
@@ -935,23 +950,19 @@ export default function ThreeGlobe({
                 t.generateMipmaps = true;
                 mat.map = t;
                 mat.needsUpdate = true;
-                mesh.visible = true;
+                item.loaded = true;
+                item.texture = t;
+                if (requiredKeys.has(key)) {
+                  mesh.visible = true;
+                }
               },
               undefined,
               () => {
-                // Offline fallback - keeps base 4K imagery visible
+                // If fetch fails or rate limited, keep mesh hidden so base 4K imagery shows cleanly
+                item.loaded = false;
+                mesh.visible = false;
               }
             );
-
-            tileCache.set(key, {
-              key,
-              mesh,
-              geo,
-              mat,
-              texture,
-              lastUsed: Date.now(),
-              z,
-            });
           }
         }
       }
@@ -963,17 +974,17 @@ export default function ThreeGlobe({
         }
       }
 
-      // Memory safeguard: LRU pruning when cache exceeds 130 tiles
-      if (tileCache.size > 130) {
+      // Memory safeguard: LRU pruning when cache exceeds 80 tiles
+      if (tileCache.size > 80) {
         const entries = Array.from(tileCache.entries()).sort(
           (a, b) => a[1].lastUsed - b[1].lastUsed
         );
-        const toRemove = entries.slice(0, entries.length - 85);
+        const toRemove = entries.slice(0, entries.length - 50);
         for (const [k, item] of toRemove) {
           if (!requiredKeys.has(k)) {
             tiledSatelliteGroup.remove(item.mesh);
             item.geo.dispose();
-            item.texture.dispose();
+            if (item.texture) item.texture.dispose();
             item.mat.dispose();
             tileCache.delete(k);
           }
@@ -1196,7 +1207,7 @@ export default function ThreeGlobe({
     let animId: number;
     let frameCount = 0;
     let lastReportedZoom = 1.0;
-    let lastCheckedAlt = DEFAULT_DIST - radius;
+    let lastScreenRadiusPx = -1;
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -1210,7 +1221,10 @@ export default function ThreeGlobe({
       const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
       const screenH = mount.clientHeight || window.innerHeight;
       const screenRadiusPx = Math.round((radius / (camera.position.z * tanHalfFov)) * (screenH / 2));
-      document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
+      if (Math.abs(screenRadiusPx - lastScreenRadiusPx) >= 2) {
+        lastScreenRadiusPx = screenRadiusPx;
+        document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
+      }
 
       const altitude = Math.max(0.025, camera.position.z - radius);
 
@@ -1274,21 +1288,22 @@ export default function ThreeGlobe({
       // ── Progressive Google Maps style grid LOD fading (Strictly Single Grid) ──
       // Level 1: Major 10° global graticule
       majorMat.opacity = THREE.MathUtils.lerp(0.02, 0.18, Math.min(1, altitude / 70));
+      majorMesh.visible = majorMat.opacity > 0.005;
 
       // Level 2: Regional 2° graticule
-      // Fades in between alt 80 and alt 25, fades completely to 0 below alt 12
       const medAlpha = altitude > 80 ? 0 : altitude > 25 ? (80 - altitude) / 55 : Math.max(0, (altitude - 12) / 13);
       medMat.opacity = medAlpha * 0.22;
+      medMesh.visible = medMat.opacity > 0.005;
 
       // Level 3: 0.5° Sub-Regional Grid (~55km)
-      // Active between alt 25 and alt 7, fades completely to 0 below alt 5.5
       const subAlpha = altitude > 25 ? 0 : altitude > 12 ? (25 - altitude) / 13 : Math.max(0, (altitude - 5.5) / 6.5);
       subRegionalMat.opacity = subAlpha * 0.30;
+      subRegionalMesh.visible = subRegionalMat.opacity > 0.005;
 
-      // Level 4: 6km x 5km Tactical Mesh
-      // Fades in smoothly as altitude drops below 6.5, reaches full opacity below alt 4
+      // Level 4: Tactical Mesh
       const fineAlpha = altitude > 6.5 ? 0 : Math.min(1.0, (6.5 - altitude) / 2.5);
       fineMat.opacity = fineAlpha * 0.70;
+      fineGridMesh.visible = fineMat.opacity > 0.005;
 
       renderer.render(scene, camera);
     };
@@ -1329,7 +1344,7 @@ export default function ThreeGlobe({
       for (const [, item] of tileCache.entries()) {
         tiledSatelliteGroup.remove(item.mesh);
         item.geo.dispose();
-        item.texture.dispose();
+        if (item.texture) item.texture.dispose();
         item.mat.dispose();
       }
       tileCache.clear();
