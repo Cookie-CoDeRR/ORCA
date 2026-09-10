@@ -300,7 +300,6 @@ export default function ThreeGlobe({
     });
 
     const earthSpecularMap = textureLoader.load("/textures/earth_specular.jpg");
-    const earthCloudsMap = textureLoader.load("/textures/earth_clouds.jpg");
 
     // Earth Sphere with Photorealistic Satellite Imagery & Specular Ocean Reflection
     const earthGeo = new THREE.SphereGeometry(radius, 64, 64);
@@ -343,18 +342,6 @@ export default function ThreeGlobe({
     const rasterMesh = new THREE.Mesh(rasterGeo, rasterMat);
     rasterMesh.visible = false;
     globeGroup.add(rasterMesh);
-
-    // Delicate Real Clouds Layer (slight elevation + independent drift)
-    const cloudsGeo = new THREE.SphereGeometry(radius * 1.006, 64, 64);
-    const cloudsMat = new THREE.MeshPhongMaterial({
-      map: earthCloudsMap,
-      transparent: true,
-      opacity: 0.28,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const cloudsMesh = new THREE.Mesh(cloudsGeo, cloudsMat);
-    globeGroup.add(cloudsMesh);
 
     // ── 5. Atmospheric Rayleigh Scatter Rim Glow ──────────────────
     const atmoGeo = new THREE.SphereGeometry(radius * 1.12, 64, 64);
@@ -1262,9 +1249,6 @@ export default function ThreeGlobe({
       globeGroup.rotation.y += (targetRotY - globeGroup.rotation.y) * 0.08;
       globeGroup.rotation.x += (targetRotX - globeGroup.rotation.x) * 0.08;
 
-      // Delicate cloud atmospheric drift
-      cloudsMesh.rotation.y += 0.00015;
-
       // Animate PFZ beacon pulsing rings (tactical radar beacon pulse)
       pulseRings.forEach((pr) => {
         const s = 1.0 + 0.30 * (0.5 + 0.5 * Math.sin(t * 2.8 + pr.phase));
@@ -1336,7 +1320,6 @@ export default function ThreeGlobe({
       renderer.dispose();
       earthDayMap.dispose();
       earthSpecularMap.dispose();
-      earthCloudsMap.dispose();
       sstTexture.dispose();
       chlTexture.dispose();
       currentsRasterTexture.dispose();

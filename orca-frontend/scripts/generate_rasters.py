@@ -9,11 +9,17 @@ from PIL import ImageFilter
 spec_img = Image.open("public/textures/earth_specular.jpg").convert("L")
 WIDTH, HEIGHT = 4096, 2048
 mask_img = spec_img.resize((WIDTH, HEIGHT), Image.Resampling.BILINEAR)
-mask = np.array(mask_img) > 100
+
+# Remove 8x8 JPEG compression block artifacts with heavy Gaussian blur
+spec_clean = mask_img.filter(ImageFilter.GaussianBlur(radius=8))
+spec_arr = np.array(spec_clean, dtype=np.float32) / 255.0
+water_binary = (spec_arr > 0.25).astype(np.float32)
+mask = water_binary > 0.5
 
 # Smooth coastal feathering for soft alpha blending
-smooth_mask = np.array(mask_img.filter(ImageFilter.GaussianBlur(radius=3))) / 255.0
-WATER_ALPHA = (smooth_mask * 155).astype(np.uint8)
+smooth_water = Image.fromarray((water_binary * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=6))
+smooth_mask = np.array(smooth_water, dtype=np.float32) / 255.0
+WATER_ALPHA = (smooth_mask * 150).astype(np.uint8)
 
 # Coordinate grids for equirectangular projection
 # Lat: +90 to -90, Lon: -180 to +180
