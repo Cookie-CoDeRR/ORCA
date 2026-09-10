@@ -72,7 +72,102 @@ const vec3ToLatLon = (vec3: THREE.Vector3): { lat: number; lon: number } => {
   return { lat, lon };
 };
 
+const latLonToTile = (lat: number, lon: number, z: number) => {
+  const n = Math.pow(2, z);
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
+  );
+  return {
+    x: Math.max(0, Math.min(n - 1, x)),
+    y: Math.max(0, Math.min(n - 1, y)),
+  };
+};
 
+const tileToBounds = (x: number, y: number, z: number) => {
+  const n = Math.pow(2, z);
+  const lonMin = (x / n) * 360 - 180;
+  const lonMax = ((x + 1) / n) * 360 - 180;
+  const latMaxRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+  const latMinRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+  const latMax = (latMaxRad * 180) / Math.PI;
+  const latMin = (latMinRad * 180) / Math.PI;
+  return { latMin, latMax, lonMin, lonMax };
+};
+
+const createTileGeometry = (
+  latMin: number,
+  latMax: number,
+  lonMin: number,
+  lonMax: number,
+  r: number,
+  segs: number = 6
+) => {
+  const geo = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let j = 0; j <= segs; j++) {
+    const v = j / segs;
+    const lat = latMax - v * (latMax - latMin);
+    const phi = ((90 - lat) * Math.PI) / 180;
+
+    for (let i = 0; i <= segs; i++) {
+      const u = i / segs;
+      const lon = lonMin + u * (lonMax - lonMin);
+      const theta = ((lon + 180) * Math.PI) / 180;
+
+      const x = -r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.cos(phi);
+      const z = r * Math.sin(phi) * Math.sin(theta);
+
+      positions.push(x, y, z);
+      uvs.push(u, 1 - v);
+    }
+  }
+
+  const rowSize = segs + 1;
+  for (let j = 0; j < segs; j++) {
+    for (let i = 0; i < segs; i++) {
+      const a = j * rowSize + i;
+      const b = j * rowSize + (i + 1);
+      const c = (j + 1) * rowSize + i;
+      const d = (j + 1) * rowSize + (i + 1);
+
+      indices.push(a, c, b);
+      indices.push(b, c, d);
+    }
+  }
+
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+};
+
+const getTileZoomLevel = (altitude: number): number => {
+  if (altitude > 24) return 0; // base 4K texture is sharp enough for whole hemisphere
+  if (altitude > 9.0) return 6; // ~5.6° per tile, covers subcontinent
+  if (altitude > 2.8) return 8; // ~1.4° per tile, regional coastline
+  if (altitude > 0.8) return 10; // ~0.35° per tile, coastal bay / gulf
+  if (altitude > 0.22) return 12; // ~0.088° per tile, coastal harbor & entrance channel
+  if (altitude > 0.065) return 14; // ~0.022° per tile, inner harbor / port terminals
+  if (altitude > 0.022) return 16; // ~0.0055° per tile (~600m), piers, breakwaters, docks
+  return 17; // ~0.0027° per tile (~300m), sub-meter vessel & crane resolution
+};
+
+interface TileCacheItem {
+  key: string;
+  mesh: THREE.Mesh;
+  geo: THREE.BufferGeometry;
+  mat: THREE.MeshBasicMaterial;
+  texture: THREE.Texture;
+  lastUsed: number;
+  z: number;
+}
 
 export default function ThreeGlobe({
   className = "",
@@ -217,6 +312,14 @@ export default function ThreeGlobe({
     const earthMesh = new THREE.Mesh(earthGeo, earthMat);
     globeGroup.add(earthMesh);
 
+    // ── 4a. Dynamic High-Resolution Satellite Tile Group (ArcGIS World Imagery) ──
+    const tiledSatelliteGroup = new THREE.Group();
+    globeGroup.add(tiledSatelliteGroup);
+
+    const tileCache = new Map<string, TileCacheItem>();
+    const tileLoader = new THREE.TextureLoader();
+    tileLoader.setCrossOrigin("anonymous");
+
     // ── 4b. Environmental Color Raster Layer (Mutually Exclusive) ──
     // Continuous colour field rasters: SST Thermal, Chlorophyll-a, Ocean Currents velocity, Bathymetry relief.
     // Strictly ONE raster mode active at a time so colors never mix or muddy each other.
@@ -229,7 +332,7 @@ export default function ThreeGlobe({
       t.anisotropy = 8;
     });
 
-    const rasterGeo = new THREE.SphereGeometry(radius + 0.005, 64, 64);
+    const rasterGeo = new THREE.SphereGeometry(radius + 0.006, 64, 64);
     const rasterMat = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0.55,
@@ -763,6 +866,121 @@ export default function ThreeGlobe({
     let targetRotY = DEFAULT_ROT_Y;
     let targetRotX = DEFAULT_ROT_X;
 
+    // ── 10a. Dynamic High-Resolution Tile Fetcher & Seamless Stacking ──
+    let lastTileUpdate = 0;
+
+    const updateTiledSatellite = (force = false) => {
+      const now = performance.now();
+      if (!force && now - lastTileUpdate < 150) return;
+      lastTileUpdate = now;
+
+      const altitude = Math.max(0.015, camera.position.z - radius);
+      const z = getTileZoomLevel(altitude);
+
+      if (z === 0) {
+        tiledSatelliteGroup.visible = false;
+        return;
+      }
+
+      tiledSatelliteGroup.visible = true;
+
+      // Surface coordinate facing the camera
+      const facingVec = new THREE.Vector3(0, 0, radius).applyQuaternion(
+        globeGroup.quaternion.clone().invert()
+      );
+      const { lat: centerLat, lon: centerLon } = vec3ToLatLon(facingVec);
+
+      const n = Math.pow(2, z);
+      const centerTile = latLonToTile(centerLat, centerLon, z);
+      // span 3 creates a 7x7 tile cluster (49 tiles) which strictly covers 3x+ viewport FOV
+      const span = 3;
+
+      const requiredKeys = new Set<string>();
+
+      for (let dy = -span; dy <= span; dy++) {
+        const y = centerTile.y + dy;
+        if (y < 0 || y >= n) continue;
+
+        for (let dx = -span; dx <= span; dx++) {
+          const x = (centerTile.x + dx + n) % n;
+          const key = `${z}_${x}_${y}`;
+          requiredKeys.add(key);
+
+          const existing = tileCache.get(key);
+          if (existing) {
+            existing.lastUsed = Date.now();
+            existing.mesh.visible = true;
+          } else {
+            const { latMin, latMax, lonMin, lonMax } = tileToBounds(x, y, z);
+            const geo = createTileGeometry(latMin, latMax, lonMin, lonMax, radius + 0.002, 6);
+            const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+
+            const mat = new THREE.MeshBasicMaterial({
+              side: THREE.FrontSide,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -1,
+            });
+
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.visible = false;
+            tiledSatelliteGroup.add(mesh);
+
+            const texture = tileLoader.load(
+              url,
+              (t) => {
+                t.colorSpace = THREE.SRGBColorSpace;
+                t.minFilter = THREE.LinearMipmapLinearFilter;
+                t.magFilter = THREE.LinearFilter;
+                t.generateMipmaps = true;
+                mat.map = t;
+                mat.needsUpdate = true;
+                mesh.visible = true;
+              },
+              undefined,
+              () => {
+                // Offline fallback - keeps base 4K imagery visible
+              }
+            );
+
+            tileCache.set(key, {
+              key,
+              mesh,
+              geo,
+              mat,
+              texture,
+              lastUsed: Date.now(),
+              z,
+            });
+          }
+        }
+      }
+
+      // Hide tiles from mismatched zoom tiers
+      for (const [k, item] of tileCache.entries()) {
+        if (!requiredKeys.has(k) && item.z !== z) {
+          item.mesh.visible = false;
+        }
+      }
+
+      // Memory safeguard: LRU pruning when cache exceeds 130 tiles
+      if (tileCache.size > 130) {
+        const entries = Array.from(tileCache.entries()).sort(
+          (a, b) => a[1].lastUsed - b[1].lastUsed
+        );
+        const toRemove = entries.slice(0, entries.length - 85);
+        for (const [k, item] of toRemove) {
+          if (!requiredKeys.has(k)) {
+            tiledSatelliteGroup.remove(item.mesh);
+            item.geo.dispose();
+            item.texture.dispose();
+            item.mat.dispose();
+            tileCache.delete(k);
+          }
+        }
+      }
+    };
+
     // External target coordinate setter: smooth centering and deep tactical zoom
     updateTargetRef.current = (lat: number, lon: number) => {
       targetRotX = (lat * Math.PI) / 180;
@@ -777,6 +995,7 @@ export default function ThreeGlobe({
 
       createTargetBox(lat, lon);
       updateRemoteGrid(lat, lon);
+      updateTiledSatellite(true);
     };
 
     if (targetCoordsRef.current) {
@@ -795,6 +1014,7 @@ export default function ThreeGlobe({
         const newAltitude = Math.max(0.025, currentAltitude * 0.55);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
+      updateTiledSatellite(true);
     };
 
     zoomInRef.current = () => applyZoom(-1);
@@ -821,6 +1041,7 @@ export default function ThreeGlobe({
       if (onLocationSelectRef.current) {
         onLocationSelectRef.current(null);
       }
+      updateTiledSatellite(true);
     };
     toggleGridRef.current = () => {
       gridMeshGroup.visible = !gridMeshGroup.visible;
@@ -854,6 +1075,7 @@ export default function ThreeGlobe({
         const newAltitude = Math.max(0.025, currentAltitude * inFactor);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
+      updateTiledSatellite();
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -865,6 +1087,7 @@ export default function ThreeGlobe({
 
     const onMouseUp = () => {
       isDragging = false;
+      updateTiledSatellite(true);
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -956,6 +1179,7 @@ export default function ThreeGlobe({
     const onTouchEnd = () => {
       isDragging = false;
       touchDistanceStart = 0;
+      updateTiledSatellite(true);
     };
 
     mount.addEventListener("wheel", onWheel, { passive: false });
@@ -989,6 +1213,11 @@ export default function ThreeGlobe({
       document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
 
       const altitude = Math.max(0.025, camera.position.z - radius);
+
+      // Refresh detailed satellite tiles seamlessly during camera translation / zoom
+      if (frameCount % 10 === 0) {
+        updateTiledSatellite();
+      }
 
       // Update zoom readout badge directly in DOM (no React re-renders)
       const zoomX = Math.round((DEFAULT_DIST - radius) / Math.max(0.025, altitude));
@@ -1097,6 +1326,13 @@ export default function ThreeGlobe({
       chlTexture.dispose();
       currentsRasterTexture.dispose();
       bathyTexture.dispose();
+      for (const [, item] of tileCache.entries()) {
+        tiledSatelliteGroup.remove(item.mesh);
+        item.geo.dispose();
+        item.texture.dispose();
+        item.mat.dispose();
+      }
+      tileCache.clear();
     };
   }, [radius]);
 
