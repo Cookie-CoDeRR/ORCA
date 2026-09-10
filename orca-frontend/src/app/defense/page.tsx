@@ -48,51 +48,48 @@ const TERRAIN_DEM_SOURCE = {
   maxzoom: 15,
 };
 
-function buildDefenseMapStyle(): any {
-  return {
-    version: 8,
-    sources: {
-      "carto-voyager": {
-        type: "raster",
-        tiles: [
-          `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-          `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
-        ],
-        tileSize: 256,
-        attribution: "© CARTO, © OpenStreetMap contributors",
-      },
-      "terrain-dem": TERRAIN_DEM_SOURCE,
+const DEFENSE_MAP_STYLE: any = {
+  version: 8,
+  projection: {
+    type: "mercator",
+  },
+  sources: {
+    "carto-voyager": {
+      type: "raster",
+      tiles: [
+        `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+        `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${CARTO_API_KEY}`,
+      ],
+      tileSize: 256,
+      attribution: "© CARTO, © OpenStreetMap contributors",
     },
-    terrain: {
+    "terrain-dem": TERRAIN_DEM_SOURCE,
+  },
+  layers: [
+    {
+      id: "carto-voyager-tiles",
+      type: "raster",
+      source: "carto-voyager",
+      minzoom: 0,
+      maxzoom: 20,
+    },
+    {
+      id: "hillshade-relief",
+      type: "hillshade",
       source: "terrain-dem",
-      exaggeration: 2.2,
+      minzoom: 0,
+      maxzoom: 18,
+      paint: {
+        "hillshade-shadow-color": "#94a3b8",
+        "hillshade-highlight-color": "#ffffff",
+        "hillshade-accent-color": "#cbd5e1",
+        "hillshade-exaggeration": 0.45,
+      },
     },
-    layers: [
-      {
-        id: "carto-voyager-tiles",
-        type: "raster",
-        source: "carto-voyager",
-        minzoom: 0,
-        maxzoom: 20,
-      },
-      {
-        id: "hillshade-relief",
-        type: "hillshade",
-        source: "terrain-dem",
-        minzoom: 0,
-        maxzoom: 18,
-        paint: {
-          "hillshade-shadow-color": "#94a3b8",
-          "hillshade-highlight-color": "#ffffff",
-          "hillshade-accent-color": "#cbd5e1",
-          "hillshade-exaggeration": 0.45,
-        },
-      },
-    ],
-  };
-}
+  ],
+};
 
 interface Message {
   id: string;
@@ -352,7 +349,7 @@ Click any border coordinate or run tactical intercept simulations below.`,
     );
   }
 
-  const defenseMapStyle = buildDefenseMapStyle();
+  const defenseMapStyle = DEFENSE_MAP_STYLE;
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-slate-100 text-zinc-900 font-sans">

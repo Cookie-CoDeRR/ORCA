@@ -1,95 +1,112 @@
-"use client";
 import Image from "next/image";
 import Link from "next/link";
-
-const CAPABILITIES = [
-  { value: "Agent Swarm", label: "6-Engine Consensus", sub: "Decentralized LangGraph mesh" },
-  { value: "72 hrs", label: "Cyclone Horizon", sub: "Autonomous harbor routing" },
-  { value: "15%–22%", label: "Fuel Saved", sub: "Vector A* current drift solver" },
-  { value: "Border Shield", label: "Zero IMBL Crossings", sub: "Audio-visual standoff geofence" },
-];
+import { ArrowRight, Compass } from "lucide-react";
 
 export default function Hero() {
   return (
-    <section className="relative h-screen min-h-[680px] flex items-center overflow-hidden">
-      {/* Background image — Indian Ocean from space */}
+    <section className="relative min-h-[90vh] lg:min-h-screen pt-28 pb-20 flex flex-col justify-between overflow-hidden bg-[#070B14]">
+      {/* Background Satellite Imagery — Indian Ocean from Orbit */}
       <Image
         src="/images/landing/hero.jpg"
-        alt="Indian Ocean from space at night"
+        alt="Indian Ocean from orbit at night with coastal lights"
         fill
         priority
+        quality={85}
         className="object-cover object-center scale-105"
         sizes="100vw"
       />
 
-      {/* Overlays: dark on top for readability, smoothly fading to pure white at bottom */}
-      <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/60" />
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-transparent" />
+      {/* Dark editorial vignettes: protects readability while showcasing Earth & city lights */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#070B14] via-transparent to-black/70" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#070B14]/90 via-[#070B14]/50 to-transparent" />
 
-      {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="max-w-2xl">
-          {/* Clean status indicator pill */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 shadow-sm mb-6">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-900 text-xs font-bold tracking-wider uppercase font-mono">
-              Live — 7,516 km EEZ Under Watch
+      {/* Main Headline Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-8 sm:pt-14 my-auto">
+        <div className="max-w-3xl">
+          {/* Subtle Project Identifier Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white text-xs mb-6 shadow-xs font-sans">
+            <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
+            <span className="font-medium text-slate-200">
+              ORCA · Autonomous Marine Platform
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight drop-shadow-md">
-            Sovereign{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-blue-200">
-              Marine Intelligence
-            </span>{" "}
-            for India&apos;s Waters
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.08] drop-shadow-md font-sans">
+            Marine Intelligence <br className="hidden sm:inline" />
+            for <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-blue-200 to-white">India&apos;s Waters</span>
           </h1>
 
-          <p className="mt-6 text-lg text-slate-100 max-w-xl leading-relaxed drop-shadow-sm font-normal">
-            Real-time AI agent mesh monitoring India&apos;s 7,516 km coastline — fisheries safety,
-            cyclone prediction, vector fuel conservation, and maritime defense.
+          <p className="mt-6 text-base sm:text-lg text-slate-200 leading-relaxed font-normal max-w-2xl drop-shadow-sm font-sans">
+            ORCA combines satellite, oceanographic, and scientific data to help understand fisheries, marine conditions, coastal risks, and ocean dynamics across the Indian Ocean basin.
           </p>
 
-          {/* CTAs */}
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          {/* Exactly Two Primary Actions + Secondary Advisory Link */}
+          <div className="mt-8 flex flex-wrap items-center gap-4 sm:gap-6 font-sans">
+            <Link
+              href="/research/data"
+              className="px-6 py-3 rounded-lg bg-[#1F4E8C] hover:bg-[#183E70] text-white font-semibold text-sm transition-all duration-200 shadow-sm flex items-center gap-2"
+            >
+              <span>Explore Ocean Data</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
             <Link
               href="/dashboard"
-              className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all duration-200 shadow-xl shadow-blue-950/40"
+              className="px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-all duration-200 border border-white/20 backdrop-blur-sm"
             >
-              Explore Dashboard →
+              Ask ORCA
             </Link>
-            <Link
-              href="#mission"
-              className="px-6 py-3 rounded-lg bg-white/90 hover:bg-white text-slate-900 font-semibold text-sm transition-all duration-200 shadow-sm border border-slate-200/80 backdrop-blur-sm"
-            >
-              Mission Overview
-            </Link>
-          </div>
 
-          {/* Platform Capability Highlights */}
-          <div className="mt-12 flex flex-wrap gap-4">
-            {CAPABILITIES.map((s, i) => (
-              <div
-                key={s.label}
-                className={`bg-white/95 backdrop-blur-md border border-white/80 px-4 py-2.5 rounded-lg shadow-sm animate-fade-in-up stagger-${
-                  i + 1
-                }`}
-              >
-                <div className="text-xl font-bold text-slate-950 font-mono">{s.value}</div>
-                <div className="text-xs text-slate-800 font-bold mt-0.5">{s.label}</div>
-                <div className="text-[10px] text-slate-500 font-mono">{s.sub}</div>
-              </div>
-            ))}
+            <Link
+              href="/research/reports"
+              className="text-xs sm:text-sm font-medium text-sky-300 hover:text-white transition-colors flex items-center gap-1.5 ml-1"
+            >
+              <span>View latest advisory</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Bottom scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 opacity-70">
-        <span className="text-slate-800 text-xs font-semibold tracking-widest">SCROLL</span>
-        <svg className="animate-bounce w-4 h-4 text-slate-800" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+      {/* Horizontal Statistics Strip (No cards, thin vertical dividers) */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-10 pb-4">
+        <div className="border-t border-white/15 pt-6 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-white">
+          <div className="space-y-1">
+            <div className="text-2xl sm:text-3xl font-semibold font-mono tracking-tight text-white">
+              7,516 km
+            </div>
+            <div className="text-xs font-normal text-slate-300 font-sans">
+              Coastline monitored
+            </div>
+          </div>
+
+          <div className="space-y-1 border-l-0 md:border-l border-white/15 md:pl-8">
+            <div className="text-2xl sm:text-3xl font-semibold font-mono tracking-tight text-white">
+              1.2M+ km²
+            </div>
+            <div className="text-xs font-normal text-slate-300 font-sans">
+              Maritime area (EEZ)
+            </div>
+          </div>
+
+          <div className="space-y-1 border-l-0 md:border-l border-white/15 md:pl-8">
+            <div className="text-2xl sm:text-3xl font-semibold font-mono tracking-tight text-sky-300">
+              72 hrs
+            </div>
+            <div className="text-xs font-normal text-slate-300 font-sans">
+              Forecast horizon
+            </div>
+          </div>
+
+          <div className="space-y-1 border-l-0 md:border-l border-white/15 md:pl-8">
+            <div className="text-2xl sm:text-3xl font-semibold font-mono tracking-tight text-[#10B981]">
+              94.3%
+            </div>
+            <div className="text-xs font-normal text-slate-300 font-sans">
+              Data coverage
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

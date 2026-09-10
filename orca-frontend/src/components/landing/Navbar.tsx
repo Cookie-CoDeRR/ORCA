@@ -11,21 +11,40 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
+  const [navTheme, setNavTheme] = useState<"top" | "darkGlass" | "light">("top");
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => {
+      const y = window.scrollY;
+      const heroThreshold = window.innerHeight ? window.innerHeight - 80 : 650;
+      if (y > heroThreshold) {
+        setNavTheme("light");
+      } else if (y > 20) {
+        setNavTheme("darkGlass");
+      } else {
+        setNavTheme("top");
+      }
+    };
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
+
+  const isLight = navTheme === "light";
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
+        navTheme === "light"
           ? "bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs text-slate-900"
-          : "bg-gradient-to-b from-black/70 via-black/30 to-transparent text-white"
+          : navTheme === "darkGlass"
+          ? "bg-slate-950/85 backdrop-blur-md shadow-lg text-white"
+          : "bg-gradient-to-b from-black/80 via-black/40 to-transparent text-white"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -34,12 +53,12 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-2 group">
             {/* Sonar ring SVG icon */}
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="3" fill={scrolled ? "#1e3a8a" : "#38bdf8"} />
-              <circle cx="16" cy="16" r="7" stroke={scrolled ? "#1e3a8a" : "#38bdf8"} strokeWidth="1.5" strokeOpacity="0.7" />
-              <circle cx="16" cy="16" r="12" stroke={scrolled ? "#1e3a8a" : "#38bdf8"} strokeWidth="1" strokeOpacity="0.35" />
-              <line x1="16" y1="16" x2="28" y2="5" stroke={scrolled ? "#1e3a8a" : "#38bdf8"} strokeWidth="1.5" strokeOpacity="0.8" strokeLinecap="round" />
+              <circle cx="16" cy="16" r="3" fill={isLight ? "#1e3a8a" : "#38bdf8"} />
+              <circle cx="16" cy="16" r="7" stroke={isLight ? "#1e3a8a" : "#38bdf8"} strokeWidth="1.5" strokeOpacity="0.7" />
+              <circle cx="16" cy="16" r="12" stroke={isLight ? "#1e3a8a" : "#38bdf8"} strokeWidth="1" strokeOpacity="0.35" />
+              <line x1="16" y1="16" x2="28" y2="5" stroke={isLight ? "#1e3a8a" : "#38bdf8"} strokeWidth="1.5" strokeOpacity="0.8" strokeLinecap="round" />
             </svg>
-            <span className={`font-bold text-xl tracking-widest ${scrolled ? "text-slate-950" : "text-white"}`}>
+            <span className={`font-bold text-xl tracking-widest ${isLight ? "text-slate-950" : "text-white"}`}>
               ORCA
             </span>
           </Link>
@@ -51,7 +70,7 @@ export default function Navbar() {
                 key={l.label}
                 href={l.href}
                 className={`text-sm font-medium transition-colors duration-200 ${
-                  scrolled
+                  isLight
                     ? "text-slate-700 hover:text-blue-700"
                     : "text-slate-200 hover:text-white"
                 }`}
@@ -66,7 +85,7 @@ export default function Navbar() {
             <Link
               href="/dashboard"
               className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 shadow-sm ${
-                scrolled
+                isLight
                   ? "bg-blue-900 hover:bg-blue-800 text-white"
                   : "bg-blue-600 hover:bg-blue-500 text-white"
               }`}
@@ -78,7 +97,7 @@ export default function Navbar() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setOpen(!open)}
-            className={`md:hidden p-1 ${scrolled ? "text-slate-700 hover:text-slate-950" : "text-slate-200 hover:text-white"}`}
+            className={`md:hidden p-1 ${isLight ? "text-slate-700 hover:text-slate-950" : "text-slate-200 hover:text-white"}`}
             aria-label="Toggle menu"
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">

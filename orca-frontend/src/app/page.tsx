@@ -1,54 +1,52 @@
-import Navbar       from "@/components/landing/Navbar";
-import Hero          from "@/components/landing/Hero";
-import TelemetryBar  from "@/components/landing/TelemetryBar";
-import StatsBar      from "@/components/landing/StatsBar";
-import FeaturedNews  from "@/components/landing/FeaturedNews";
-import FeatureStory  from "@/components/landing/FeatureStory";
-import ImageGallery  from "@/components/landing/ImageGallery";
-import GraticuleBar  from "@/components/landing/GraticuleBar";
-import ResourceLinks from "@/components/landing/ResourceLinks";
-import ArticleGrid   from "@/components/landing/ArticleGrid";
-import Newsletter    from "@/components/landing/Newsletter";
-import Footer        from "@/components/landing/Footer";
+import Navbar from "@/components/landing/Navbar";
+import Hero from "@/components/landing/Hero";
+import OceanAtAGlance from "@/components/landing/OceanAtAGlance";
+import FeaturedAlert from "@/components/landing/FeaturedAlert";
+import WhatOrcaDoes from "@/components/landing/WhatOrcaDoes";
+import FeaturedAnalysis from "@/components/landing/FeaturedAnalysis";
+import EarthOceanScience from "@/components/landing/EarthOceanScience";
+import DataAndResearch from "@/components/landing/DataAndResearch";
+import EngineeringResearch from "@/components/landing/EngineeringResearch";
+import ExploreOrca from "@/components/landing/ExploreOrca";
+import FinalCTA from "@/components/landing/Newsletter";
+import Footer from "@/components/landing/Footer";
 
 export default function HomePage() {
   return (
-    <div className="bg-white min-h-screen text-slate-900">
+    <main className="bg-white min-h-screen text-slate-900 selection:bg-blue-100 selection:text-blue-900">
       {/* Sticky navigation */}
       <Navbar />
 
-      {/* 1. Hero — full screen, Indian Ocean from ISS */}
+      {/* 01 — HERO */}
       <Hero />
 
-      {/* 2. Subtle Dark Telemetry Bar */}
-      <TelemetryBar />
+      {/* 02 — OCEAN AT A GLANCE */}
+      <OceanAtAGlance />
 
-      {/* 3. Stats bar */}
-      <StatsBar />
+      {/* 03 — FEATURED ALERT / OPERATION */}
+      <FeaturedAlert />
 
-      {/* 4. Featured alerts / news grid */}
-      <FeaturedNews />
+      {/* 04 — WHAT ORCA DOES */}
+      <WhatOrcaDoes />
 
-      {/* 5. Feature story — cyclone agent prediction */}
-      <FeatureStory />
+      {/* 05 — FEATURED ANALYSIS */}
+      <FeaturedAnalysis />
 
-      {/* 6. Image gallery strip (NASA Earth Science style) */}
-      <ImageGallery />
+      {/* 06 — EARTH & OCEAN SCIENCE */}
+      <EarthOceanScience />
 
-      {/* 7. Subtle Dark Geodetic Coordinate Bar */}
-      <GraticuleBar />
+      {/* 07 — DATA & RESEARCH */}
+      <DataAndResearch />
 
-      {/* 8. Reference data sources */}
-      <ResourceLinks />
+      {/* 08 — ENGINEERING / MISSION RESEARCH */}
+      <EngineeringResearch />
 
-      {/* 9. Article grid — deep dives & research publications */}
-      <ArticleGrid />
+      {/* 09 — EXPLORE ORCA */}
+      <ExploreOrca />
 
-      {/* 10. Dark Newsletter CTA */}
-      <Newsletter />
-
-      {/* 11. NASA-style Deep Black Footer */}
+      {/* 10 — FINAL CTA & FOOTER */}
+      <FinalCTA />
       <Footer />
-    </div>
+    </main>
   );
 }
