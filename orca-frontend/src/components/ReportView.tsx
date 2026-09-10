@@ -457,7 +457,7 @@ const REFERENCE_LINKS: ReferenceLink[] = [
     organization: "Indian National Centre for Ocean Information Services (MoES)",
     description: "Official dissemination system for Potential Fishing Zone (PFZ) maps, Ocean State Forecasts (OSF), and High Wave Alerts.",
     category: "Government Agency",
-    href: "https://incois.gov.in/portal/PFS.jsp",
+    href: "https://incois.gov.in/MarineFisheries/TextDataHome?mfid=1&request_locale=en",
   },
   {
     name: "ISRO Bhuvan Ocean Geospatial Hub",

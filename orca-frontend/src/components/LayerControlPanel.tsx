@@ -31,7 +31,7 @@ interface LayerDef {
   id: keyof LayerVisibility;
   label: string;
   description: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;           // dot / swatch color (Tailwind bg-*)
   swatchStyle: "dot" | "line";
   requiresDefense?: boolean;

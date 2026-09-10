@@ -160,3 +160,83 @@ code, kbd, samp, pre {
   margin: 0.5rem 0;
   color: #991b1b;
 }
+
+/* Kinetic Font & Load Animations */
+@keyframes textShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseBeacon {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.15);
+  }
+}
+
+.font-shimmer {
+  background: linear-gradient(90deg, #09090b 0%, #1e3a8a 35%, #2563eb 50%, #1e3a8a 65%, #09090b 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: textShimmer 8s ease infinite;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 4s linear infinite;
+  transform-origin: center center;
+}
+
+.animate-pulse-beacon {
+  animation: pulseBeacon 2s ease-in-out infinite;
+}
+
+/* Stagger Delays for Grid Loading */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.19s; }
+.stagger-4 { animation-delay: 0.26s; }
+.stagger-5 { animation-delay: 0.33s; }
+.stagger-6 { animation-delay: 0.40s; }
+
+/* Progressive Image Blur-to-Sharp Transition */
+.img-blur-reveal {
+  transition: filter 0.5s ease-out, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
