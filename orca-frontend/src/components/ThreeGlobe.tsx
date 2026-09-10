@@ -222,12 +222,12 @@ export default function ThreeGlobe({
     const width = mount.clientWidth || 600;
     const height = mount.clientHeight || 600;
 
-    // ── 1. Scene & Camera (Deep Close-Up Tactical Zoom: altitude 0.20 to 139) ──
+    // ── 1. Scene & Camera (Deep Close-Up Tactical Zoom: altitude 0.025 to 139) ──
     const scene = new THREE.Scene();
-    // Near clipping plane 0.02 prevents clipping down to 20cm above surface
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.02, 2000);
+    // Near clipping plane 0.008 prevents clipping down to 8mm above surface
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.008, 2000);
 
-    const MIN_DIST = radius + 0.20; // Altitude ~0.20 (deep tactical harbor & 5km cell zoom, >550x zoom)
+    const MIN_DIST = radius + 0.025; // Altitude ~0.025 (ultra-deep harbor berth & pier zoom, >1400x zoom)
     const MAX_DIST = 320;           // High orbit view
     const DEFAULT_DIST = 205;       // Standard India regional overview
 
@@ -257,11 +257,11 @@ export default function ThreeGlobe({
     const globeGroup = new THREE.Group();
     scene.add(globeGroup);
 
-    // ── 4. OFFICIAL NASA BLUE MARBLE 5400x2700 TOPOGRAPHY & BATHYMETRY ──
+    // ── 4. OFFICIAL PHOTOREALISTIC SATELLITE IMAGERY BEDROCK ──
     const textureLoader = new THREE.TextureLoader();
     
-    // Load high-resolution NASA Blue Marble texture with 16x anisotropic filtering
-    const earthDayMap = textureLoader.load("/textures/earth_daymap.jpg", (tex) => {
+    // Load unified ArcGIS World Imagery bedrock texture so high-orbit & close-up use the EXACT SAME skin
+    const earthDayMap = textureLoader.load("/textures/world_imagery_base.jpg", (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 16;
       tex.generateMipmaps = true;
@@ -273,13 +273,13 @@ export default function ThreeGlobe({
     const earthSpecularMap = textureLoader.load("/textures/earth_specular.jpg");
     const earthCloudsMap = textureLoader.load("/textures/earth_clouds.jpg");
 
-    // Earth Sphere with Real Satellite Imagery & Specular Ocean Reflection
+    // Earth Sphere with Photorealistic Satellite Imagery & Specular Ocean Reflection
     const earthGeo = new THREE.SphereGeometry(radius, 64, 64);
     const earthMat = new THREE.MeshPhongMaterial({
       map: earthDayMap,
       specularMap: earthSpecularMap,
-      specular: new THREE.Color(0x333333),
-      shininess: 18,
+      specular: new THREE.Color(0x181818),
+      shininess: 10,
     });
     const earthMesh = new THREE.Mesh(earthGeo, earthMat);
     globeGroup.add(earthMesh);
@@ -296,10 +296,10 @@ export default function ThreeGlobe({
       t.anisotropy = 8;
     });
 
-    const rasterGeo = new THREE.SphereGeometry(radius + 0.045, 64, 64);
+    const rasterGeo = new THREE.SphereGeometry(radius + 0.012, 64, 64);
     const rasterMat = new THREE.MeshBasicMaterial({
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.82,
       depthWrite: false,
       side: THREE.FrontSide,
     });
@@ -366,17 +366,21 @@ export default function ThreeGlobe({
       // Determine optimal slippy map zoom level based on camera altitude
       let z = 0;
       if (altitude > 45) {
-        z = 0; // High-res NASA Blue Marble 5400x2700 bedrock sufficient at high orbit
-      } else if (altitude > 18) {
+        z = 0; // Bedrock world_imagery_base.jpg covers high orbit perfectly
+      } else if (altitude > 20) {
         z = 5; // Basin wide
-      } else if (altitude > 6) {
+      } else if (altitude > 7.0) {
         z = 7; // Sub-regional shelf
-      } else if (altitude > 2.0) {
+      } else if (altitude > 2.2) {
         z = 9; // Sector tactical (~200m/pixel)
-      } else if (altitude > 0.7) {
+      } else if (altitude > 0.8) {
         z = 11; // Fine coastal (~50m/pixel)
+      } else if (altitude > 0.28) {
+        z = 13; // Harbor docks, breakwaters (~12m/pixel)
+      } else if (altitude > 0.09) {
+        z = 15; // Piers, shipping channels (~3m/pixel)
       } else {
-        z = 13; // Harbor docks, breakwaters & shallow reefs (~12m/pixel)
+        z = 17; // Tactical ultra-resolution (~0.8m/pixel: individual vessels, berths)
       }
 
       if (z === 0) {
@@ -395,8 +399,8 @@ export default function ThreeGlobe({
       const n = 1 << z;
       const activeKeys = new Set<string>();
 
-      // Cluster span: 3x3 for moderate zoom, 5x5 for close-in tactical view
-      const span = z >= 9 ? 2 : 1;
+      // Cluster span: 3x3 for moderate zoom, 5x5 for close-in, 7x7 for ultra close-in to prevent edge cutoffs
+      const span = z >= 13 ? 3 : z >= 9 ? 2 : 1;
 
       for (let dx = -span; dx <= span; dx++) {
         for (let dy = -span; dy <= span; dy++) {
@@ -415,7 +419,7 @@ export default function ThreeGlobe({
               bounds.latMax,
               bounds.lonMin,
               bounds.lonMax,
-              radius + 0.055,
+              radius + 0.005,
               6
             );
 
@@ -967,16 +971,20 @@ export default function ThreeGlobe({
 
     // ── 11. Smooth Adaptive Zoom & Control Handlers ─────────────────
     const applyZoom = (delta: number) => {
-      const currentAltitude = Math.max(0.08, targetCamDist - radius);
+      const currentAltitude = Math.max(0.015, targetCamDist - radius);
       if (delta > 0) {
         // Quick zoom out: multiplies altitude by 1.65 + guaranteed minimum jump
         const newAltitude = Math.max(currentAltitude * 1.65, currentAltitude + 7.5);
         targetCamDist = Math.min(MAX_DIST, radius + newAltitude);
       } else {
-        // Quick zoom in: contracts altitude by 0.60
-        const newAltitude = Math.max(0.12, currentAltitude * 0.60);
+        // Quick zoom in: contracts altitude down to 0.025 (deep harbor berth / pier level)
+        const newAltitude = Math.max(0.025, currentAltitude * 0.55);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
+      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
+      const { lat, lon } = vec3ToLatLon(centerLocal);
+      const alt = Math.max(0.025, targetCamDist - radius);
+      updateTiledSatellite(lat, lon, alt);
     };
 
     zoomInRef.current = () => applyZoom(-1);
@@ -1019,7 +1027,7 @@ export default function ThreeGlobe({
     // Fast, responsive, exponential scroll-to-zoom (escapes close zoom in 3-4 ticks)
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const currentAltitude = Math.max(0.08, targetCamDist - radius);
+      const currentAltitude = Math.max(0.015, targetCamDist - radius);
       const isZoomingOut = e.deltaY > 0;
 
       if (isZoomingOut) {
@@ -1031,12 +1039,16 @@ export default function ThreeGlobe({
         const newAltitude = Math.max(currentAltitude * outFactor, currentAltitude + minBoost);
         targetCamDist = Math.min(MAX_DIST, radius + newAltitude);
       } else {
-        // Fast zoom in: smooth geometric contraction
+        // Fast zoom in: smooth geometric contraction down to 0.025 altitude
         const magnitude = Math.min(3.5, Math.max(1.0, Math.abs(e.deltaY) / 30));
         const inFactor = Math.pow(0.65, magnitude);
-        const newAltitude = Math.max(0.12, currentAltitude * inFactor);
+        const newAltitude = Math.max(0.025, currentAltitude * inFactor);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
+      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
+      const { lat, lon } = vec3ToLatLon(centerLocal);
+      const alt = Math.max(0.025, targetCamDist - radius);
+      updateTiledSatellite(lat, lon, alt);
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -1179,10 +1191,10 @@ export default function ThreeGlobe({
       const screenRadiusPx = Math.round((radius / (camera.position.z * tanHalfFov)) * (screenH / 2));
       document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
 
-      const altitude = Math.max(0.05, camera.position.z - radius);
+      const altitude = Math.max(0.025, camera.position.z - radius);
 
       // Update zoom readout badge directly in DOM (no React re-renders)
-      const zoomX = Math.round((DEFAULT_DIST - radius) / Math.max(0.2, altitude));
+      const zoomX = Math.round((DEFAULT_DIST - radius) / Math.max(0.025, altitude));
       if (Math.abs(zoomX - lastReportedZoom) >= 1) {
         lastReportedZoom = zoomX;
         if (zoomBadgeRef.current) {
@@ -1193,7 +1205,11 @@ export default function ThreeGlobe({
               ? "2° Regional (~220km)"
               : altitude > 6.5
               ? "0.5° (~55km)"
-              : "6km × 5km Tactical Mesh";
+              : altitude > 1.2
+              ? "6km × 5km Tactical Mesh"
+              : altitude > 0.25
+              ? "1km Coastal Sector"
+              : "50m Harbor Pier";
           zoomBadgeRef.current.textContent = `${zoomX}x · ${gridText}`;
         }
         if (onZoomChangeRef.current) onZoomChangeRef.current(zoomX);
@@ -1249,7 +1265,7 @@ export default function ThreeGlobe({
       fineMat.opacity = fineAlpha * 0.70;
 
       // Periodic tile check during camera movements
-      if (frameCount % 18 === 0 && Math.abs(altitude - lastCheckedAlt) > 1.0 && !isDragging) {
+      if (frameCount % 10 === 0 && Math.abs(altitude - lastCheckedAlt) > 0.04 && !isDragging) {
         lastCheckedAlt = altitude;
         const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
         const { lat, lon } = vec3ToLatLon(centerLocal);

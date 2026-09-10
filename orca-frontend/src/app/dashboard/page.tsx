@@ -211,17 +211,17 @@ const studioGlass = {
   boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.08)",
 } as React.CSSProperties;
 
-// ISRO Scientific Toggle Switch
+// Sleek Minimalist Toggle Switch
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <button
       onClick={onChange}
-      className="relative flex-shrink-0 h-5 w-9 rounded-full transition-colors duration-150 focus:outline-none"
-      style={{ background: on ? "#1F4E8C" : "#E1E5EA" }}
+      className="relative flex-shrink-0 h-4.5 w-8 rounded-full transition-colors duration-150 focus:outline-none"
+      style={{ background: on ? "#18181b" : "#E4E4E7" }}
     >
       <span
-        className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-xs transition-all duration-150"
-        style={{ left: on ? "calc(100% - 18px)" : "2px" }}
+        className="absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-xs transition-all duration-150"
+        style={{ left: on ? "calc(100% - 16px)" : "2px" }}
       />
     </button>
   );
@@ -581,7 +581,7 @@ function AIChatDrawer({
           <button
             onClick={() => triggerReportGeneration(input)}
             disabled={isGenerating || streaming}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1F4E8C] hover:bg-[#173F72] text-white text-[10px] font-sans font-medium transition disabled:opacity-40 shadow-xs"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-medium transition disabled:opacity-40 shadow-none active:scale-95"
             title="Generate a dynamic report for current topic and coordinates"
           >
             <FileText className="h-3 w-3" />
@@ -613,9 +613,9 @@ function AIChatDrawer({
               </p>
 
               {/* Quick Query Starters */}
-              <div className="w-full space-y-2 max-w-xs text-left">
-                <div className="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wider">
-                  Quick Queries (Conversational)
+              <div className="w-full space-y-1.5 max-w-xs text-left">
+                <div className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
+                  Quick Queries
                 </div>
                 {[
                   "What is the SST at this location?",
@@ -625,15 +625,15 @@ function AIChatDrawer({
                   <button
                     key={promptText}
                     onClick={() => setInput(promptText)}
-                    className="w-full text-left px-3 py-2 rounded-xl bg-white border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 text-[11px] text-zinc-800 transition shadow-xs flex items-center justify-between group"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group"
                   >
-                    <span>{promptText}</span>
-                    <span className="text-zinc-400 group-hover:text-black font-bold">&rarr;</span>
+                    <span className="truncate">{promptText}</span>
+                    <span className="text-zinc-300 group-hover:text-zinc-600 text-xs ml-1 flex-shrink-0">&rarr;</span>
                   </button>
                 ))}
 
-                <div className="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wider pt-2">
-                  Report Commands (Dynamic Dossier)
+                <div className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider pt-2">
+                  Report Commands
                 </div>
                 {[
                   "Generate a report about high wave conditions",
@@ -643,10 +643,10 @@ function AIChatDrawer({
                   <button
                     key={reportPrompt}
                     onClick={() => triggerReportGeneration(reportPrompt)}
-                    className="w-full text-left px-3 py-2 rounded-xl bg-[#F0F4FA] border border-[#CBD5E1] hover:border-[#1F4E8C] text-[11px] text-[#1F4E8C] font-medium transition shadow-xs flex items-center justify-between group"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group"
                   >
-                    <span>{reportPrompt}</span>
-                    <FileText className="h-3 w-3 text-[#1F4E8C]" />
+                    <span className="truncate">{reportPrompt}</span>
+                    <FileText className="h-3 w-3 text-zinc-400 group-hover:text-zinc-600 flex-shrink-0 ml-1" />
                   </button>
                 ))}
               </div>
@@ -827,169 +827,129 @@ function LayerDock({
   const currentRasterDef = ENVIRONMENTAL_RASTERS.find((r) => r.id === activeRaster) || ENVIRONMENTAL_RASTERS[0];
   const CurrentRasterIcon = currentRasterDef.icon;
 
+  const totalActive = activeVectorsCount + (activeRaster !== "none" ? 1 : 0);
+
   return (
     <div
-      className={`fixed left-0 top-0 h-screen z-40 flex transition-opacity duration-300 ${visible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      className={`fixed top-16 left-4 z-40 transition-opacity duration-300 ${
+        visible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
     >
-      {/* Collapsed Icon Strip */}
-      <motion.div
-        animate={{ width: expanded ? 0 : 42 }}
-        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-col items-center gap-3 py-20 overflow-hidden flex-shrink-0 bg-white/95 border-r border-zinc-200 shadow-md backdrop-blur-md"
-      >
-        {/* Active Raster indicator in collapsed bar */}
-        <div
-          className="p-1.5 rounded-lg bg-blue-50 border border-blue-200 text-[#1F4E8C]"
-          title={`Active Environmental Raster: ${currentRasterDef.label}`}
+      {/* Floating Collapsed Pill */}
+      {!expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white border border-zinc-200/90 hover:border-zinc-300 text-zinc-700 hover:text-zinc-900 shadow-sm backdrop-blur-md transition-all active:scale-95"
+          title="Open Map Layers & Overlays"
         >
-          <CurrentRasterIcon className="h-3.5 w-3.5" />
-        </div>
-        <div className="w-4 h-[1px] bg-zinc-200" />
-        {/* Active Vector indicators */}
-        {VECTOR_OVERLAYS_DEF.filter((v) => vectorOverlays[v.id]).slice(0, 6).map((v) => {
-          const LayerIcon = v.icon;
-          return (
-            <div
-              key={v.id}
-              className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-800"
-              title={`Active Overlay: ${v.label}`}
-            >
-              <LayerIcon className="h-3.5 w-3.5" />
-            </div>
-          );
-        })}
-      </motion.div>
+          <Layers className="h-3.5 w-3.5 text-zinc-500" />
+          <span className="text-xs font-medium">Layers</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+            {totalActive}
+          </span>
+        </button>
+      )}
 
-      {/* Expanded Full Dock */}
+      {/* Expanded Clean Menu */}
       <AnimatePresence>
         {expanded && (
           <motion.div
-            initial={{ x: -280, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute left-0 top-0 h-full w-72 flex flex-col overflow-hidden shadow-2xl bg-white/98 border-r border-zinc-200"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="w-72 max-h-[calc(100vh-80px)] rounded-xl flex flex-col overflow-hidden shadow-xl bg-white/98 backdrop-blur-md border border-zinc-200"
           >
-            {/* Persona & Platform Badge */}
-            <div className="px-4 pt-20 pb-3 flex-shrink-0 border-b border-[#E1E5EA]">
-              <div className="text-xs font-sans font-bold flex items-center gap-1.5 text-[#202124]">
-                <PersonaIcon className="h-3.5 w-3.5 text-[#1F4E8C]" />
-                <span>{pm.agent}</span>
+            {/* Persona & Console Header */}
+            <div className="px-3.5 py-2.5 flex-shrink-0 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/60">
+              <div className="flex items-center gap-2">
+                <PersonaIcon className="h-3.5 w-3.5 text-zinc-600" />
+                <span className="text-xs font-semibold text-zinc-800">{pm.agent}</span>
               </div>
-              <div className="text-[11px] text-[#667085] font-sans mt-0.5">{pm.name} GIS Console</div>
-              <div className="mt-2 flex items-center gap-1.5 text-[10px] font-sans px-2 py-1 rounded bg-[#F6F8FA] text-[#202124] border border-[#E1E5EA]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#228B5A]" />
-                <span>INCOIS & ISRO Synchronized</span>
-              </div>
+              <button
+                onClick={() => setExpanded(false)}
+                className="h-6 w-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition"
+                title="Close Layers"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             {/* Scrollable Controls */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
-              {/* ── SECTION 1: ENVIRONMENTAL COLOR RASTERS (MUTUALLY EXCLUSIVE) ── */}
+            <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-4">
+              {/* ── SECTION 1: ENVIRONMENTAL COLOR RASTERS ── */}
               <div>
-                <div className="flex items-center justify-between pb-1.5 border-b border-[#E1E5EA]">
-                  <div>
-                    <div className="text-[10px] font-sans font-bold tracking-wider uppercase text-[#202124]">
-                      Environmental Rasters
-                    </div>
-                    <div className="text-[9px] text-[#667085]">Mutually exclusive · 1 active</div>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase">
-                    {activeRaster === "none" ? "Satellite" : activeRaster}
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
+                    Environmental Layers
                   </span>
+                  <span className="text-[9px] font-mono text-zinc-400">1 active</span>
                 </div>
 
-                <div className="space-y-1.5 pt-2">
+                <div className="space-y-1">
                   {ENVIRONMENTAL_RASTERS.map((r) => {
-                    const RasterIcon = r.icon;
                     const isActive = activeRaster === r.id;
                     return (
                       <button
                         key={r.id}
                         type="button"
                         onClick={() => onSelectRaster(r.id)}
-                        className={`w-full text-left p-2 rounded-xl transition border text-xs flex flex-col gap-1.5 ${
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg transition border text-xs flex items-center justify-between ${
                           isActive
-                            ? "bg-[#F0F5FF] border-[#1F4E8C] shadow-xs"
-                            : "bg-white hover:bg-[#F8FAFC] border-zinc-200 text-zinc-700"
+                            ? "bg-zinc-100 border-zinc-300 text-zinc-900 font-medium"
+                            : "bg-white hover:bg-zinc-50 border-zinc-200/80 text-zinc-600"
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`p-1 rounded-md ${
-                                isActive ? "bg-[#1F4E8C] text-white" : "bg-zinc-100 text-zinc-600"
-                              }`}
-                            >
-                              <RasterIcon className="h-3 w-3" />
-                            </div>
-                            <div>
-                              <div
-                                className={`font-semibold leading-tight text-[11px] ${
-                                  isActive ? "text-[#1F4E8C]" : "text-zinc-800"
-                                }`}
-                              >
-                                {r.label}
-                              </div>
-                              <div className="text-[9.5px] text-zinc-500 leading-tight">
-                                {r.rangeText}
-                              </div>
-                            </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                              r.id === "sst"
+                                ? "bg-amber-500"
+                                : r.id === "chlorophyll"
+                                ? "bg-emerald-500"
+                                : r.id === "currents"
+                                ? "bg-sky-500"
+                                : r.id === "bathymetry"
+                                ? "bg-indigo-500"
+                                : "bg-zinc-400"
+                            }`}
+                          />
+                          <div className="truncate">
+                            <div className="text-[11px] leading-tight truncate">{r.label}</div>
+                            <div className="text-[9px] text-zinc-400 font-mono leading-tight">{r.rangeText}</div>
                           </div>
-                          {isActive && (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-[#1F4E8C] flex-shrink-0" />
-                          )}
                         </div>
-
-                        {/* Color Ramp Gradient Bar */}
-                        <div
-                          className="w-full h-1.5 rounded-full overflow-hidden border border-black/5"
-                          style={{ background: r.gradient }}
-                          title={r.rangeText}
-                        />
+                        {isActive && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-900 flex-shrink-0" />
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* ── SECTION 2: DIRECT MAP OVERLAYS (MULTI-SELECT TOGGLES) ── */}
+              {/* ── SECTION 2: DIRECT MAP OVERLAYS ── */}
               <div>
-                <div className="flex items-center justify-between pb-1.5 border-b border-[#E1E5EA]">
-                  <div>
-                    <div className="text-[10px] font-sans font-bold tracking-wider uppercase text-[#202124]">
-                      Direct Map Overlays
-                    </div>
-                    <div className="text-[9px] text-[#667085]">Independent point & vector layers</div>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold text-[#1F4E8C]">
-                    {activeVectorsCount} ACTIVE
+                <div className="flex items-center justify-between mb-1.5 pt-2 border-t border-zinc-100">
+                  <span className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
+                    Direct Map Overlays
                   </span>
+                  <span className="text-[9px] font-mono text-zinc-400">{activeVectorsCount} active</span>
                 </div>
 
-                <div className="space-y-1.5 pt-2">
+                <div className="space-y-1">
                   {VECTOR_OVERLAYS_DEF.map((v) => {
                     const LayerIcon = v.icon;
                     const isOn = vectorOverlays[v.id];
                     return (
                       <div
                         key={v.id}
-                        className="flex items-center justify-between py-1 px-1 rounded-lg hover:bg-zinc-50 transition"
+                        className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-zinc-50 transition"
                       >
                         <div className="flex items-center gap-2 truncate pr-2">
-                          <LayerIcon
-                            className="h-3.5 w-3.5 flex-shrink-0"
-                            style={{ color: isOn ? v.color : "#9ca3af" }}
-                          />
+                          <LayerIcon className="h-3.5 w-3.5 flex-shrink-0 text-zinc-400" />
                           <div className="truncate">
-                            <div
-                              className={`text-[11px] leading-tight truncate ${
-                                isOn ? "text-zinc-900 font-medium" : "text-zinc-500"
-                              }`}
-                            >
+                            <div className={`text-[11px] leading-tight truncate ${isOn ? "text-zinc-900 font-medium" : "text-zinc-500"}`}>
                               {v.label}
                             </div>
                             <div className="text-[9px] text-zinc-400 truncate leading-tight">
@@ -1006,16 +966,14 @@ function LayerDock({
 
               {/* ── SECTION 3: SENSOR THRESHOLDS ── */}
               <div>
-                <div className="text-[10px] font-sans font-bold tracking-wider uppercase mb-2 pb-1 border-b border-[#E1E5EA] text-[#202124]">
+                <div className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider mb-2 pt-2 border-t border-zinc-100">
                   Sensor Thresholds
                 </div>
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2.5">
                   <div>
-                    <div className="flex justify-between text-[11px] font-sans text-[#667085] mb-1">
+                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1">
                       <span>SST Range</span>
-                      <span className="text-[#202124] font-mono font-semibold">
-                        {sstRange[0]}–{sstRange[1]}°C
-                      </span>
+                      <span className="text-zinc-800 font-semibold">{sstRange[0]}–{sstRange[1]}°C</span>
                     </div>
                     <input
                       type="range"
@@ -1024,13 +982,13 @@ function LayerDock({
                       step={0.5}
                       value={sstRange[1]}
                       onChange={(e) => setSstRange([sstRange[0], Number(e.target.value)])}
-                      className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
+                      className="w-full h-1 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-zinc-800"
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[11px] font-sans text-[#667085] mb-1">
+                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1">
                       <span>Max SWH (Swell)</span>
-                      <span className="text-[#202124] font-mono font-semibold">{waveMax}m</span>
+                      <span className="text-zinc-800 font-semibold">{waveMax}m</span>
                     </div>
                     <input
                       type="range"
@@ -1039,12 +997,11 @@ function LayerDock({
                       step={0.5}
                       value={waveMax}
                       onChange={(e) => setWaveMax(Number(e.target.value))}
-                      className="w-full h-1.5 rounded-full appearance-none bg-[#E1E5EA] cursor-pointer accent-[#1F4E8C]"
+                      className="w-full h-1 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-zinc-800"
                     />
                   </div>
                 </div>
               </div>
-
             </div>
           </motion.div>
         )}
