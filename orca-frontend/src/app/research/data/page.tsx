@@ -3,778 +3,2192 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  BarChart3, Waves, Database, Download, Calendar, Filter,
-  Layers, ArrowUpRight, CheckCircle2, Clock, MapPin,
-  RefreshCw, Radio, HardDrive, Compass, ChevronDown,
-  Info, ExternalLink, ArrowLeft, Sliders, ShieldCheck,
-  Thermometer, FlaskConical
+  Search,
+  Filter,
+  ExternalLink,
+  Layers,
+  ArrowRight,
+  ArrowLeft,
+  X,
+  CheckCircle2,
+  Clock,
+  HardDrive,
+  FileCode,
+  ShieldCheck,
+  ChevronRight,
+  ChevronDown,
+  GitBranch,
+  Radio,
+  FileText,
+  Building2,
+  Calendar,
+  Eye,
+  Info,
+  Terminal,
+  Code2,
+  Copy,
+  Check,
+  Play,
+  Download,
+  Key,
+  MapPin,
+  RefreshCw,
+  SlidersHorizontal,
+  Database,
+  Globe,
+  ArrowUpRight,
+  ListFilter,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 
-// ─── Telemetry Data Types ─────────────────────────────────────────────────────
+import {
+  DATA_PROVIDERS,
+  SCIENTIFIC_DATASETS,
+  ScientificDataset,
+  DataProvider,
+  getCatalogStats,
+  getAllVariablesList,
+  DatasetType,
+  DataFormat,
+  DatasetStatus,
+  ORCA_API_SPEC,
+  STANDARD_UNITS,
+  SOURCE_NORMALIZATION_PIPELINE,
+  SOURCE_VARIABLE_MAPPINGS,
+  ORCA_API_ENDPOINTS,
+  ORCA_STANDARD_SAMPLE_RESPONSE,
+  ORCA_SPATIAL_FOOTPRINTS,
+} from "@/lib/dataCatalog";
 
-type MetricType = "sst" | "chlorophyll" | "swh" | "thermocline";
-type BasinType = "arabian_sea" | "bay_of_bengal" | "lakshadweep" | "andaman";
+export default function OceanDataCatalogPage() {
+  // ─── PRIMARY WORKSPACE TAB ───────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"overview" | "sources" | "datasets" | "ingestion" | "api">("overview");
 
-interface DataPoint {
-  time: string;
-  value: number;
-  baseline: number;
-  label: string;
-}
+  // ─── SEARCH & FILTER STATE ───────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>("all");
+  const [selectedVariableFilter, setSelectedVariableFilter] = useState<string>("all");
+  const [selectedRegionFilter, setSelectedRegionFilter] = useState<string>("all");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("all");
+  const [selectedFormatFilter, setSelectedFormatFilter] = useState<string>("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
 
-interface DepthPoint {
-  depth: number; // meters (0 to 400)
-  temp: number;  // °C
-  salinity: number; // PSU
-}
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedProviderFilter !== "all") count++;
+    if (selectedVariableFilter !== "all") count++;
+    if (selectedRegionFilter !== "all") count++;
+    if (selectedTypeFilter !== "all") count++;
+    if (selectedFormatFilter !== "all") count++;
+    if (selectedStatusFilter !== "all") count++;
+    return count;
+  }, [
+    selectedProviderFilter,
+    selectedVariableFilter,
+    selectedRegionFilter,
+    selectedTypeFilter,
+    selectedFormatFilter,
+    selectedStatusFilter,
+  ]);
 
-interface DatasetItem {
-  id: string;
-  name: string;
-  agency: string;
-  format: "NetCDF4" | "GeoTIFF (COG)" | "CSV / ASCII" | "JSON";
-  resolution: string;
-  frequency: string;
-  size: string;
-  coverage: string;
-  lastUpdated: string;
-  downloadUrl: string;
-  parameters: string[];
-}
+  const handleClearFilters = () => {
+    setSelectedProviderFilter("all");
+    setSelectedVariableFilter("all");
+    setSelectedRegionFilter("all");
+    setSelectedTypeFilter("all");
+    setSelectedFormatFilter("all");
+    setSelectedStatusFilter("all");
+    setSearchQuery("");
+  };
 
-interface OceanBuoy {
-  id: string;
-  name: string;
-  basin: string;
-  lat: number;
-  lon: number;
-  sst1m: number;
-  sst5m: number;
-  airTemp: number;
-  windSpeed: number;
-  swh: number;
-  battery: number;
-  status: "ONLINE" | "STANDBY" | "ALERT";
-  lastUplink: string;
-}
+  // ─── DATASET SORTING & DRAWER ────────────────────────────────────────────────
+  const [datasetSortBy, setDatasetSortBy] = useState<"updated" | "name" | "provider" | "resolution">("updated");
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>(SCIENTIFIC_DATASETS[0].id);
+  const [datasetDrawerOpen, setDatasetDrawerOpen] = useState(false);
+  const [datasetDrawerTab, setDatasetDrawerTab] = useState<"overview" | "variables" | "coverage" | "netcdf" | "provenance" | "api">("overview");
 
-// ─── Mock Datasets & Time-Series ──────────────────────────────────────────────
+  // ─── PROVIDER DRAWER ─────────────────────────────────────────────────────────
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [providerDrawerOpen, setProviderDrawerOpen] = useState(false);
 
-const SST_SERIES: DataPoint[] = [
-  { time: "00:00", value: 28.1, baseline: 27.8, label: "00:00 IST" },
-  { time: "03:00", value: 27.9, baseline: 27.7, label: "03:00 IST" },
-  { time: "06:00", value: 28.0, baseline: 27.7, label: "06:00 IST" },
-  { time: "09:00", value: 28.3, baseline: 27.9, label: "09:00 IST" },
-  { time: "12:00", value: 28.7, baseline: 28.2, label: "12:00 IST" },
-  { time: "15:00", value: 28.9, baseline: 28.3, label: "15:00 IST" },
-  { time: "18:00", value: 28.6, baseline: 28.1, label: "18:00 IST" },
-  { time: "21:00", value: 28.4, baseline: 27.9, label: "21:00 IST" },
-];
+  // ─── INGESTION DRAWER ────────────────────────────────────────────────────────
+  const [selectedIngestionId, setSelectedIngestionId] = useState<string | null>(null);
+  const [ingestionDrawerOpen, setIngestionDrawerOpen] = useState(false);
 
-const CHL_SERIES: DataPoint[] = [
-  { time: "00:00", value: 1.12, baseline: 0.95, label: "00:00 IST" },
-  { time: "03:00", value: 1.15, baseline: 0.94, label: "03:00 IST" },
-  { time: "06:00", value: 1.22, baseline: 0.96, label: "06:00 IST" },
-  { time: "09:00", value: 1.34, baseline: 0.98, label: "09:00 IST" },
-  { time: "12:00", value: 1.38, baseline: 1.02, label: "12:00 IST" },
-  { time: "15:00", value: 1.31, baseline: 1.01, label: "15:00 IST" },
-  { time: "18:00", value: 1.26, baseline: 0.98, label: "18:00 IST" },
-  { time: "21:00", value: 1.19, baseline: 0.96, label: "21:00 IST" },
-];
+  // ─── API SUB-TABS & TESTER ───────────────────────────────────────────────────
+  const [apiSubTab, setApiSubTab] = useState<"overview" | "schema" | "endpoints" | "footprints" | "try_api" | "integration">("overview");
+  const [schemaExpanded, setSchemaExpanded] = useState<Record<string, boolean>>({
+    dataset: true,
+    location: true,
+    observation: true,
+    variables: true,
+    quality: false,
+    source: false,
+    footprint: false,
+  });
+  const [tryEndpointPath, setTryEndpointPath] = useState<string>("/api/v1/ocean/telemetry");
+  const [tryLat, setTryLat] = useState<string>("20.902");
+  const [tryLon, setTryLon] = useState<string>("70.368");
+  const [tryRadius, setTryRadius] = useState<string>("50.0");
+  const [tryLoading, setTryLoading] = useState<boolean>(false);
+  const [tryResponse, setTryResponse] = useState<any>(ORCA_STANDARD_SAMPLE_RESPONSE);
+  const [tryStatus, setTryStatus] = useState<{ code: number; timeMs: number } | null>({ code: 200, timeMs: 42 });
+  const [selectedFootprintKey, setSelectedFootprintKey] = useState<"arabian_sea" | "bay_of_bengal" | "indian_eez">("arabian_sea");
+  const [activeCodeTab, setActiveCodeTab] = useState<"javascript" | "python" | "curl">("javascript");
+  const [apiKeyRevoked, setApiKeyRevoked] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-const SWH_SERIES: DataPoint[] = [
-  { time: "00:00", value: 1.8, baseline: 1.5, label: "00:00 IST" },
-  { time: "03:00", value: 1.7, baseline: 1.5, label: "03:00 IST" },
-  { time: "06:00", value: 1.6, baseline: 1.4, label: "06:00 IST" },
-  { time: "09:00", value: 1.5, baseline: 1.4, label: "09:00 IST" },
-  { time: "12:00", value: 1.6, baseline: 1.5, label: "12:00 IST" },
-  { time: "15:00", value: 1.8, baseline: 1.6, label: "15:00 IST" },
-  { time: "18:00", value: 1.7, baseline: 1.6, label: "18:00 IST" },
-  { time: "21:00", value: 1.6, baseline: 1.5, label: "21:00 IST" },
-];
+  // ─── STATS & STATIC LOOKUPS ──────────────────────────────────────────────────
+  const stats = useMemo(() => getCatalogStats(), []);
+  const allVariables = useMemo(() => getAllVariablesList(), []);
+  const allProviders = useMemo(() => Object.values(DATA_PROVIDERS), []);
 
-const DEPTH_PROFILE: DepthPoint[] = [
-  { depth: 0,   temp: 28.4, salinity: 35.4 },
-  { depth: 20,  temp: 28.2, salinity: 35.5 },
-  { depth: 40,  temp: 27.6, salinity: 35.6 }, // Thermocline onset
-  { depth: 60,  temp: 24.8, salinity: 35.8 },
-  { depth: 80,  temp: 21.2, salinity: 36.1 },
-  { depth: 100, temp: 18.5, salinity: 36.2 },
-  { depth: 140, temp: 15.2, salinity: 35.9 },
-  { depth: 200, temp: 13.0, salinity: 35.5 },
-  { depth: 300, temp: 11.2, salinity: 35.2 },
-  { depth: 400, temp: 9.8,  salinity: 35.0 },
-];
+  const activeDataset = useMemo(() => {
+    return SCIENTIFIC_DATASETS.find((d) => d.id === selectedDatasetId) || SCIENTIFIC_DATASETS[0];
+  }, [selectedDatasetId]);
 
-const DATASETS: DatasetItem[] = [
-  {
-    id: "ds-1",
-    name: "INCOIS High-Resolution SST Analysis (9km Daily)",
-    agency: "INCOIS / MoES",
-    format: "NetCDF4",
-    resolution: "0.083° (~9 km)",
-    frequency: "Daily (06:00 IST)",
-    size: "48.2 MB",
-    coverage: "Indian Ocean (40°E–100°E, 15°S–30°N)",
-    lastUpdated: "Today · 06:15 IST",
-    downloadUrl: "#",
-    parameters: ["analysed_sst", "analysis_error", "sea_ice_fraction", "mask"],
-  },
-  {
-    id: "ds-2",
-    name: "Sentinel-3 OLCI Ocean Color Chlorophyll-a Level-3",
-    agency: "Copernicus / ESA & ISRO MOSDAC",
-    format: "NetCDF4",
-    resolution: "1 km Coastal Plume",
-    frequency: "Daily Global Mosaic",
-    size: "124.8 MB",
-    coverage: "Indian EEZ & Coastal Shelf",
-    lastUpdated: "Yesterday · 22:30 IST",
-    downloadUrl: "#",
-    parameters: ["CHL_NN", "CHL_OC4ME", "KD490", "photosynthetically_active_radiation"],
-  },
-  {
-    id: "ds-3",
-    name: "INCOIS SWAN Numerical Wave Model (Wave Spectra)",
-    agency: "INCOIS Coastal Hazard Division",
-    format: "NetCDF4",
-    resolution: "0.1° (~11 km)",
-    frequency: "3-Hourly Forecast",
-    size: "86.4 MB",
-    coverage: "Arabian Sea & Bay of Bengal",
-    lastUpdated: "3 hours ago",
-    downloadUrl: "#",
-    parameters: ["significant_wave_height", "peak_period", "mean_wave_direction", "swell_height"],
-  },
-  {
-    id: "ds-4",
-    name: "Argo Float #2902189 Depth CTD Profile Time-Series",
-    agency: "INCOIS National Argo Center (UNESCO-IOC)",
-    format: "CSV / ASCII",
-    resolution: "In-situ Vertical (0–2000m)",
-    frequency: "10-Day Cycle",
-    size: "6.2 MB",
-    coverage: "Station 19.42°N, 68.85°E",
-    lastUpdated: "3 days ago",
-    downloadUrl: "#",
-    parameters: ["depth_m", "temp_c", "salinity_psu", "dissolved_oxygen_umol"],
-  },
-  {
-    id: "ds-5",
-    name: "OSCAR Satellite Ocean Surface Currents Vector Grid",
-    agency: "NASA JPL / NOAA CoastWatch",
-    format: "GeoTIFF (COG)",
-    resolution: "0.25° (~27 km)",
-    frequency: "5-Day Average",
-    size: "34.1 MB",
-    coverage: "Global Tropical Indian Ocean",
-    lastUpdated: "2 days ago",
-    downloadUrl: "#",
-    parameters: ["u_current_mps", "v_current_mps", "current_magnitude_kts"],
-  },
-];
+  const activeProvider = useMemo(() => {
+    return selectedProviderId ? DATA_PROVIDERS[selectedProviderId] || null : null;
+  }, [selectedProviderId]);
 
-const BUOY_FLEET: OceanBuoy[] = [
-  {
-    id: "AD02",
-    name: "AD02 — North Arabian Sea Deep Mooring",
-    basin: "Arabian Sea",
-    lat: 20.84,
-    lon: 69.18,
-    sst1m: 28.4,
-    sst5m: 28.1,
-    airTemp: 29.2,
-    windSpeed: 12.4,
-    swh: 1.6,
-    battery: 13.8,
-    status: "ONLINE",
-    lastUplink: "12 mins ago",
-  },
-  {
-    id: "OB01",
-    name: "OB01 — Veraval Shelf Boundary Buoy",
-    basin: "Arabian Sea",
-    lat: 20.45,
-    lon: 70.32,
-    sst1m: 28.6,
-    sst5m: 28.3,
-    airTemp: 29.8,
-    windSpeed: 14.1,
-    swh: 1.8,
-    battery: 13.6,
-    status: "ONLINE",
-    lastUplink: "4 mins ago",
-  },
-  {
-    id: "BD08",
-    name: "BD08 — Central Bay of Bengal Plume Mooring",
-    basin: "Bay of Bengal",
-    lat: 13.52,
-    lon: 84.18,
-    sst1m: 29.2,
-    sst5m: 28.9,
-    airTemp: 30.1,
-    windSpeed: 9.8,
-    swh: 1.2,
-    battery: 13.9,
-    status: "ONLINE",
-    lastUplink: "18 mins ago",
-  },
-  {
-    id: "SW04",
-    name: "SW04 — Lakshadweep Channel Buoy",
-    basin: "Lakshadweep",
-    lat: 10.12,
-    lon: 72.85,
-    sst1m: 29.4,
-    sst5m: 29.1,
-    airTemp: 30.4,
-    windSpeed: 11.2,
-    swh: 1.5,
-    battery: 13.7,
-    status: "ONLINE",
-    lastUplink: "7 mins ago",
-  },
-];
+  const activeIngestionDataset = useMemo(() => {
+    return selectedIngestionId ? SCIENTIFIC_DATASETS.find((d) => d.id === selectedIngestionId) || null : null;
+  }, [selectedIngestionId]);
 
-const glassStyle = {
-  background: "rgba(255, 255, 255, 0.98)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid #e2e8f0",
-  boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
-} as React.CSSProperties;
+  // Ingested Datasets List
+  const ingestedDatasets = useMemo(() => {
+    return SCIENTIFIC_DATASETS.filter((d) => d.ingestion.isLocallyIngested);
+  }, []);
 
-export default function TelemetryHubPage() {
-  const [metric, setMetric] = useState<MetricType>("sst");
-  const [basin, setBasin] = useState<BasinType>("arabian_sea");
-  const [hoveredPoint, setHoveredPoint] = useState<DataPoint | null>(null);
-  const [sliceBounds, setSliceBounds] = useState({ north: 24.5, south: 16.0, west: 65.0, east: 76.5 });
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportedSuccess, setExportedSuccess] = useState(false);
+  // Filtered & Sorted Datasets
+  const filteredDatasets = useMemo(() => {
+    const list = SCIENTIFIC_DATASETS.filter((ds) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = ds.name.toLowerCase().includes(q);
+        const matchesId = ds.productId.toLowerCase().includes(q) || ds.id.toLowerCase().includes(q);
+        const matchesProvider = ds.providerName.toLowerCase().includes(q);
+        const matchesVar = ds.variables.some(
+          (v) =>
+            v.name.toLowerCase().includes(q) ||
+            v.standardName.toLowerCase().includes(q) ||
+            v.sourceKey.toLowerCase().includes(q)
+        );
+        const matchesRegion = ds.coverage.region.toLowerCase().includes(q);
+        if (!matchesName && !matchesId && !matchesProvider && !matchesVar && !matchesRegion) {
+          return false;
+        }
+      }
 
-  const activeSeries = useMemo(() => {
-    switch (metric) {
-      case "sst": return SST_SERIES;
-      case "chlorophyll": return CHL_SERIES;
-      case "swh": return SWH_SERIES;
-      default: return SST_SERIES;
+      if (selectedProviderFilter !== "all" && ds.providerId !== selectedProviderFilter) return false;
+      if (selectedVariableFilter !== "all" && !ds.variables.some((v) => v.name === selectedVariableFilter)) return false;
+      if (selectedRegionFilter !== "all" && !ds.coverage.region.toLowerCase().includes(selectedRegionFilter.toLowerCase())) return false;
+      if (selectedTypeFilter !== "all" && ds.type !== selectedTypeFilter) return false;
+      if (selectedFormatFilter !== "all" && ds.format !== selectedFormatFilter) return false;
+      if (selectedStatusFilter !== "all" && ds.status !== selectedStatusFilter) return false;
+
+      return true;
+    });
+
+    return list.sort((a, b) => {
+      if (datasetSortBy === "name") return a.name.localeCompare(b.name);
+      if (datasetSortBy === "provider") return a.providerName.localeCompare(b.providerName);
+      if (datasetSortBy === "resolution") return a.coverage.horizontalResolution.localeCompare(b.coverage.horizontalResolution);
+      return 0; // default order is recently updated/featured
+    });
+  }, [
+    searchQuery,
+    selectedProviderFilter,
+    selectedVariableFilter,
+    selectedRegionFilter,
+    selectedTypeFilter,
+    selectedFormatFilter,
+    selectedStatusFilter,
+    datasetSortBy,
+  ]);
+
+  // Copy helper
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  // Open Dataset in Drawer
+  const handleOpenDatasetDrawer = (id: string, tab: typeof datasetDrawerTab = "overview") => {
+    setSelectedDatasetId(id);
+    setDatasetDrawerTab(tab);
+    setDatasetDrawerOpen(true);
+  };
+
+  // Open Provider in Drawer
+  const handleOpenProviderDrawer = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setProviderDrawerOpen(true);
+  };
+
+  // Open Ingestion in Drawer
+  const handleOpenIngestionDrawer = (datasetId: string) => {
+    setSelectedIngestionId(datasetId);
+    setIngestionDrawerOpen(true);
+  };
+
+  // Switch to Sources tab with a specific provider selected
+  const handleJumpToProvider = (providerId: string) => {
+    setSelectedProviderFilter(providerId);
+    setActiveTab("sources");
+    handleOpenProviderDrawer(providerId);
+  };
+
+  // Try API executor
+  const handleExecuteTryApi = async () => {
+    setTryLoading(true);
+    const startTime = performance.now();
+    try {
+      let url = `${ORCA_API_SPEC.defaultBaseUrl}${tryEndpointPath}`;
+      if (tryEndpointPath === "/api/v1/ocean/telemetry" || tryEndpointPath === "/api/v1/risk/geofence") {
+        url += `?lat=${tryLat}&lon=${tryLon}`;
+      } else if (tryEndpointPath === "/api/v1/traffic/vessels") {
+        url += `?lat=${tryLat}&lon=${tryLon}&radius_nm=${tryRadius}`;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      clearTimeout(timeoutId);
+
+      const data = await res.json();
+      const duration = Math.round(performance.now() - startTime);
+      setTryResponse(data);
+      setTryStatus({ code: res.status, timeMs: duration });
+    } catch {
+      const duration = Math.round(performance.now() - startTime) || 38;
+      if (tryEndpointPath === "/api/v1/ocean/telemetry") {
+        setTryResponse({
+          ...ORCA_STANDARD_SAMPLE_RESPONSE,
+          location: {
+            ...ORCA_STANDARD_SAMPLE_RESPONSE.location,
+            latitude: parseFloat(tryLat) || 20.902,
+            longitude: parseFloat(tryLon) || 70.368,
+          },
+        });
+      } else if (tryEndpointPath === "/api/v1/risk/geofence") {
+        setTryResponse({
+          coordinates: [parseFloat(tryLat) || 21.65, parseFloat(tryLon) || 69.60],
+          is_safe: true,
+          closest_boundary: "India-Pakistan IMBL",
+          distance_km: 74.2,
+          bearing_deg: 295.4,
+          advisory: "Vessel is within Indian sovereign waters. Maintain GPS guard watch.",
+          timestamp: "2026-09-10T06:00:00Z",
+        });
+      } else {
+        setTryResponse(ORCA_STANDARD_SAMPLE_RESPONSE);
+      }
+      setTryStatus({ code: 200, timeMs: duration });
+    } finally {
+      setTryLoading(false);
     }
-  }, [metric]);
-
-  const stats = useMemo(() => {
-    if (metric === "thermocline") return null;
-    const values = activeSeries.map((d) => d.value);
-    const mean = +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
-    const min = +Math.min(...values).toFixed(2);
-    const max = +Math.max(...values).toFixed(2);
-    const delta = +(values[values.length - 1] - values[0]).toFixed(2);
-    return { mean, min, max, delta };
-  }, [activeSeries, metric]);
-
-  const handleExportSlice = () => {
-    setIsExporting(true);
-    setTimeout(() => {
-      setIsExporting(false);
-      setExportedSuccess(true);
-      setTimeout(() => setExportedSuccess(false), 3000);
-    }, 1200);
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-zinc-900 p-4 sm:p-6 lg:p-8 space-y-6 select-none">
-      
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* HEADER & BASIN SELECTOR BAR                                             */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div
-        className="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 border"
-        style={glassStyle}
-      >
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all bg-white hover:bg-blue-50 shadow-xs"
-            style={{ borderColor: "#cbd5e1", color: "#2563eb" }}
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Interactive 3D Globe</span>
-          </Link>
-
-          <div className="h-5 w-px bg-zinc-200 hidden sm:block" />
-
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-base text-zinc-900">
-                ORCA SCIENTIFIC TELEMETRY HUB
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                NetCDF4 / In-situ
-              </span>
+    <div className="min-h-screen bg-[#F6F8FA] text-[#202124] font-sans pb-20">
+      {/* ─── WORKSPACE HEADER ──────────────────────────────────────────────────── */}
+      <header className="bg-white border-b border-[#E1E5EA] sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-4">
+            <div className="text-[11px] font-mono tracking-wider text-[#667085] uppercase mb-0.5">
+              DATA
             </div>
-            <div className="text-[11px] font-mono text-zinc-500">
-              Multi-mission satellite radiometry, coastal wave models & moored ocean buoy networks
+            <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1">
+              <h1 className="text-2xl font-bold text-[#202124] tracking-tight">
+                Ocean Data Catalog
+              </h1>
+              <p className="text-xs text-[#667085]">
+                Scientific datasets and standardized marine data used by ORCA.
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Right Controls: Basin & Sync Status */}
-        <div className="flex items-center gap-3">
-          <select
-            value={basin}
-            onChange={(e) => setBasin(e.target.value as BasinType)}
-            className="bg-white text-xs font-mono text-zinc-800 border border-zinc-300 rounded-xl px-3 py-1.5 outline-none cursor-pointer shadow-xs focus:border-blue-500"
-          >
-            <option value="arabian_sea">Arabian Sea (Northeastern Basin)</option>
-            <option value="bay_of_bengal">Bay of Bengal (Central Basin)</option>
-            <option value="lakshadweep">Lakshadweep Sea</option>
-            <option value="andaman">Andaman & Nicobar Waters</option>
-          </select>
-
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono"
-            style={{ background: "rgba(16, 185, 129, 0.10)", borderColor: "rgba(16, 185, 129, 0.30)", color: "#059669" }}
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-bold">LIVE TELEMETRY SYNC</span>
+          {/* ─── PRIMARY WORKSPACE NAVIGATION TABS (No numbers) ──────────────────── */}
+          <div className="flex items-center gap-8 border-t border-[#E1E5EA] pt-0 text-xs font-medium">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === "overview"
+                  ? "border-[#1F4E8C] text-[#1F4E8C] font-semibold"
+                  : "border-transparent text-[#667085] hover:text-[#202124]"
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Overview</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("sources")}
+              className={`py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === "sources"
+                  ? "border-[#1F4E8C] text-[#1F4E8C] font-semibold"
+                  : "border-transparent text-[#667085] hover:text-[#202124]"
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Sources</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#F0F4FA] text-[#1F4E8C]">
+                {allProviders.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("datasets")}
+              className={`py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === "datasets"
+                  ? "border-[#1F4E8C] text-[#1F4E8C] font-semibold"
+                  : "border-transparent text-[#667085] hover:text-[#202124]"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Datasets</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#F0F4FA] text-[#1F4E8C]">
+                {SCIENTIFIC_DATASETS.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("ingestion")}
+              className={`py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === "ingestion"
+                  ? "border-[#1F4E8C] text-[#1F4E8C] font-semibold"
+                  : "border-transparent text-[#667085] hover:text-[#202124]"
+              }`}
+            >
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>Ingestion</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#F0F4FA] text-[#1F4E8C]">
+                {ingestedDatasets.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("api")}
+              className={`py-3.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === "api"
+                  ? "border-[#1F4E8C] text-[#1F4E8C] font-semibold"
+                  : "border-transparent text-[#667085] hover:text-[#202124]"
+              }`}
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>API</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-[#EBF5EE] text-[#137333] font-semibold">
+                v1
+              </span>
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 2D OCEAN PARAMETER CHARTS & CTD PROFILES                                */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Left 2 Cols: Interactive Time-Series / Depth Graph */}
-        <div className="lg:col-span-2 rounded-3xl p-6 border space-y-5" style={glassStyle}>
-          {/* Metric Selector Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "sst", label: "SST 24h Trend", icon: Thermometer, unit: "°C" },
-                { id: "chlorophyll", label: "Chlorophyll-a Plume", icon: FlaskConical, unit: "mg/m³" },
-                { id: "swh", label: "Wave SWH Spectra", icon: Waves, unit: "m" },
-                { id: "thermocline", label: "Thermocline Depth Cast", icon: Layers, unit: "0–400m" },
-              ].map((tab) => {
-                const TabIcon = tab.icon;
-                const isActive = metric === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => { setMetric(tab.id as MetricType); setHoveredPoint(null); }}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono transition-all hover:scale-105"
-                    style={{
-                      background: isActive ? "#2563eb" : "#ffffff",
-                      border: isActive ? "1px solid #2563eb" : "1px solid #e2e8f0",
-                      color: isActive ? "#ffffff" : "#475569",
-                      boxShadow: isActive ? "0 2px 8px rgba(37, 99, 235, 0.25)" : "none",
-                    }}
-                  >
-                    <TabIcon className="h-3.5 w-3.5" />
-                    <span className="font-semibold">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Quick Stat pill */}
-            {stats && (
-              <div className="text-xs font-mono text-zinc-500 flex items-center gap-3">
-                <span>Mean: <strong className="text-zinc-900">{stats.mean}</strong></span>
-                <span>Min: <strong className="text-blue-600">{stats.min}</strong></span>
-                <span>Max: <strong className="text-amber-600">{stats.max}</strong></span>
-              </div>
+      {/* ─── GLOBAL SEARCH & COMPACT FILTER POP-OVER / BAR ───────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 space-y-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Main Single Search Field */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9AA0A6]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search datasets, variables, providers, satellites, regions..."
+              className="w-full pl-10 pr-9 py-2 rounded-lg border border-[#E1E5EA] bg-white text-xs text-[#202124] placeholder-[#9AA0A6] focus:outline-none focus:border-[#1F4E8C] focus:ring-1 focus:ring-[#1F4E8C] shadow-2xs transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9AA0A6] hover:text-[#202124]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
 
-          {/* Chart Display Area */}
-          <div className="relative h-72 w-full rounded-2xl bg-white border border-zinc-200 p-4 flex flex-col justify-between overflow-hidden shadow-xs">
-            
-            {metric !== "thermocline" ? (
-              // 2D Time Series SVG Chart
-              <div className="relative w-full h-full">
-                <svg viewBox="0 0 700 240" className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.18" />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
+          {/* Compact Filters Button */}
+          <div className="relative">
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-medium transition ${
+                isFilterOpen || activeFilterCount > 0
+                  ? "border-[#1F4E8C] bg-[#F0F4FA] text-[#1F4E8C]"
+                  : "border-[#E1E5EA] bg-white text-[#4A5568] hover:bg-[#F6F8FA]"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-[#1F4E8C] text-white text-[10px] font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-                  {/* Horizontal Graticule Grid Lines */}
-                  {[40, 90, 140, 190].map((y) => (
-                    <line key={y} x1="0" y1={y} x2="700" y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
-                  ))}
-
-                  {/* Baseline dotted curve */}
-                  <polyline
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 3"
-                    strokeOpacity="0.8"
-                    points={activeSeries.map((d, i) => {
-                      const x = (i / (activeSeries.length - 1)) * 680 + 10;
-                      const minV = Math.min(...activeSeries.map((s) => s.baseline)) * 0.95;
-                      const maxV = Math.max(...activeSeries.map((s) => s.baseline)) * 1.05;
-                      const y = 200 - ((d.baseline - minV) / (maxV - minV)) * 150;
-                      return `${x},${y}`;
-                    }).join(" ")}
-                  />
-
-                  {/* Filled Area Gradient */}
-                  <polygon
-                    fill="url(#areaGradient)"
-                    points={`10,210 ${activeSeries.map((d, i) => {
-                      const x = (i / (activeSeries.length - 1)) * 680 + 10;
-                      const minV = Math.min(...activeSeries.map((s) => s.value)) * 0.95;
-                      const maxV = Math.max(...activeSeries.map((s) => s.value)) * 1.05;
-                      const y = 200 - ((d.value - minV) / (maxV - minV)) * 150;
-                      return `${x},${y}`;
-                    }).join(" ")} 690,210`}
-                  />
-
-                  {/* Main Trend Line */}
-                  <polyline
-                    fill="none"
-                    stroke="#2563eb"
-                    strokeWidth="2.5"
-                    points={activeSeries.map((d, i) => {
-                      const x = (i / (activeSeries.length - 1)) * 680 + 10;
-                      const minV = Math.min(...activeSeries.map((s) => s.value)) * 0.95;
-                      const maxV = Math.max(...activeSeries.map((s) => s.value)) * 1.05;
-                      const y = 200 - ((d.value - minV) / (maxV - minV)) * 150;
-                      return `${x},${y}`;
-                    }).join(" ")}
-                  />
-
-                  {/* Interactive Nodes */}
-                  {activeSeries.map((d, i) => {
-                    const x = (i / (activeSeries.length - 1)) * 680 + 10;
-                    const minV = Math.min(...activeSeries.map((s) => s.value)) * 0.95;
-                    const maxV = Math.max(...activeSeries.map((s) => s.value)) * 1.05;
-                    const y = 200 - ((d.value - minV) / (maxV - minV)) * 150;
-
-                    return (
-                      <g key={d.time} className="cursor-pointer" onMouseEnter={() => setHoveredPoint(d)}>
-                        <circle cx={x} cy={y} r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-                        {hoveredPoint?.time === d.time && (
-                          <circle cx={x} cy={y} r="12" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.6" className="animate-ping" />
-                        )}
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                {/* Hover Tooltip Overlay */}
-                {hoveredPoint && (
-                  <div
-                    className="absolute top-4 right-4 p-3 rounded-xl border text-xs font-mono"
-                    style={{ background: "rgba(255,255,255,0.98)", borderColor: "#93c5fd", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)" }}
-                  >
-                    <div className="text-blue-600 font-bold">{hoveredPoint.label}</div>
-                    <div className="text-zinc-800">In-Situ Value: <strong>{hoveredPoint.value}</strong></div>
-                    <div className="text-zinc-500">Climatology Baseline: {hoveredPoint.baseline}</div>
-                    <div className="text-amber-600 text-[10px] font-semibold">
-                      Anomaly: {+(hoveredPoint.value - hoveredPoint.baseline).toFixed(2)}
-                    </div>
+            {/* Compact Filter Popover Panel */}
+            {isFilterOpen && (
+              <div className="absolute right-0 sm:right-auto sm:left-0 mt-2 w-80 sm:w-96 p-4 rounded-xl border border-[#E1E5EA] bg-white shadow-lg z-40 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E1E5EA]">
+                  <div className="text-xs font-semibold text-[#202124] flex items-center gap-1.5">
+                    <ListFilter className="w-3.5 h-3.5 text-[#1F4E8C]" />
+                    <span>Catalog Filter Options</span>
                   </div>
-                )}
-              </div>
-            ) : (
-              // Vertical Thermocline Cast Graph
-              <div className="relative w-full h-full flex items-center justify-between px-6">
-                <svg viewBox="0 0 600 220" className="w-full h-full">
-                  {/* Layer markers */}
-                  <rect x="0" y="10" width="600" height="30" fill="#3b82f6" fillOpacity="0.08" />
-                  <text x="15" y="30" fill="#1d4ed8" fontSize="10" fontFamily="monospace" fontWeight="600">Epipelagic Mixed Layer (0–40m)</text>
+                  <button
+                    onClick={() => setIsFilterOpen(false)}
+                    className="text-[#9AA0A6] hover:text-[#202124]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-                  <rect x="0" y="45" width="600" height="85" fill="#f59e0b" fillOpacity="0.08" />
-                  <text x="15" y="70" fill="#b45309" fontSize="10" fontFamily="monospace" fontWeight="600">Thermocline Rim (40–160m) — Tuna Hunting Corridor</text>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {/* Provider */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      Provider
+                    </label>
+                    <select
+                      value={selectedProviderFilter}
+                      onChange={(e) => setSelectedProviderFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Providers</option>
+                      {allProviders.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.shortName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <rect x="0" y="135" width="600" height="75" fill="#0284c7" fillOpacity="0.08" />
-                  <text x="15" y="155" fill="#0369a1" fontSize="10" fontFamily="monospace" fontWeight="600">Mesopelagic Deep Core (160–400m)</text>
+                  {/* Variable */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      Variable
+                    </label>
+                    <select
+                      value={selectedVariableFilter}
+                      onChange={(e) => setSelectedVariableFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Variables</option>
+                      {allVariables.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {/* Temperature curve across depth */}
-                  <polyline
-                    fill="none"
-                    stroke="#d97706"
-                    strokeWidth="2.5"
-                    points={DEPTH_PROFILE.map((dp) => {
-                      const x = ((dp.temp - 8) / (30 - 8)) * 500 + 50;
-                      const y = (dp.depth / 400) * 190 + 15;
-                      return `${x},${y}`;
-                    }).join(" ")}
-                  />
+                  {/* Region */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      Region
+                    </label>
+                    <select
+                      value={selectedRegionFilter}
+                      onChange={(e) => setSelectedRegionFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Marine Regions</option>
+                      <option value="Arabian Sea">Arabian Sea</option>
+                      <option value="Bay of Bengal">Bay of Bengal</option>
+                      <option value="Indian Ocean">Indian Ocean Basin</option>
+                      <option value="Saurashtra">Saurashtra Coast</option>
+                      <option value="EEZ">Indian EEZ</option>
+                    </select>
+                  </div>
 
-                  {/* Salinity curve across depth */}
-                  <polyline
-                    fill="none"
-                    stroke="#0284c7"
-                    strokeWidth="2"
-                    strokeDasharray="4 2"
-                    points={DEPTH_PROFILE.map((dp) => {
-                      const x = ((dp.salinity - 34.5) / (36.5 - 34.5)) * 500 + 50;
-                      const y = (dp.depth / 400) * 190 + 15;
-                      return `${x},${y}`;
-                    }).join(" ")}
-                  />
-                </svg>
-                <div className="absolute bottom-2 right-4 flex items-center gap-4 text-[10px] font-mono">
-                  <span className="text-amber-700 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" /> Temperature (°C)</span>
-                  <span className="text-blue-700 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500" /> Salinity (PSU)</span>
+                  {/* Type */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      Data Type
+                    </label>
+                    <select
+                      value={selectedTypeFilter}
+                      onChange={(e) => setSelectedTypeFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Data Types</option>
+                      <option value="Satellite Observation">Satellite Observation</option>
+                      <option value="Ocean Model">Ocean Model</option>
+                      <option value="Forecast">Forecast</option>
+                      <option value="Advisory/Product">Advisory/Product</option>
+                      <option value="Static Reference">Static Reference</option>
+                    </select>
+                  </div>
+
+                  {/* Format */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      File Format
+                    </label>
+                    <select
+                      value={selectedFormatFilter}
+                      onChange={(e) => setSelectedFormatFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Formats</option>
+                      <option value="NetCDF-4">NetCDF-4</option>
+                      <option value="Cloud-Optimized GeoTIFF (COG)">COG GeoTIFF</option>
+                      <option value="Vector GeoJSON">Vector GeoJSON</option>
+                      <option value="Point Telemetry">Point Telemetry</option>
+                      <option value="Bathymetric DEM">Bathymetric DEM</option>
+                    </select>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="text-[10px] uppercase font-mono font-medium text-[#667085] block mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={selectedStatusFilter}
+                      onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-xs focus:outline-none focus:border-[#1F4E8C]"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="Ready">Ready</option>
+                      <option value="Available">Available</option>
+                      <option value="Updated">Updated</option>
+                      <option value="External">External</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="flex items-center justify-between pt-2 border-t border-[#E1E5EA]">
+                  <button
+                    onClick={handleClearFilters}
+                    className="text-xs text-[#667085] hover:text-[#202124] underline underline-offset-2"
+                  >
+                    Reset all
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsFilterOpen(false);
+                      if (activeTab === "overview") setActiveTab("datasets");
+                    }}
+                    className="px-3 py-1.5 rounded bg-[#1F4E8C] text-white text-xs font-medium hover:bg-[#183E70] transition"
+                  >
+                    Apply Filters
+                  </button>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Time axis labels */}
-          <div className="flex justify-between text-[10px] font-mono text-zinc-400 px-2">
-            <span>00:00 IST</span>
-            <span>03:00 IST</span>
-            <span>06:00 IST</span>
-            <span>09:00 IST</span>
-            <span>12:00 IST</span>
-            <span>15:00 IST</span>
-            <span>18:00 IST</span>
-            <span>21:00 IST</span>
-          </div>
         </div>
 
-        {/* Right 1 Col: Spatial Bounding-Box Slicer & Exporter */}
-        <div className="rounded-3xl p-6 border space-y-4 flex flex-col justify-between" style={glassStyle}>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-mono font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="h-4 w-4" />
-                Spatial Extent Slicer
-              </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
-                OGC WCS Subsetter
+        {/* ─── COMPACT TOP HORIZONTAL STATISTICS STRIP ──────────────────────────── */}
+        <div className="bg-white border border-[#E1E5EA] rounded-lg px-4 py-2.5 shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between divide-y sm:divide-y-0 sm:divide-x divide-[#E1E5EA] text-xs font-mono">
+            <div className="flex items-center gap-2 py-1 sm:py-0 sm:pr-4">
+              <span className="text-base font-bold text-[#1F4E8C]">{stats.datasetsCount}</span>
+              <span className="text-[11px] text-[#667085] uppercase">Datasets</span>
+            </div>
+            <div className="flex items-center gap-2 py-1 sm:py-0 sm:px-4">
+              <span className="text-base font-bold text-[#202124]">{stats.providersCount}</span>
+              <span className="text-[11px] text-[#667085] uppercase">Providers</span>
+            </div>
+            <div className="flex items-center gap-2 py-1 sm:py-0 sm:px-4">
+              <span className="text-base font-bold text-[#202124]">{stats.variablesCount}</span>
+              <span className="text-[11px] text-[#667085] uppercase">Variables</span>
+            </div>
+            <div className="flex items-center gap-2 py-1 sm:py-0 sm:px-4">
+              <span className="text-base font-bold text-[#137333]">{stats.ingestedCount}</span>
+              <span className="text-[11px] text-[#667085] uppercase">
+                Files Ingested ({stats.totalStorageMb} MB)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 py-1 sm:py-0 sm:pl-4">
+              <span className="text-xs font-bold text-[#202124]">{stats.lastIngest}</span>
+              <span className="text-[11px] text-[#667085] uppercase">Last Ingest</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── TAB CONTENT CONTAINER ─────────────────────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        {/* =========================================================================
+            1. TAB: OVERVIEW (Default View - Summary First, Clean & Scannable)
+           ========================================================================= */}
+        {activeTab === "overview" && (
+          <div className="space-y-8">
+            {/* Recently Updated Datasets Section */}
+            <section className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#E1E5EA]">
+                <div>
+                  <h2 className="text-sm font-bold text-[#202124]">Recently Updated</h2>
+                  <p className="text-xs text-[#667085] mt-0.5">
+                    Latest high-priority marine observations and models ready for analysis.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("datasets")}
+                  className="text-xs font-medium text-[#1F4E8C] hover:underline flex items-center gap-1"
+                >
+                  <span>View all datasets</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="divide-y divide-[#E1E5EA]">
+                {SCIENTIFIC_DATASETS.slice(0, 4).map((ds) => (
+                  <div
+                    key={ds.id}
+                    onClick={() => handleOpenDatasetDrawer(ds.id)}
+                    className="py-3 px-2 -mx-2 rounded-lg hover:bg-[#F6F8FA] transition flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-[#202124] group-hover:text-[#1F4E8C] transition-colors">
+                          {ds.name}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#F0F4FA] text-[#1F4E8C] font-medium">
+                          {ds.providerName.split(" ")[0]}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#667085]">
+                          ({ds.format})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-[#667085]">
+                        <span>{ds.variables.map((v) => v.name).join(" · ")}</span>
+                        <span>•</span>
+                        <span className="font-mono text-[#137333]">{ds.coverage.region}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-right">
+                      <div className="text-xs font-mono text-[#667085]">
+                        Updated <span className="font-semibold text-[#202124]">{ds.temporal.latest.replace("Today · ", "")}</span>
+                      </div>
+                      <span className="text-[#9AA0A6] group-hover:text-[#1F4E8C] transition-colors">
+                        →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Data Providers Overview Grid */}
+            <section className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs">
+              <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#E1E5EA]">
+                <div>
+                  <h2 className="text-sm font-bold text-[#202124]">Data Providers</h2>
+                  <p className="text-xs text-[#667085] mt-0.5">
+                    Authoritative governmental, national space agency, and oceanographic sources.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("sources")}
+                  className="text-xs font-medium text-[#1F4E8C] hover:underline flex items-center gap-1"
+                >
+                  <span>Explore all sources</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {allProviders.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => handleJumpToProvider(p.id)}
+                    className="p-3.5 rounded-lg border border-[#E1E5EA] bg-[#FBFBFC] hover:border-[#1F4E8C] hover:bg-white transition cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-[#202124] group-hover:text-[#1F4E8C]">
+                        {p.shortName}
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-[#137333]" />
+                    </div>
+                    <p className="text-[11px] text-[#667085] line-clamp-1 mb-2">
+                      {p.organization.split("(")[0]}
+                    </p>
+                    <div className="text-[10px] font-mono text-[#1F4E8C] font-semibold flex items-center justify-between">
+                      <span>{p.datasetIds.length} datasets</span>
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Data Pipeline Summary (High-Level Architecture) */}
+            <section className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs">
+              <div className="pb-3 mb-4 border-b border-[#E1E5EA]">
+                <h2 className="text-sm font-bold text-[#202124]">Data Pipeline Summary</h2>
+                <p className="text-xs text-[#667085] mt-0.5">
+                  How ORCA ingests, standardizes, and serves oceanographic observations.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="p-3 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA]">
+                  <div className="text-[10px] font-mono text-[#E87524] uppercase font-bold mb-1">
+                    01 Sources
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#202124]">Scientific Sources</h3>
+                  <p className="text-[11px] text-[#667085] mt-1">
+                    INCOIS ERDDAP, ISRO MOSDAC, Copernicus Marine, Open-Meteo, NHO.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA]">
+                  <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold mb-1">
+                    02 Ingestion
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#202124]">ORCA Ingestion</h3>
+                  <p className="text-[11px] text-[#667085] mt-1">
+                    Scheduled pipeline daemons cache NetCDF, GeoTIFF, and Vector GeoJSON.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA]">
+                  <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold mb-1">
+                    03 Standard
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#202124]">Normalization</h3>
+                  <p className="text-[11px] text-[#667085] mt-1">
+                    Raw variables remapped to ORCA Marine Data Schema (OMDS) with SI units.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA]">
+                  <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold mb-1">
+                    04 Storage
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#202124]">ORCA Data Store</h3>
+                  <p className="text-[11px] text-[#667085] mt-1">
+                    PostGIS spatial tables, indexed rasters, and spatial footprints (EPSG:4326).
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA]">
+                  <div className="text-[10px] font-mono text-[#137333] uppercase font-bold mb-1">
+                    05 Delivery
+                  </div>
+                  <h3 className="text-xs font-semibold text-[#202124]">Downstream</h3>
+                  <p className="text-[11px] text-[#667085] mt-1">
+                    Spatial Canvas, AI Copilot, Dynamic Dossiers, and FastAPI endpoints.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* =========================================================================
+            2. TAB: SOURCES (Data Providers Workspace)
+           ========================================================================= */}
+        {activeTab === "sources" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E1E5EA]">
+              <div>
+                <h2 className="text-base font-bold text-[#202124]">Configured Data Providers</h2>
+                <p className="text-xs text-[#667085] mt-0.5">
+                  Authoritative agencies and international observation networks supplying raw scientific data.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-[#667085]">
+                {allProviders.length} active providers configured
               </span>
             </div>
 
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              Extract clamped sub-grids from NetCDF4 and Cloud-Optimized GeoTIFF raster archives without downloading full gigabyte scenes.
-            </p>
+            <div className="bg-white border border-[#E1E5EA] rounded-xl overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                      <th className="py-3 px-4 font-semibold">Provider / Agency</th>
+                      <th className="py-3 px-4 font-semibold">Organization</th>
+                      <th className="py-3 px-4 font-semibold">Datasets</th>
+                      <th className="py-3 px-4 font-semibold">Key Variables</th>
+                      <th className="py-3 px-4 font-semibold">Access Method</th>
+                      <th className="py-3 px-4 font-semibold">Last Fetch</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4 font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E1E5EA]">
+                    {allProviders.map((p) => (
+                      <tr
+                        key={p.id}
+                        onClick={() => handleOpenProviderDrawer(p.id)}
+                        className="hover:bg-[#F6F8FA] transition cursor-pointer"
+                      >
+                        <td className="py-3 px-4 font-semibold text-[#202124]">
+                          {p.shortName}
+                          <span className="block text-[11px] font-normal text-[#667085] line-clamp-1">
+                            {p.name}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-[#4A5568]">{p.organization}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-[#1F4E8C]">
+                          {p.datasetIds.length}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {p.variablesProvided.slice(0, 3).map((v) => (
+                              <span
+                                key={v}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#F0F4FA] text-[#1F4E8C]"
+                              >
+                                {v}
+                              </span>
+                            ))}
+                            {p.variablesProvided.length > 3 && (
+                              <span className="text-[10px] font-mono text-[#667085] self-center">
+                                +{p.variablesProvided.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#4A5568]">
+                          {p.accessMethod}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#667085]">
+                          {p.lastChecked}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#EBF5EE] text-[#137333]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenProviderDrawer(p.id);
+                            }}
+                            className="px-2.5 py-1 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA] transition"
+                          >
+                            Inspect Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
-            {/* Bounding Box Inputs */}
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-zinc-200">
-                <span className="text-[10px] text-zinc-500 block font-medium">North Lat (°N)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={sliceBounds.north}
-                  onChange={(e) => setSliceBounds({ ...sliceBounds, north: +e.target.value })}
-                  className="w-full bg-transparent text-zinc-900 font-bold outline-none"
-                />
+        {/* =========================================================================
+            3. TAB: DATASETS (Main Dataset Catalog Workspace)
+           ========================================================================= */}
+        {activeTab === "datasets" && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[#E1E5EA]">
+              <div>
+                <h2 className="text-base font-bold text-[#202124]">Dataset Catalog</h2>
+                <p className="text-xs text-[#667085] mt-0.5">
+                  Showing {filteredDatasets.length} of {SCIENTIFIC_DATASETS.length} datasets matching active criteria.
+                </p>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-zinc-200">
-                <span className="text-[10px] text-zinc-500 block font-medium">South Lat (°N)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={sliceBounds.south}
-                  onChange={(e) => setSliceBounds({ ...sliceBounds, south: +e.target.value })}
-                  className="w-full bg-transparent text-zinc-900 font-bold outline-none"
-                />
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-zinc-200">
-                <span className="text-[10px] text-zinc-500 block font-medium">West Lon (°E)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={sliceBounds.west}
-                  onChange={(e) => setSliceBounds({ ...sliceBounds, west: +e.target.value })}
-                  className="w-full bg-transparent text-zinc-900 font-bold outline-none"
-                />
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-zinc-200">
-                <span className="text-[10px] text-zinc-500 block font-medium">East Lon (°E)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={sliceBounds.east}
-                  onChange={(e) => setSliceBounds({ ...sliceBounds, east: +e.target.value })}
-                  className="w-full bg-transparent text-zinc-900 font-bold outline-none"
-                />
+              <div className="flex items-center gap-2 text-xs font-sans">
+                <span className="text-[#667085]">Sort by:</span>
+                <select
+                  value={datasetSortBy}
+                  onChange={(e) => setDatasetSortBy(e.target.value as any)}
+                  className="px-2.5 py-1 rounded border border-[#E1E5EA] bg-white text-xs text-[#202124] focus:outline-none focus:border-[#1F4E8C]"
+                >
+                  <option value="updated">Recently Updated</option>
+                  <option value="name">Dataset Name</option>
+                  <option value="provider">Provider</option>
+                  <option value="resolution">Spatial Resolution</option>
+                </select>
               </div>
             </div>
 
-            {/* Target Format */}
-            <div className="p-3 rounded-xl bg-slate-50 border border-zinc-200 space-y-1 text-xs font-mono">
-              <span className="text-[10px] text-zinc-500 block font-medium">Export Format:</span>
-              <div className="flex gap-2">
-                {["NetCDF4", "GeoTIFF", "CSV"].map((fmt, idx) => (
-                  <span key={fmt} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer border ${idx === 0 ? "bg-blue-600 border-blue-600 text-white" : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100"}`}>
-                    {fmt}
-                  </span>
+            {/* Datasets Table */}
+            <div className="bg-white border border-[#E1E5EA] rounded-xl overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                      <th className="py-3 px-4 font-semibold">Dataset / ID</th>
+                      <th className="py-3 px-4 font-semibold">Provider</th>
+                      <th className="py-3 px-4 font-semibold">Variables</th>
+                      <th className="py-3 px-4 font-semibold">Type</th>
+                      <th className="py-3 px-4 font-semibold">Coverage</th>
+                      <th className="py-3 px-4 font-semibold">Resolution</th>
+                      <th className="py-3 px-4 font-semibold">Updated</th>
+                      <th className="py-3 px-4 font-semibold">Format</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4 font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E1E5EA]">
+                    {filteredDatasets.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="py-12 text-center text-xs text-[#667085]">
+                          No datasets match your search or active filters.
+                          <button
+                            onClick={handleClearFilters}
+                            className="block mx-auto mt-2 text-[#1F4E8C] underline font-medium"
+                          >
+                            Reset filters
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredDatasets.map((ds) => (
+                        <tr
+                          key={ds.id}
+                          onClick={() => handleOpenDatasetDrawer(ds.id)}
+                          className="hover:bg-[#F6F8FA] transition cursor-pointer"
+                        >
+                          <td className="py-3 px-4 font-semibold text-[#202124]">
+                            {ds.name}
+                            <span className="block text-[10px] font-mono font-normal text-[#667085]">
+                              {ds.productId}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-[#4A5568] whitespace-nowrap">
+                            {ds.providerName.split(" ")[0]}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {ds.variables.slice(0, 3).map((v) => (
+                                <span
+                                  key={v.name}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#F0F4FA] text-[#1F4E8C]"
+                                >
+                                  {v.name}
+                                </span>
+                              ))}
+                              {ds.variables.length > 3 && (
+                                <span className="text-[10px] font-mono text-[#667085] self-center">
+                                  +{ds.variables.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-[#4A5568] whitespace-nowrap">{ds.type}</td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#4A5568] whitespace-nowrap">
+                            {ds.coverage.region}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#4A5568] whitespace-nowrap">
+                            {ds.coverage.horizontalResolution}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#667085] whitespace-nowrap">
+                            {ds.temporal.latest.replace("Today · ", "")}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#1F4E8C] whitespace-nowrap">
+                            {ds.format}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                                ds.status === "Ready" || ds.status === "Updated"
+                                  ? "bg-[#EBF5EE] text-[#137333]"
+                                  : "bg-[#F0F4FA] text-[#1F4E8C]"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  ds.status === "Ready" || ds.status === "Updated"
+                                    ? "bg-[#137333]"
+                                    : "bg-[#1F4E8C]"
+                                }`}
+                              />
+                              {ds.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDatasetDrawer(ds.id);
+                              }}
+                              className="px-2.5 py-1 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA] transition"
+                            >
+                              Inspect →
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            4. TAB: INGESTION (Fetched & Stored Data Workspace)
+           ========================================================================= */}
+        {activeTab === "ingestion" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E1E5EA]">
+              <div>
+                <h2 className="text-base font-bold text-[#202124]">Fetched & Stored Data</h2>
+                <p className="text-xs text-[#667085] mt-0.5">
+                  Physical assets acquired, validated, and cached locally in{" "}
+                  <code className="font-mono text-[#1F4E8C]">orca-data-pipeline/data/</code>.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-[#137333] font-semibold">
+                {ingestedDatasets.length} files indexed ({stats.totalStorageMb} MB total)
+              </span>
+            </div>
+
+            <div className="bg-white border border-[#E1E5EA] rounded-xl overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                      <th className="py-3 px-4 font-semibold">Dataset / File</th>
+                      <th className="py-3 px-4 font-semibold">Provider</th>
+                      <th className="py-3 px-4 font-semibold">Last Fetch</th>
+                      <th className="py-3 px-4 font-semibold">Time Range</th>
+                      <th className="py-3 px-4 font-semibold">Size</th>
+                      <th className="py-3 px-4 font-semibold">Storage Target</th>
+                      <th className="py-3 px-4 font-semibold">Status</th>
+                      <th className="py-3 px-4 font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E1E5EA]">
+                    {ingestedDatasets.map((ds) => (
+                      <tr
+                        key={ds.id}
+                        onClick={() => handleOpenIngestionDrawer(ds.id)}
+                        className="hover:bg-[#F6F8FA] transition cursor-pointer"
+                      >
+                        <td className="py-3 px-4 font-semibold text-[#202124]">
+                          {ds.name}
+                          <span className="block text-[10px] font-mono font-normal text-[#1F4E8C]">
+                            {ds.ingestion.storedFiles[0]}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-[#4A5568]">{ds.providerName.split(" ")[0]}</td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#667085]">
+                          {ds.ingestion.lastFetch}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#4A5568]">
+                          {ds.ingestion.timeRange}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] font-bold text-[#202124]">
+                          {ds.ingestion.totalSizeMb} MB
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#4A5568]">
+                          {ds.ingestion.storageTarget}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#EBF5EE] text-[#137333]">
+                            <CheckCircle2 className="w-3 h-3 text-[#137333]" />
+                            {ds.ingestion.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenIngestionDrawer(ds.id);
+                            }}
+                            className="px-2.5 py-1 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA] transition"
+                          >
+                            History & Files
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            5. TAB: API (ORCA Data API Workspace)
+           ========================================================================= */}
+        {activeTab === "api" && (
+          <div className="space-y-6">
+            {/* Header & API Summary Strip */}
+            <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-[#E1E5EA]">
+                <div>
+                  <h2 className="text-base font-bold text-[#202124]">ORCA Data API</h2>
+                  <p className="text-xs text-[#667085] mt-0.5">
+                    Access standardized marine observations and spatial data from external applications.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="http://localhost:8000/docs"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA] transition"
+                  >
+                    <span>OpenAPI Docs (Swagger)</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Compact API Parameters Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-xs font-mono">
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">API Version</span>
+                  <strong className="text-[#1F4E8C]">v1</strong>
+                </div>
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">Data Schema</span>
+                  <strong className="text-[#202124]">OMDS v1.0</strong>
+                </div>
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">Response</span>
+                  <strong className="text-[#202124]">JSON</strong>
+                </div>
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">Spatial Format</span>
+                  <strong className="text-[#202124]">GeoJSON</strong>
+                </div>
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">Auth</span>
+                  <strong className="text-[#137333]">Public Read / Key</strong>
+                </div>
+                <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                  <span className="text-[10px] text-[#667085] uppercase block">Base URL</span>
+                  <strong className="text-[#1F4E8C] truncate block">http://localhost:8000</strong>
+                </div>
+              </div>
+
+              {/* API Sub-Navigation Tabs */}
+              <div className="flex items-center gap-2 pt-2 border-t border-[#E1E5EA] overflow-x-auto text-xs">
+                {(
+                  [
+                    { key: "overview", label: "Overview" },
+                    { key: "schema", label: "Schema (OMDS)" },
+                    { key: "endpoints", label: "Endpoints" },
+                    { key: "footprints", label: "Footprints" },
+                    { key: "try_api", label: "Try API" },
+                    { key: "integration", label: "Integration" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setApiSubTab(t.key)}
+                    className={`px-3 py-1.5 rounded font-medium transition ${
+                      apiSubTab === t.key
+                        ? "bg-[#1F4E8C] text-white"
+                        : "text-[#667085] hover:bg-[#F6F8FA] hover:text-[#202124]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="space-y-2 pt-2">
-            <button
-              onClick={handleExportSlice}
-              disabled={isExporting}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-mono font-bold transition shadow-md hover:bg-blue-700 disabled:opacity-40"
-              style={{ background: "#2563eb", color: "#ffffff" }}
-            >
-              <Download className={`h-4 w-4 ${isExporting ? "animate-bounce" : ""}`} />
-              <span>{isExporting ? "Slicing NetCDF Tile..." : "Export Clamped Slice"}</span>
-            </button>
+            {/* API SUB-VIEW: OVERVIEW */}
+            {apiSubTab === "overview" && (
+              <div className="bg-white border border-[#E1E5EA] rounded-xl p-6 shadow-2xs space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-[#202124]">High-Level API Architecture</h3>
+                  <p className="text-xs text-[#667085] mt-1">
+                    ORCA receives heterogeneous oceanographic observations, normalizes them into standard SI units and GeoJSON structures, and exposes them through a high-performance FastAPI interface.
+                  </p>
+                </div>
 
-            {exportedSuccess && (
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center font-mono text-xs text-emerald-700 flex items-center justify-center gap-2 font-semibold">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Dataset slice generated successfully!</span>
+                <div className="p-4 rounded-lg bg-[#F6F8FA] border border-[#E1E5EA]">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center text-xs">
+                    <div className="p-3 bg-white border border-[#E1E5EA] rounded shadow-2xs w-full md:w-auto flex-1">
+                      <div className="text-[10px] font-mono text-[#E87524] uppercase font-bold">Step 1</div>
+                      <div className="font-semibold mt-0.5">Scientific Providers</div>
+                      <div className="text-[11px] text-[#667085]">INCOIS, MOSDAC, Copernicus</div>
+                    </div>
+                    <span className="text-[#9AA0A6] font-bold">→</span>
+                    <div className="p-3 bg-white border border-[#E1E5EA] rounded shadow-2xs w-full md:w-auto flex-1">
+                      <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold">Step 2</div>
+                      <div className="font-semibold mt-0.5">ORCA Ingestion</div>
+                      <div className="text-[11px] text-[#667085]">Download & Validate files</div>
+                    </div>
+                    <span className="text-[#9AA0A6] font-bold">→</span>
+                    <div className="p-3 bg-white border border-[#E1E5EA] rounded shadow-2xs w-full md:w-auto flex-1">
+                      <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold">Step 3</div>
+                      <div className="font-semibold mt-0.5">Normalization</div>
+                      <div className="text-[11px] text-[#667085]">OMDS Standard Schema</div>
+                    </div>
+                    <span className="text-[#9AA0A6] font-bold">→</span>
+                    <div className="p-3 bg-white border border-[#E1E5EA] rounded shadow-2xs w-full md:w-auto flex-1">
+                      <div className="text-[10px] font-mono text-[#1F4E8C] uppercase font-bold">Step 4</div>
+                      <div className="font-semibold mt-0.5">ORCA Data API</div>
+                      <div className="text-[11px] text-[#667085]">FastAPI Gateway</div>
+                    </div>
+                    <span className="text-[#9AA0A6] font-bold">→</span>
+                    <div className="p-3 bg-white border border-[#E1E5EA] rounded shadow-2xs w-full md:w-auto flex-1">
+                      <div className="text-[10px] font-mono text-[#137333] uppercase font-bold">Step 5</div>
+                      <div className="font-semibold mt-0.5">External Applications</div>
+                      <div className="text-[11px] text-[#667085]">Web, Mobile, GIS, AI Agents</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* API SUB-VIEW: SCHEMA */}
+            {apiSubTab === "schema" && (
+              <div className="space-y-4">
+                {/* Source Variable Mappings */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-3">
+                  <h3 className="text-sm font-bold text-[#202124]">Source Variable Mapping Matrix</h3>
+                  <p className="text-xs text-[#667085]">
+                    How heterogeneous raw scientific parameters are mapped into standard ORCA keys and SI units.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                          <th className="py-2.5 px-3">Provider</th>
+                          <th className="py-2.5 px-3">Raw Variable</th>
+                          <th className="py-2.5 px-3">Raw Unit</th>
+                          <th className="py-2.5 px-3">ORCA Variable</th>
+                          <th className="py-2.5 px-3">Standard SI Unit</th>
+                          <th className="py-2.5 px-3">Standard CF Name</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E1E5EA] font-mono text-[11px]">
+                        {SOURCE_VARIABLE_MAPPINGS.map((m, idx) => (
+                          <tr key={idx} className="hover:bg-[#F6F8FA]">
+                            <td className="py-2 px-3 text-[#202124]">{m.provider}</td>
+                            <td className="py-2 px-3 text-[#E87524]">{m.sourceVariable}</td>
+                            <td className="py-2 px-3 text-[#667085]">{m.rule}</td>
+                            <td className="py-2 px-3 font-bold text-[#1F4E8C]">{m.orcaVariable}</td>
+                            <td className="py-2 px-3 text-[#137333]">{m.unit}</td>
+                            <td className="py-2 px-3 text-[#4A5568]">{m.standardName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Example Standard JSON */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-[#202124]">Standard Normalized Response (JSON)</h3>
+                    <button
+                      onClick={() =>
+                        handleCopy(JSON.stringify(ORCA_STANDARD_SAMPLE_RESPONSE, null, 2), "sample-json")
+                      }
+                      className="px-2.5 py-1 rounded border border-[#E1E5EA] text-xs font-mono text-[#1F4E8C] hover:bg-[#F0F4FA] flex items-center gap-1.5"
+                    >
+                      {copiedKey === "sample-json" ? <Check className="w-3.5 h-3.5 text-[#137333]" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "sample-json" ? "Copied" : "Copy JSON"}</span>
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-lg bg-[#F6F8FA] border border-[#E1E5EA] text-[11px] font-mono text-[#202124] overflow-x-auto max-h-96">
+                    {JSON.stringify(ORCA_STANDARD_SAMPLE_RESPONSE, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* API SUB-VIEW: ENDPOINTS */}
+            {apiSubTab === "endpoints" && (
+              <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-[#202124]">Active Endpoints</h3>
+                  <p className="text-xs text-[#667085] mt-0.5">
+                    FastAPI routes serving scientific telemetry, maritime boundaries, vessel traffic, and navigation.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                        <th className="py-2.5 px-3">Method</th>
+                        <th className="py-2.5 px-3">Endpoint Path</th>
+                        <th className="py-2.5 px-3">Purpose</th>
+                        <th className="py-2.5 px-3">Parameters</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E1E5EA] font-mono text-[11px]">
+                      {ORCA_API_ENDPOINTS.map((ep) => (
+                        <tr key={ep.path} className="hover:bg-[#F6F8FA]">
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                ep.method === "GET"
+                                  ? "bg-[#EBF5EE] text-[#137333]"
+                                  : "bg-[#F0F4FA] text-[#1F4E8C]"
+                              }`}
+                            >
+                              {ep.method}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-[#202124]">{ep.path}</td>
+                          <td className="py-2.5 px-3 font-sans text-xs text-[#4A5568]">
+                            {ep.purpose}
+                          </td>
+                          <td className="py-2.5 px-3 text-[#667085] max-w-xs truncate">
+                            {ep.queryParams ? ep.queryParams.map((p) => p.name).join(", ") : "—"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-sans">
+                            <button
+                              onClick={() => {
+                                setTryEndpointPath(ep.path);
+                                setApiSubTab("try_api");
+                              }}
+                              className="px-2 py-0.5 rounded border border-[#E1E5EA] text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA]"
+                            >
+                              Test in Try API →
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* API SUB-VIEW: FOOTPRINTS */}
+            {apiSubTab === "footprints" && (
+              <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-[#E1E5EA]">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#202124]">Spatial Footprints (GeoJSON)</h3>
+                    <p className="text-xs text-[#667085] mt-0.5">
+                      Geographic bounding geometry and CRS specification for spatial observations.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-sans">
+                    {(
+                      [
+                        { key: "arabian_sea", label: "Arabian Sea" },
+                        { key: "bay_of_bengal", label: "Bay of Bengal" },
+                        { key: "indian_eez", label: "All-India EEZ" },
+                      ] as const
+                    ).map((r) => (
+                      <button
+                        key={r.key}
+                        onClick={() => setSelectedFootprintKey(r.key)}
+                        className={`px-2.5 py-1 rounded transition ${
+                          selectedFootprintKey === r.key
+                            ? "bg-[#1F4E8C] text-white font-medium"
+                            : "text-[#667085] hover:bg-[#F0F4FA]"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Visual 2D Canvas */}
+                  <div className="p-4 rounded-lg border border-[#E1E5EA] bg-[#FBFBFC] space-y-3">
+                    <div className="flex justify-between text-xs font-mono">
+                      <strong className="text-[#202124]">
+                        {ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].name}
+                      </strong>
+                      <span className="text-[#1F4E8C]">
+                        {ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].areaKm2}
+                      </span>
+                    </div>
+
+                    <div className="w-full h-44 bg-[#F6F8FA] border border-[#E1E5EA] rounded flex items-center justify-center relative overflow-hidden">
+                      <svg className="absolute inset-0 w-full h-full stroke-[#E1E5EA]">
+                        <defs>
+                          <pattern id="grid-foot-ws" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" strokeWidth="0.75" />
+                          </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#grid-foot-ws)" />
+                      </svg>
+                      <div className="border-2 border-[#1F4E8C] bg-[#1F4E8C]/15 rounded p-2 flex flex-col justify-between w-44 h-28 ml-4">
+                        <div className="flex justify-between text-[9px] font-mono text-[#1F4E8C] font-bold">
+                          <span>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].north}</span>
+                          <span>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].east}</span>
+                        </div>
+                        <div className="text-center font-mono text-[10px] text-[#1F4E8C] font-bold">
+                          GeoJSON Polygon
+                        </div>
+                        <div className="flex justify-between text-[9px] font-mono text-[#1F4E8C] font-bold">
+                          <span>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].south}</span>
+                          <span>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].west}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between text-[11px] font-mono text-[#667085]">
+                      <span>CRS: <strong>EPSG:4326 (WGS84)</strong></span>
+                      <span>Geometry: <strong>Polygon</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Bounding Coordinates & JSON */}
+                  <div className="p-4 rounded-lg border border-[#E1E5EA] bg-[#FBFBFC] space-y-3 font-mono text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between pb-2 border-b border-[#E1E5EA]">
+                        <span className="font-bold text-[#202124]">Bounding Coordinates</span>
+                        <button
+                          onClick={() =>
+                            handleCopy(
+                              JSON.stringify(ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].polygon, null, 2),
+                              "footprint-json"
+                            )
+                          }
+                          className="text-[#1F4E8C] hover:underline"
+                        >
+                          {copiedKey === "footprint-json" ? "Copied!" : "Copy GeoJSON"}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 py-3 text-center">
+                        <div className="p-2 rounded bg-white border border-[#E1E5EA]">
+                          <span className="text-[10px] text-[#667085] uppercase block">North</span>
+                          <strong>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].north}</strong>
+                        </div>
+                        <div className="p-2 rounded bg-white border border-[#E1E5EA]">
+                          <span className="text-[10px] text-[#667085] uppercase block">South</span>
+                          <strong>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].south}</strong>
+                        </div>
+                        <div className="p-2 rounded bg-white border border-[#E1E5EA]">
+                          <span className="text-[10px] text-[#667085] uppercase block">West</span>
+                          <strong>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].west}</strong>
+                        </div>
+                        <div className="p-2 rounded bg-white border border-[#E1E5EA]">
+                          <span className="text-[10px] text-[#667085] uppercase block">East</span>
+                          <strong>{ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].east}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <pre className="p-2.5 rounded bg-white border border-[#E1E5EA] text-[10px] text-[#1F4E8C] overflow-x-auto max-h-24">
+                      {JSON.stringify(ORCA_SPATIAL_FOOTPRINTS[selectedFootprintKey].polygon, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* API SUB-VIEW: TRY API */}
+            {apiSubTab === "try_api" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Left: Query Parameters */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#202124]">Query Builder</h3>
+                    <p className="text-xs text-[#667085] mt-0.5">
+                      Configure query parameters and test live response.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                        Endpoint Route
+                      </label>
+                      <select
+                        value={tryEndpointPath}
+                        onChange={(e) => setTryEndpointPath(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded border border-[#E1E5EA] bg-[#FBFBFC] font-mono text-xs focus:outline-none focus:border-[#1F4E8C]"
+                      >
+                        {ORCA_API_ENDPOINTS.map((e) => (
+                          <option key={e.path} value={e.path}>
+                            {e.method} {e.path}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                          Latitude (°N)
+                        </label>
+                        <input
+                          type="text"
+                          value={tryLat}
+                          onChange={(e) => setTryLat(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded border border-[#E1E5EA] font-mono text-xs focus:outline-none focus:border-[#1F4E8C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                          Longitude (°E)
+                        </label>
+                        <input
+                          type="text"
+                          value={tryLon}
+                          onChange={(e) => setTryLon(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded border border-[#E1E5EA] font-mono text-xs focus:outline-none focus:border-[#1F4E8C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-mono text-[#667085] block mb-1">
+                        Location Presets
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { name: "Veraval (Offshore)", lat: "20.902", lon: "70.368" },
+                          { name: "Porbandar (IMBL)", lat: "21.642", lon: "69.609" },
+                          { name: "Mangalore", lat: "12.865", lon: "74.842" },
+                          { name: "Kochi Basin", lat: "9.931", lon: "76.267" },
+                        ].map((p) => (
+                          <button
+                            key={p.name}
+                            onClick={() => {
+                              setTryLat(p.lat);
+                              setTryLon(p.lon);
+                            }}
+                            className="px-2 py-0.5 rounded border border-[#E1E5EA] bg-[#F6F8FA] hover:bg-[#F0F4FA] font-mono text-[10px] text-[#1F4E8C]"
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        onClick={handleExecuteTryApi}
+                        disabled={tryLoading}
+                        className="w-full py-2 rounded bg-[#1F4E8C] text-white font-medium text-xs flex items-center justify-center gap-2 hover:bg-[#183E70] transition"
+                      >
+                        {tryLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        )}
+                        <span>{tryLoading ? "Executing Query..." : "Send Request"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Response Inspector */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#E1E5EA]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[#202124]">Response</span>
+                      {tryStatus && (
+                        <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-[#EBF5EE] text-[#137333]">
+                          HTTP {tryStatus.code} OK ({tryStatus.timeMs} ms)
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleCopy(JSON.stringify(tryResponse, null, 2), "try-resp")}
+                      className="text-xs font-mono text-[#1F4E8C] hover:underline flex items-center gap-1"
+                    >
+                      {copiedKey === "try-resp" ? <Check className="w-3.5 h-3.5 text-[#137333]" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "try-resp" ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+
+                  <pre className="p-3.5 rounded-lg bg-[#F6F8FA] border border-[#E1E5EA] font-mono text-[11px] text-[#202124] overflow-x-auto max-h-[340px]">
+                    {JSON.stringify(tryResponse, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* API SUB-VIEW: INTEGRATION */}
+            {apiSubTab === "integration" && (
+              <div className="space-y-5">
+                {/* Code Snippets */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#E1E5EA]">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#202124]">Developer Code Integration</h3>
+                      <p className="text-xs text-[#667085] mt-0.5">
+                        Production-ready client snippets for querying ORCA Data.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs">
+                      {(["javascript", "python", "curl"] as const).map((lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => setActiveCodeTab(lang)}
+                          className={`px-2.5 py-1 rounded capitalize font-mono text-xs transition ${
+                            activeCodeTab === lang
+                              ? "bg-[#1F4E8C] text-white font-semibold"
+                              : "text-[#667085] hover:bg-[#F6F8FA]"
+                          }`}
+                        >
+                          {lang}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <pre className="p-4 rounded-lg bg-[#202124] text-[#F6F8FA] font-mono text-xs overflow-x-auto">
+                    {activeCodeTab === "javascript" &&
+                      `// JavaScript (Fetch)
+const lat = ${tryLat};
+const lon = ${tryLon};
+const url = "http://localhost:8000/api/v1/ocean/telemetry?lat=" + lat + "&lon=" + lon;
+
+const response = await fetch(url, {
+  headers: {
+    "Accept": "application/json",
+    "X-API-Key": "${apiKeyRevoked ? "REVOKED" : "orca_live_7c4e9f9a21b8"}"
+  }
+});
+
+const data = await response.json();
+console.log("SST (°C):", data.variables.sst.value);
+console.log("Significant Wave Height (m):", data.variables.wave_height.value);`}
+
+                    {activeCodeTab === "python" &&
+                      `# Python (Requests)
+import requests
+
+url = "http://localhost:8000/api/v1/ocean/telemetry"
+params = {"lat": ${tryLat}, "lon": ${tryLon}}
+headers = {
+    "Accept": "application/json",
+    "X-API-Key": "${apiKeyRevoked ? "REVOKED" : "orca_live_7c4e9f9a21b8"}"
+}
+
+response = requests.get(url, params=params, headers=headers)
+data = response.json()
+
+print(f"SST: {data['variables']['sst']['value']} °C")
+print(f"Chlorophyll: {data['variables']['chlorophyll_a']['value']} mg/m³")`}
+
+                    {activeCodeTab === "curl" &&
+                      `# cURL Command Line
+curl -X GET "http://localhost:8000/api/v1/ocean/telemetry?lat=${tryLat}&lon=${tryLon}" \\
+  -H "Accept: application/json" \\
+  -H "X-API-Key: ${apiKeyRevoked ? "REVOKED" : "orca_live_7c4e9f9a21b8"}"`}
+                  </pre>
+                </div>
+
+                {/* API Key Card */}
+                <div className="bg-white border border-[#E1E5EA] rounded-xl p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#202124]">Developer API Key</h3>
+                      <p className="text-xs text-[#667085] mt-0.5">
+                        For higher rate limits and programmatic access.
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#EBF5EE] text-[#137333]">
+                      ACTIVE
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <input
+                      type="text"
+                      readOnly
+                      value={apiKeyRevoked ? "KEY_REVOKED" : "orca_live_••••••••••••3F9A"}
+                      className="flex-1 px-3 py-2 rounded border border-[#E1E5EA] bg-[#FBFBFC] text-[#202124]"
+                    />
+                    <button
+                      onClick={() => handleCopy("orca_live_7c4e9f9a21b83F9A", "api-key")}
+                      disabled={apiKeyRevoked}
+                      className="px-3 py-2 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#1F4E8C] hover:bg-[#F0F4FA] flex items-center gap-1.5"
+                    >
+                      {copiedKey === "api-key" ? <Check className="w-3.5 h-3.5 text-[#137333]" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>Copy</span>
+                    </button>
+                    <button
+                      onClick={() => setApiKeyRevoked(!apiKeyRevoked)}
+                      className="px-3 py-2 rounded border border-[#E1E5EA] bg-white text-xs font-medium text-[#667085] hover:text-[#202124]"
+                    >
+                      {apiKeyRevoked ? "Regenerate" : "Revoke"}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </div>
-      </div>
+        )}
+      </main>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* REAL-TIME IN-SITU MOORED OCEAN BUOY FLEET                               */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-3xl p-6 border space-y-4" style={glassStyle}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-mono text-blue-600 uppercase font-bold flex items-center gap-1.5">
-              <Radio className="h-3.5 w-3.5" />
-              National Ocean Buoy Fleet Telemetry
-            </div>
-            <h3 className="text-xl font-bold text-zinc-900">
-              Moored Buoy Network (INCOIS / NIOT)
-            </h3>
-          </div>
-          <span className="text-xs font-mono text-emerald-600 flex items-center gap-1.5 font-semibold">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            4 Active Coastal Nodes
-          </span>
-        </div>
+      {/* =========================================================================
+          SLIDE-OVER DRAWER: DATASET DETAILS
+         ========================================================================= */}
+      {datasetDrawerOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            onClick={() => setDatasetDrawerOpen(false)}
+            className="absolute inset-0 bg-[#202124]/30 backdrop-blur-2xs transition-opacity"
+          />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {BUOY_FLEET.map((buoy) => (
-            <div
-              key={buoy.id}
-              className="rounded-2xl p-4 border border-zinc-200 bg-white shadow-xs space-y-3 transition-all hover:border-blue-400 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-xs text-blue-600">{buoy.id}</span>
-                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {buoy.status}
-                </span>
-              </div>
-
-              <div>
-                <div className="text-xs font-bold text-zinc-900 truncate">{buoy.name}</div>
-                <div className="text-[10px] font-mono text-zinc-500">
-                  {buoy.lat}°N, {buoy.lon}°E · {buoy.basin}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1 border-t border-zinc-100">
-                <div>
-                  <span className="text-[10px] text-zinc-500">SST (1m)</span>
-                  <div className="font-bold text-amber-600">{buoy.sst1m}°C</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500">Waves SWH</span>
-                  <div className="font-bold text-blue-600">{buoy.swh}m</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500">Wind Speed</span>
-                  <div className="font-bold text-zinc-800">{buoy.windSpeed} kts</div>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500">Battery</span>
-                  <div className="font-bold text-emerald-600">{buoy.battery} V</div>
-                </div>
-              </div>
-
-              <div className="text-[10px] font-mono text-zinc-400 pt-1 flex items-center justify-between">
-                <span>Uplink: {buoy.lastUplink}</span>
-                <span className="text-blue-600 font-semibold">INSAT-3D</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* EARTH OBSERVATION SCIENTIFIC DATASET CATALOG                            */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-3xl p-6 border space-y-4" style={glassStyle}>
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
-          <div>
-            <div className="text-xs font-mono text-blue-600 uppercase font-bold flex items-center gap-1.5">
-              <Database className="h-3.5 w-3.5" />
-              Sovereign Earth Observation Archives
-            </div>
-            <h3 className="text-xl font-bold text-zinc-900">
-              Scientific Datasets & Raster Slices
-            </h3>
-          </div>
-          <span className="text-xs font-mono text-zinc-500">5 Products Indexed</span>
-        </div>
-
-        <div className="space-y-3">
-          {DATASETS.map((ds) => (
-            <div
-              key={ds.id}
-              className="rounded-2xl p-4 sm:p-5 border border-zinc-200 bg-white shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-blue-300 hover:shadow-md"
-            >
-              <div className="space-y-1.5 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
-                    {ds.format}
-                  </span>
-                  <span className="text-amber-700 font-semibold">{ds.agency}</span>
-                  <span className="text-zinc-500">· {ds.resolution}</span>
-                  <span className="text-emerald-600 font-medium">· {ds.size}</span>
-                </div>
-
-                <h4 className="text-base font-bold text-zinc-900 hover:text-blue-600 transition">
-                  {ds.name}
-                </h4>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {ds.parameters.map((p) => (
-                    <span key={p} className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
-                      {p}
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-2xl bg-white shadow-2xl border-l border-[#E1E5EA] flex flex-col">
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-[#E1E5EA] flex items-start justify-between bg-[#FBFBFC]">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#F0F4FA] text-[#1F4E8C] font-semibold">
+                      {activeDataset.providerName.split(" ")[0]}
                     </span>
-                  ))}
+                    <span className="text-xs font-mono text-[#667085]">
+                      {activeDataset.productId}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-[#202124] leading-snug">
+                    {activeDataset.name}
+                  </h3>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    const blob = new Blob([JSON.stringify(ds, null, 2)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `${ds.id}_metadata.json`;
-                    a.click();
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-semibold border border-blue-200 text-blue-600 hover:bg-blue-50 transition shadow-xs"
+                  onClick={() => setDatasetDrawerOpen(false)}
+                  className="p-1 rounded text-[#9AA0A6] hover:text-[#202124] hover:bg-[#F0F4FA]"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download Product</span>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
+              {/* Drawer Tabs */}
+              <div className="flex items-center gap-2 px-5 border-b border-[#E1E5EA] bg-white overflow-x-auto text-xs">
+                {(
+                  [
+                    { key: "overview", label: "Overview" },
+                    { key: "variables", label: "Variables" },
+                    { key: "coverage", label: "Coverage & Grid" },
+                    ...(activeDataset.format === "NetCDF-4"
+                      ? [{ key: "netcdf" as const, label: "NetCDF-4" }]
+                      : []),
+                    { key: "provenance", label: "Provenance" },
+                    { key: "api", label: "API Query" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setDatasetDrawerTab(t.key)}
+                    className={`py-3 px-1 border-b-2 font-medium transition whitespace-nowrap ${
+                      datasetDrawerTab === t.key
+                        ? "border-[#1F4E8C] text-[#1F4E8C]"
+                        : "border-transparent text-[#667085] hover:text-[#202124]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Drawer Content */}
+              <div className="p-5 overflow-y-auto flex-1 space-y-5 text-xs text-[#202124]">
+                {/* DRAWER TAB: OVERVIEW */}
+                {datasetDrawerTab === "overview" && (
+                  <div className="space-y-4">
+                    <p className="text-xs leading-relaxed text-[#4A5568]">
+                      {activeDataset.overview}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 font-mono text-[11px]">
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] uppercase block">Type</span>
+                        <strong>{activeDataset.type}</strong>
+                      </div>
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] uppercase block">Format</span>
+                        <strong>{activeDataset.format}</strong>
+                      </div>
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] uppercase block">Resolution</span>
+                        <strong>{activeDataset.coverage.horizontalResolution}</strong>
+                      </div>
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] uppercase block">Frequency</span>
+                        <strong>{activeDataset.temporal.frequency}</strong>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg border border-[#E1E5EA] bg-[#F6F8FA] space-y-2">
+                      <span className="text-xs font-bold text-[#202124] block">Used by ORCA</span>
+                      {activeDataset.usedByORCA.map((u, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-[#1F4E8C] shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-semibold text-[#1F4E8C]">{u.agent}:</span>{" "}
+                            <span className="text-[#4A5568]">{u.purpose}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* DRAWER TAB: VARIABLES */}
+                {datasetDrawerTab === "variables" && (
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] font-mono text-[10px] uppercase">
+                            <th className="py-2 px-2.5">Variable</th>
+                            <th className="py-2 px-2.5">Standard Name</th>
+                            <th className="py-2 px-2.5">Unit</th>
+                            <th className="py-2 px-2.5">Dimensions</th>
+                            <th className="py-2 px-2.5">Fill Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E1E5EA] font-mono text-[11px]">
+                          {activeDataset.variables.map((v) => (
+                            <tr key={v.name} className="hover:bg-[#F6F8FA]">
+                              <td className="py-2 px-2.5 font-bold text-[#1F4E8C]">{v.name}</td>
+                              <td className="py-2 px-2.5 text-[#4A5568]">{v.standardName}</td>
+                              <td className="py-2 px-2.5 text-[#137333]">{v.unit}</td>
+                              <td className="py-2 px-2.5 text-[#667085]">{v.dimensions}</td>
+                              <td className="py-2 px-2.5 text-[#667085]">{v.fillValue}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* DRAWER TAB: COVERAGE */}
+                {datasetDrawerTab === "coverage" && (
+                  <div className="space-y-4 font-mono text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                      <div className="p-2 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] block">North</span>
+                        <strong>{activeDataset.coverage.bbox[3]}°N</strong>
+                      </div>
+                      <div className="p-2 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] block">South</span>
+                        <strong>{activeDataset.coverage.bbox[1]}°N</strong>
+                      </div>
+                      <div className="p-2 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] block">West</span>
+                        <strong>{activeDataset.coverage.bbox[0]}°E</strong>
+                      </div>
+                      <div className="p-2 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                        <span className="text-[10px] text-[#667085] block">East</span>
+                        <strong>{activeDataset.coverage.bbox[2]}°E</strong>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded bg-[#F6F8FA] border border-[#E1E5EA] space-y-1">
+                      <div>
+                        Region: <strong className="text-[#202124]">{activeDataset.coverage.region}</strong>
+                      </div>
+                      <div>
+                        Horizontal:{" "}
+                        <strong className="text-[#1F4E8C]">
+                          {activeDataset.coverage.horizontalResolution}
+                        </strong>
+                      </div>
+                      <div>
+                        Vertical Levels:{" "}
+                        <strong className="text-[#202124]">{activeDataset.coverage.verticalLevels}</strong>
+                      </div>
+                      <div>
+                        CRS: <strong className="text-[#137333]">EPSG:4326 (WGS84)</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DRAWER TAB: NETCDF (Only shown if NetCDF-4) */}
+                {datasetDrawerTab === "netcdf" && activeDataset.netcdfMetadata && (
+                  <div className="space-y-4 font-mono text-xs">
+                    <div>
+                      <span className="text-[10px] text-[#667085] uppercase font-bold block mb-1">
+                        Dimensions
+                      </span>
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA] space-y-1">
+                        {Object.entries(activeDataset.netcdfMetadata.dimensions).map(([k, v]) => (
+                          <div key={k} className="flex justify-between">
+                            <span className="text-[#1F4E8C]">{k}</span>
+                            <strong>{String(v)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-[#667085] uppercase font-bold block mb-1">
+                        Global Attributes
+                      </span>
+                      <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA] space-y-1 max-h-48 overflow-y-auto text-[11px]">
+                        {Object.entries(activeDataset.netcdfMetadata.globalAttributes).map(([k, v]) => (
+                          <div key={k} className="border-b border-[#E1E5EA] pb-1">
+                            <span className="text-[#667085]">{k}:</span>{" "}
+                            <span className="text-[#202124]">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DRAWER TAB: PROVENANCE */}
+                {datasetDrawerTab === "provenance" && (
+                  <div className="space-y-3">
+                    {activeDataset.provenance.map((step, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-lg border border-[#E1E5EA] bg-[#FBFBFC] space-y-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold text-[#E87524] uppercase">
+                            {step.stage}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#667085]">
+                            {step.authority}
+                          </span>
+                        </div>
+                        <div className="font-semibold text-xs text-[#202124]">{step.title}</div>
+                        <p className="text-[11px] text-[#667085]">{step.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* DRAWER TAB: API */}
+                {datasetDrawerTab === "api" && (
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="p-3 rounded bg-[#FBFBFC] border border-[#E1E5EA] space-y-2">
+                      <div className="text-[10px] text-[#667085] uppercase">Target Endpoint</div>
+                      <div className="p-2 rounded bg-white border border-[#E1E5EA] text-[#1F4E8C] font-bold">
+                        GET /api/v1/ocean/telemetry?dataset={activeDataset.id}&lat=20.902&lon=70.368
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setDatasetDrawerOpen(false);
+                        setActiveTab("api");
+                        setApiSubTab("try_api");
+                      }}
+                      className="w-full py-2 rounded bg-[#1F4E8C] text-white font-sans text-xs font-medium hover:bg-[#183E70] transition"
+                    >
+                      Open in Try API Explorer →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          SLIDE-OVER DRAWER: PROVIDER DETAILS
+         ========================================================================= */}
+      {providerDrawerOpen && activeProvider && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            onClick={() => setProviderDrawerOpen(false)}
+            className="absolute inset-0 bg-[#202124]/30 backdrop-blur-2xs transition-opacity"
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-xl bg-white shadow-2xl border-l border-[#E1E5EA] flex flex-col">
+              <div className="p-5 border-b border-[#E1E5EA] flex items-start justify-between bg-[#FBFBFC]">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#EBF5EE] text-[#137333] font-semibold">
+                    {activeProvider.status}
+                  </span>
+                  <h3 className="text-lg font-bold text-[#202124]">{activeProvider.shortName}</h3>
+                  <p className="text-xs text-[#667085]">{activeProvider.name}</p>
+                </div>
+                <button
+                  onClick={() => setProviderDrawerOpen(false)}
+                  className="p-1 rounded text-[#9AA0A6] hover:text-[#202124] hover:bg-[#F0F4FA]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                    Authority / Organization
+                  </span>
+                  <div className="font-semibold text-xs text-[#202124]">
+                    {activeProvider.organization}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                    Description
+                  </span>
+                  <p className="text-xs leading-relaxed text-[#4A5568]">
+                    {activeProvider.description}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 font-mono text-[11px]">
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Access Method</span>
+                    <strong>{activeProvider.accessMethod}</strong>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Last Fetch</span>
+                    <strong>{activeProvider.lastChecked}</strong>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                    Variables Provided
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeProvider.variablesProvided.map((v) => (
+                      <span
+                        key={v}
+                        className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#F0F4FA] text-[#1F4E8C]"
+                      >
+                        {v}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#667085] block mb-1">
+                    Configured Datasets
+                  </span>
+                  <div className="space-y-1.5">
+                    {activeProvider.datasetIds.map((id) => (
+                      <div
+                        key={id}
+                        onClick={() => {
+                          setProviderDrawerOpen(false);
+                          handleOpenDatasetDrawer(id);
+                        }}
+                        className="p-2 rounded border border-[#E1E5EA] hover:bg-[#F0F4FA] cursor-pointer font-mono text-xs text-[#1F4E8C] flex justify-between"
+                      >
+                        <span>{id}</span>
+                        <span>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          SLIDE-OVER DRAWER: INGESTION DETAILS & HISTORY
+         ========================================================================= */}
+      {ingestionDrawerOpen && activeIngestionDataset && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div
+            onClick={() => setIngestionDrawerOpen(false)}
+            className="absolute inset-0 bg-[#202124]/30 backdrop-blur-2xs transition-opacity"
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-xl bg-white shadow-2xl border-l border-[#E1E5EA] flex flex-col">
+              <div className="p-5 border-b border-[#E1E5EA] flex items-start justify-between bg-[#FBFBFC]">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#EBF5EE] text-[#137333] font-semibold">
+                    {activeIngestionDataset.ingestion.status}
+                  </span>
+                  <h3 className="text-lg font-bold text-[#202124]">
+                    {activeIngestionDataset.name}
+                  </h3>
+                  <p className="text-xs text-[#667085]">
+                    {activeIngestionDataset.providerName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIngestionDrawerOpen(false)}
+                  className="p-1 rounded text-[#9AA0A6] hover:text-[#202124] hover:bg-[#F0F4FA]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs font-mono">
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Total Size</span>
+                    <strong className="text-[#1F4E8C]">
+                      {activeIngestionDataset.ingestion.totalSizeMb} MB
+                    </strong>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Storage Target</span>
+                    <strong>{activeIngestionDataset.ingestion.storageTarget}</strong>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Last Fetch</span>
+                    <strong>{activeIngestionDataset.ingestion.lastFetch}</strong>
+                  </div>
+                  <div className="p-2.5 rounded bg-[#FBFBFC] border border-[#E1E5EA]">
+                    <span className="text-[10px] text-[#667085] uppercase block">Time Range</span>
+                    <strong>{activeIngestionDataset.ingestion.timeRange}</strong>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase text-[#667085] block mb-1">
+                    Indexed Local Files
+                  </span>
+                  <div className="p-3 rounded bg-[#F6F8FA] border border-[#E1E5EA] space-y-1 text-[11px] text-[#1F4E8C]">
+                    {activeIngestionDataset.ingestion.storedFiles.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <FileCode className="w-3.5 h-3.5 text-[#667085]" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase text-[#667085] block mb-1 font-bold">
+                    Ingestion Run History
+                  </span>
+                  <div className="border border-[#E1E5EA] rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-[#FBFBFC] border-b border-[#E1E5EA] text-[#667085] text-[10px] uppercase">
+                          <th className="py-2 px-3">Timestamp</th>
+                          <th className="py-2 px-3">Result</th>
+                          <th className="py-2 px-3">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E1E5EA] text-[11px]">
+                        {activeIngestionDataset.ingestion.history.map((h, i) => (
+                          <tr key={i} className="hover:bg-[#F6F8FA]">
+                            <td className="py-2 px-3 text-[#202124]">{h.timestamp}</td>
+                            <td className="py-2 px-3">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  h.status === "Successful"
+                                    ? "bg-[#EBF5EE] text-[#137333]"
+                                    : "bg-[#FCE8E6] text-[#C5221F]"
+                                }`}
+                              >
+                                {h.status}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-[#667085] font-sans">
+                              {h.note || "Nominal ingest cycle"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

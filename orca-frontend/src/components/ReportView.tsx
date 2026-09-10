@@ -353,7 +353,7 @@ export default function ReportView({
   return (
     <div id="orca-report-section" className="relative min-h-screen bg-[#F6F8FA] text-[#202124] pb-24">
       {/* ─── DYNAMIC LEFT-CORNER SECTION INDICATOR LINES (BOUNDED TO REPORT) ─── */}
-      <div className="absolute left-3 sm:left-5 xl:left-8 top-36 bottom-24 w-8 pointer-events-none z-30">
+      <div className="hidden 2xl:block absolute left-3 3xl:left-6 top-36 bottom-24 w-8 pointer-events-none z-30">
         <nav
           aria-label="Dossier Section Indicator Rail"
           className="sticky top-36 flex flex-col items-start gap-2.5 pointer-events-auto"
@@ -540,7 +540,7 @@ export default function ReportView({
         <header className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-mono font-semibold text-[#E87524] uppercase tracking-wider">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>ORCA Sovereign Marine Dossier · {currentReport.reportType.replace(/_/g, " ").toUpperCase()}</span>
+            <span>ORCA Marine Assessment · {currentReport.reportType.replace(/_/g, " ").toUpperCase()}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#202124]">
             {currentReport.title}
@@ -567,6 +567,7 @@ export default function ReportView({
         {/* ─── DYNAMIC SECTION ITERATION ───────────────────────────────────── */}
         {sections.map((sec, idx) => {
           const sectionNum = String(idx + 1).padStart(2, "0");
+          const sectionTitle = sec.title === currentReport.title ? (sec.subtitle || "Current Assessment") : sec.title;
           return (
             <section
               key={sec.id}
@@ -580,9 +581,9 @@ export default function ReportView({
                     {sectionNum} — {sec.label}
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
-                    {sec.title}
+                    {sectionTitle}
                   </h2>
-                  {sec.subtitle && (
+                  {sec.subtitle && sec.title !== currentReport.title && (
                     <p className="text-sm text-[#667085] mt-1 max-w-2xl">
                       {sec.subtitle}
                     </p>
