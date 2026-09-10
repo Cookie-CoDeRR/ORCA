@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Globe, Sparkles } from "lucide-react";
 import ReportView from "@/components/ReportView";
 
+import { reportStore } from "@/lib/reportStore";
+
 function ReportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -15,12 +17,14 @@ function ReportContent() {
   const lat = parseFloat(searchParams.get("lat") || "20.75");
   const lon = parseFloat(searchParams.get("lon") || "70.19");
   const basin = searchParams.get("basin") || "Arabian Sea (Northeastern Basin)";
+  const reportId = searchParams.get("reportId");
+  const matchedReport = reportId ? reportStore.getReportHistory().find((r) => r.id === reportId) : undefined;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-zinc-900">
       {/* Top Header Bar */}
       <header
-        className="sticky top-0 z-40 h-16 px-4 sm:px-8 flex items-center justify-between border-b border-zinc-200 bg-white/95 backdrop-blur-xl shadow-xs"
+        className="sticky top-0 z-40 h-14 px-4 sm:px-8 flex items-center justify-between border-b border-zinc-200 bg-white/95 backdrop-blur-xl shadow-xs"
       >
         <div className="flex items-center gap-4">
           <Link
@@ -64,6 +68,7 @@ function ReportContent() {
       {/* Main Report View */}
       <main>
         <ReportView
+          report={matchedReport}
           persona={persona}
           selectedSpeciesId={species}
           coordinates={{ lat, lon }}

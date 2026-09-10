@@ -19,18 +19,24 @@ import {
 import ThreeGlobe from "@/components/ThreeGlobe";
 import ReportView from "@/components/ReportView";
 import { sendMultiAgentMessage } from "@/lib/api";
+import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
+import { reportStore, DEFAULT_TUNA_REPORT } from "@/lib/reportStore";
+import { Report, ReportGenerationProgress } from "@/lib/reportTypes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Persona = "navigator" | "researcher" | "defense" | "student" | "guest";
-type Basin   = "arabian_sea" | "bay_of_bengal" | "lakshadweep" | "andaman";
+type Basin = "arabian_sea" | "bay_of_bengal" | "lakshadweep" | "andaman";
 
 interface ChatMessage {
   id: string;
-  role: "user" | "ai" | "thought";
+  role: "user" | "ai" | "thought" | "system";
   content: string;
   timestamp: string;
   streaming?: boolean;
   referenceImage?: { src: string; caption: string };
+  isReportProgress?: boolean;
+  progressData?: ReportGenerationProgress;
+  generatedReport?: Report;
 }
 
 interface LayerItem {
@@ -49,39 +55,39 @@ const PERSONA_META: Record<Persona, {
   agent: string;
   color: string;
 }> = {
-  navigator:  { icon: Compass,        name: "Navigator",  agent: "Matsya-Sutradhar", color: "#09090b" },
-  researcher: { icon: Microscope,     name: "Researcher", agent: "Samudra-Vigyan",   color: "#09090b" },
-  defense:    { icon: ShieldCheck,    name: "Defense",    agent: "Sagar-Rakshak",    color: "#09090b" },
-  student:    { icon: GraduationCap,  name: "Student",    agent: "Jala-Vidya",       color: "#09090b" },
-  guest:      { icon: Waves,          name: "Guest",      agent: "Public Safety",    color: "#52525b" },
+  navigator: { icon: Compass, name: "Navigator", agent: "Matsya-Sutradhar", color: "#09090b" },
+  researcher: { icon: Microscope, name: "Researcher", agent: "Samudra-Vigyan", color: "#09090b" },
+  defense: { icon: ShieldCheck, name: "Defense", agent: "Sagar-Rakshak", color: "#09090b" },
+  student: { icon: GraduationCap, name: "Student", agent: "Jala-Vidya", color: "#09090b" },
+  guest: { icon: Waves, name: "Guest", agent: "Public Safety", color: "#52525b" },
 };
 
 const BASINS: { id: Basin; label: string; short: string }[] = [
-  { id: "arabian_sea",    label: "Arabian Sea",         short: "Arabian Sea" },
-  { id: "bay_of_bengal",  label: "Bay of Bengal",       short: "Bay of Bengal" },
-  { id: "lakshadweep",    label: "Lakshadweep Sea",     short: "Lakshadweep" },
-  { id: "andaman",        label: "Andaman & Nicobar",   short: "Andaman" },
+  { id: "arabian_sea", label: "Arabian Sea", short: "Arabian Sea" },
+  { id: "bay_of_bengal", label: "Bay of Bengal", short: "Bay of Bengal" },
+  { id: "lakshadweep", label: "Lakshadweep Sea", short: "Lakshadweep" },
+  { id: "andaman", label: "Andaman & Nicobar", short: "Andaman" },
 ];
 
 const DEFAULT_LAYERS: LayerItem[] = [
-  { id: "sst",       label: "SST Thermal Raster", icon: Thermometer,  on: true,  color: "#09090b" },
-  { id: "currents",  label: "Ocean Currents",     icon: Wind,         on: true,  color: "#27272a" },
-  { id: "pfz",       label: "PFZ Hotspots",       icon: Fish,         on: true,  color: "#d97706" },
-  { id: "imbl",      label: "IMBL Sovereign Zone",icon: ShieldAlert,  on: true,  color: "#dc2626" },
-  { id: "ais",       label: "AIS Vessel Vectors", icon: Ship,         on: true,  color: "#52525b" },
-  { id: "route",     label: "Optimal Route Line", icon: Navigation,   on: false, color: "#2563eb" },
-  { id: "bathy",     label: "Bathymetric Contour",icon: Layers,       on: false, color: "#0284c7" },
-  { id: "shelf",     label: "Continental Shelf",  icon: Activity,     on: false, color: "#71717a" },
-  { id: "graticule", label: "Polar Graticule",    icon: Grid,         on: false, color: "#a1a1aa" },
-  { id: "mesh",      label: "5x5 km Tactical Mesh",icon: LayoutGrid,  on: true,  color: "#09090b" },
+  { id: "sst", label: "SST Thermal Raster", icon: Thermometer, on: true, color: "#09090b" },
+  { id: "currents", label: "Ocean Currents", icon: Wind, on: true, color: "#27272a" },
+  { id: "pfz", label: "PFZ Hotspots", icon: Fish, on: true, color: "#d97706" },
+  { id: "imbl", label: "IMBL Sovereign Zone", icon: ShieldAlert, on: true, color: "#dc2626" },
+  { id: "ais", label: "AIS Vessel Vectors", icon: Ship, on: true, color: "#52525b" },
+  { id: "route", label: "Optimal Route Line", icon: Navigation, on: false, color: "#2563eb" },
+  { id: "bathy", label: "Bathymetric Contour", icon: Layers, on: false, color: "#0284c7" },
+  { id: "shelf", label: "Continental Shelf", icon: Activity, on: false, color: "#71717a" },
+  { id: "graticule", label: "Polar Graticule", icon: Grid, on: false, color: "#a1a1aa" },
+  { id: "mesh", label: "5x5 km Tactical Mesh", icon: LayoutGrid, on: true, color: "#09090b" },
 ];
 
 const SEARCH_SUGGESTIONS = [
-  { icon: MapPin,      label: "Veraval Commercial Harbor",     sub: "20.902°N, 70.368°E · Gujarat Hub · 5km Cell [IN-2090-7036]" },
-  { icon: MapPin,      label: "Kochi Marine Terminal",         sub: "9.934°N, 76.259°E · Kerala Hub · 5km Cell [IN-0993-7625]" },
-  { icon: MapPin,      label: "Chennai — Marina Basin",        sub: "13.080°N, 80.270°E · Tamil Nadu · 5km Cell [IN-1308-8027]" },
-  { icon: Fish,        label: "PFZ Cluster — Arabian Sea",    sub: "94% INCOIS Satellite Confidence · 20.75°N, 70.19°E" },
-  { icon: Thermometer, label: "Thermal Frontal Zone",          sub: "28.4°C → 26.1°C Chlorophyll Upwelling · Western Shelf" },
+  { icon: MapPin, label: "Veraval Commercial Harbor", sub: "20.902°N, 70.368°E · Gujarat Hub · 5km Cell [IN-2090-7036]" },
+  { icon: MapPin, label: "Kochi Marine Terminal", sub: "9.934°N, 76.259°E · Kerala Hub · 5km Cell [IN-0993-7625]" },
+  { icon: MapPin, label: "Chennai — Marina Basin", sub: "13.080°N, 80.270°E · Tamil Nadu · 5km Cell [IN-1308-8027]" },
+  { icon: Fish, label: "PFZ Cluster — Arabian Sea", sub: "94% INCOIS Satellite Confidence · 20.75°N, 70.19°E" },
+  { icon: Thermometer, label: "Thermal Frontal Zone", sub: "28.4°C → 26.1°C Chlorophyll Upwelling · Western Shelf" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -197,67 +203,183 @@ export function getSovereignBasin(lat: number, lon: number): BasinInfo {
   };
 }
 
+// ─── Conversational AI Query Responder (NO report created on normal questions) ─
+function getConversationalResponse(q: string, coords: { lat: number; lon: number }, basinName: string): string {
+  const query = q.toLowerCase();
+  const latStr = coords.lat.toFixed(3);
+  const lonStr = coords.lon.toFixed(3);
+
+  if (query.includes("sst") || query.includes("temperature")) {
+    return `**Sea Surface Temperature Telemetry:**\n\nAt coordinate **${latStr}°N, ${lonStr}°E** (${basinName}), the current Sea Surface Temperature is **28.4°C** (Sentinel-3 SLSTR radiometer observation).\n\n• **Thermal State:** Normal seasonal baseline with a mild positive thermal gradient (+0.4°C/km).\n• **Ecological Suitability:** Within optimal feeding window for epipelagic tuna (25.0°C – 29.5°C).\n\n*To produce a full formal assessment, click **Generate Report** or ask "Generate a report about SST conditions here."*`;
+  }
+
+  if (query.includes("chlorophyll") || query.includes("chl") || query.includes("bloom")) {
+    return `**Chlorophyll-a Concentration Telemetry:**\n\nAt coordinate **${latStr}°N, ${lonStr}°E** (${basinName}), Sentinel-3 OLCI records **1.26 mg/m³**.\n\n• **Anomaly:** +18.4% above seasonal climatology, indicating Ekman upwelling along the western shelf.\n• **Trophic Cascade:** Increased zooplankton abundance favorable for mackerel and pelagic forage.\n\n*To produce a full bloom assessment, ask "Generate a chlorophyll report" or click **Generate Report**.*`;
+  }
+
+  if (query.includes("wave") || query.includes("swell") || query.includes("sea state")) {
+    return `**Hydrodynamic Sea State Telemetry:**\n\nAt coordinate **${latStr}°N, ${lonStr}°E** (${basinName}), INCOIS wave telemetry reports:\n\n• **Significant Wave Height (SWH):** 1.6 m (Safe operating envelope for mechanized vessels)\n• **Dominant Wave Period:** 7.8 seconds\n• **Swell Direction:** 215° SW\n• **Surface Wind:** 12 kt WNW\n\n*To produce a full wave hazard assessment, ask "Generate a report about wave conditions" or click **Generate Report**.*`;
+  }
+
+  if (query.includes("fish") || query.includes("species") || query.includes("tuna") || query.includes("catch")) {
+    return `**Pelagic Species Habitat Assessment:**\n\nIn the **${basinName}** sector around **${latStr}°N, ${lonStr}°E**, primary commercial target species include:\n\n1. **Yellowfin Tuna (*Thunnus albacares*)** — 93% suitability confidence along the 200m shelf divergence.\n2. **Skipjack Tuna (*Katsuwonus pelamis*)** — 88% confidence in surface thermal eddies.\n3. **Indian Mackerel (*Rastrelliger kanagurta*)** — Inshore upwelling corridors.\n\n*Ask "Generate a report about Yellowfin Tuna" or click **Generate Report** to formulate a full advisory dossier.*`;
+  }
+
+  if (query.includes("what information goes into") || query.includes("what goes into") || query.includes("what is a report")) {
+    return `**ORCA Maritime Intelligence Dossier Structure:**\n\nWhen a formal report is requested, ORCA's multi-agent system dynamically compiles:\n\n1. **Situation & Advisory** — Suitability index, alert rating, and operational window.\n2. **Ocean Conditions** — In-situ SST, chlorophyll-a, wave height, current vectors, and salinity.\n3. **Domain Modules** — Custom sections depending on topic (Species Profile, Wave Spectrogram, Weather, or Algal Blooms).\n4. **Safety & Guidance** — Sovereign IMBL standoff compliance, emergency shelter ports, and gear SOPs.\n5. **ORCA Reasoning & Research** — Multi-agent pipeline logs and peer-reviewed scientific literature.\n6. **Authoritative Sources** — Grounded in INCOIS, ISRO, and Copernicus data.\n\n*You can generate one anytime by clicking **Generate Report** or asking e.g. "Generate a report for this location."*`;
+  }
+
+  return `**ORCA Mission Copilot Telemetry (${basinName}):**\n\nObserving 5km × 5km cell at **${latStr}°N, ${lonStr}°E**.\n\n• **SST:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m · **IMBL:** 74.2 km SAFE\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\nI can answer questions regarding ocean physics, species suitability, and safety standoffs, or formulate a full intelligence dossier when requested.`;
+}
+
 // ─── AI Chat Drawer (Sleek Crisp White Mission Copilot) ────────────────────────
 function AIChatDrawer({
-  persona, isOpen, onToggle, onOpenReport, selectedCoord,
+  persona, isOpen, onToggle, onOpenReport, onReportGenerated, selectedCoord, basinLabel,
 }: {
   persona: Persona; isOpen: boolean; onToggle: () => void; onOpenReport?: () => void;
+  onReportGenerated?: (report: Report) => void;
   selectedCoord?: { lat: number; lon: number } | null;
+  basinLabel?: string;
 }) {
   const pm = PERSONA_META[persona];
   const PersonaIcon = pm.icon;
 
-  // Start with completely empty chat - NO premade messages
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState<ReportGenerationProgress | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = useCallback(async () => {
-    const q = input.trim();
-    if (!q || streaming) return;
+  // Method 1 & 2: Report Generation Pipeline Trigger
+  const triggerReportGeneration = useCallback(async (customTopic?: string) => {
+    if (isGenerating || streaming) return;
+    const targetTopic = (customTopic && customTopic.trim()) || input.trim() || "Comprehensive Ocean State & Advisory Report";
     setInput("");
 
+    const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
+    const basinNameToUse = basinLabel || "Arabian Sea Basin";
+
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: `Generate report: ${targetTopic}`,
+      timestamp: now(),
+    };
+    setMessages((m) => [...m, userMsg]);
+    setIsGenerating(true);
+
+    const progressMsgId = uid();
+    const initialProgress: ReportGenerationProgress = {
+      stage: 1,
+      totalStages: 6,
+      stageName: "Understanding request",
+      message: `Analyzing intent & extracting topic from: "${targetTopic}"...`,
+      progressPercent: 16,
+    };
+
+    setMessages((m) => [
+      ...m,
+      {
+        id: progressMsgId,
+        role: "system",
+        content: "",
+        timestamp: now(),
+        isReportProgress: true,
+        progressData: initialProgress,
+      },
+    ]);
+
+    try {
+      const newReport = await generateReportPipeline(
+        targetTopic,
+        {
+          lat: coordToUse.lat,
+          lon: coordToUse.lon,
+          basinLabel: basinNameToUse,
+          isEEZ: true,
+          imblDistanceKm: 74.2,
+        },
+        (progress) => {
+          setGeneratingProgress(progress);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === progressMsgId ? { ...msg, progressData: progress } : msg
+            )
+          );
+        }
+      );
+
+      // Complete
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === progressMsgId
+            ? {
+              ...msg,
+              content: `✅ **Report Complete: ${newReport.title}**\n\nGenerated ${newReport.sections.length} dynamic sections for ${newReport.location}. Automatically opening report view...`,
+              generatedReport: newReport,
+            }
+            : msg
+        )
+      );
+
+      setIsGenerating(false);
+      setGeneratingProgress(null);
+
+      // Automatically navigate to the newly generated report
+      if (onReportGenerated) {
+        onReportGenerated(newReport);
+      }
+    } catch (err) {
+      console.error("Report generation error:", err);
+      setIsGenerating(false);
+      setGeneratingProgress(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: "ai",
+          content: "⚠️ **Report Generation Error**\n\nReport generation could not be completed. Please check connection and try again.",
+          timestamp: now(),
+        },
+      ]);
+    }
+  }, [isGenerating, streaming, input, selectedCoord, basinLabel, onReportGenerated]);
+
+  const handleSend = useCallback(async () => {
+    const q = input.trim();
+    if (!q || streaming || isGenerating) return;
+
+    // Check intent: Is this explicitly asking to generate/create a report?
+    if (isReportRequest(q)) {
+      triggerReportGeneration(q);
+      return;
+    }
+
+    // Normal conversational inquiry
+    setInput("");
     const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
     setMessages((m) => [...m, userMsg]);
     setStreaming(true);
 
-    const liveResult = await sendMultiAgentMessage({
-      message: userMsg.content,
-      persona,
-    });
-
-    const thoughts = liveResult?.thoughts && liveResult.thoughts.length > 0
-      ? liveResult.thoughts
-      : [
-          "Supervisor → Ocean Analytics node dispatched",
-          "Ingesting NetCDF SST & Chlorophyll-a raster",
-          "PostGIS Spatial Query: 5km × 5km EEZ cell resolution",
-          "Synthesizing hydrodynamic advisory report",
-        ];
+    const thoughts = [
+      "Supervisor → Query Intent classified as conversational",
+      "Telemetry Engine → Ingesting localized sensor state",
+      "Domain Agent → Synthesizing response without report creation",
+    ];
 
     for (const t of thoughts) {
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, 160));
       setMessages((m) => [...m, { id: uid(), role: "thought", content: t, timestamp: now() }]);
     }
 
-    const responseText = liveResult?.text && liveResult.text.length > 20
-      ? liveResult.text
-      : `**MARITIME INTELLIGENCE ADVISORY [VERIFIED SAFE TO VENTURE]**\n\n` +
-        `**Optimal Target:** Yellowfin Tuna (*Thunnus albacares*)\n` +
-        `• 5km × 5km Geodetic Cell: [IN-EEZ-2075-7019] (20.75°N, 70.19°E)\n` +
-        `• Sea Surface Temperature: 28.4°C (Optimal thermal envelope)\n` +
-        `• Chlorophyll-a: 1.26 mg/m³ (+18.4% anomaly threshold verified)\n` +
-        `• Significant Wave Height: 1.6m SWH (Safe operating envelope)\n\n` +
-        `**Navigation & Fuel Optimization:**\n` +
-        `• Heading: 215° True Bearing · 28.4 Nautical Miles\n` +
-        `• Hydrodynamic Efficiency: +18.4% fuel conservation via 1.2 kt tailcurrent assist\n` +
-        `• Sovereign Standoff: 74.2 km from International Maritime Boundary Line (CLEAR)\n` +
-        `• Peak Feed Window: 04:30 – 07:30 IST`;
+    const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
+    const basinToUse = basinLabel || "Arabian Sea Basin";
+    const responseText = getConversationalResponse(userMsg.content, coordToUse, basinToUse);
 
     const aiId = uid();
     setMessages((m) => [
@@ -268,16 +390,12 @@ function AIChatDrawer({
         content: "",
         timestamp: now(),
         streaming: true,
-        referenceImage: {
-          src: "/images/ocean_bathymetry.jpg",
-          caption: "Satellite Bathymetry Reference: Submarine Shelf & Depth Contours",
-        },
       },
     ]);
 
     let chars = 0;
     const interval = setInterval(() => {
-      chars += 4;
+      chars += 5;
       setMessages((m) =>
         m.map((msg) =>
           msg.id === aiId
@@ -289,8 +407,8 @@ function AIChatDrawer({
         clearInterval(interval);
         setStreaming(false);
       }
-    }, 14);
-  }, [input, streaming, persona]);
+    }, 12);
+  }, [input, streaming, isGenerating, selectedCoord, basinLabel, triggerReportGeneration]);
 
   return (
     <>
@@ -310,7 +428,7 @@ function AIChatDrawer({
         </div>
         {isOpen
           ? <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
-          : <ChevronLeft  className="h-3.5 w-3.5 text-zinc-500" />
+          : <ChevronLeft className="h-3.5 w-3.5 text-zinc-500" />
         }
       </button>
 
@@ -341,17 +459,29 @@ function AIChatDrawer({
           </button>
         </div>
 
-        {/* Response Mode Selector */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-200 flex-shrink-0 text-[11px] font-mono bg-zinc-50/80">
-          <span className="text-zinc-500">Response Mode:</span>
-          <select
-            className="bg-transparent text-zinc-900 outline-none cursor-pointer font-mono font-semibold"
-            defaultValue="conversational"
+        {/* Action Header Strip with Generate Report Action Button */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 flex-shrink-0 text-[11px] font-mono bg-zinc-50/80">
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-500">Mode:</span>
+            <select
+              className="bg-transparent text-zinc-900 outline-none cursor-pointer font-mono font-semibold text-xs"
+              defaultValue="conversational"
+            >
+              <option value="conversational">Conversational</option>
+              <option value="advisory">Advisory Brief</option>
+              <option value="scientific">Scientific Telemetry</option>
+            </select>
+          </div>
+
+          <button
+            onClick={() => triggerReportGeneration(input)}
+            disabled={isGenerating || streaming}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1F4E8C] hover:bg-[#173F72] text-white text-[10px] font-sans font-medium transition disabled:opacity-40 shadow-xs"
+            title="Generate a dynamic report for current topic and coordinates"
           >
-            <option value="conversational">Conversational</option>
-            <option value="advisory">Advisory Brief</option>
-            <option value="scientific">Scientific Telemetry</option>
-          </select>
+            <FileText className="h-3 w-3" />
+            <span>Generate Report</span>
+          </button>
         </div>
 
         {/* Messages Container */}
@@ -374,18 +504,18 @@ function AIChatDrawer({
                 </div>
               )}
               <p className="text-[11px] text-zinc-500 max-w-xs leading-relaxed mb-6">
-                Operator console is clear. Ask anything regarding this sector's oceanography, fishing zones, or tactical safety vectors.
+                Ask normal questions for conversational answers, or explicitly request a report to dynamically generate a formal dossier.
               </p>
 
               {/* Quick Query Starters */}
               <div className="w-full space-y-2 max-w-xs text-left">
                 <div className="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wider">
-                  Suggested Prompts
+                  Quick Queries (Conversational)
                 </div>
                 {[
-                  "Query pelagic fish potential at this cell",
-                  "Analyze SST thermal gradient and front status",
-                  "Check IMBL sovereign standoff distance",
+                  "What is the SST at this location?",
+                  "Why is chlorophyll important?",
+                  "What information goes into a fishing report?",
                 ].map((promptText) => (
                   <button
                     key={promptText}
@@ -396,86 +526,123 @@ function AIChatDrawer({
                     <span className="text-zinc-400 group-hover:text-black font-bold">&rarr;</span>
                   </button>
                 ))}
+
+                <div className="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wider pt-2">
+                  Report Commands (Dynamic Dossier)
+                </div>
+                {[
+                  "Generate a report about high wave conditions",
+                  "Prepare a chlorophyll bloom report",
+                  "Generate a Yellowfin Tuna fishing advisory",
+                ].map((reportPrompt) => (
+                  <button
+                    key={reportPrompt}
+                    onClick={() => triggerReportGeneration(reportPrompt)}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-[#F0F4FA] border border-[#CBD5E1] hover:border-[#1F4E8C] text-[11px] text-[#1F4E8C] font-medium transition shadow-xs flex items-center justify-between group"
+                  >
+                    <span>{reportPrompt}</span>
+                    <FileText className="h-3 w-3 text-[#1F4E8C]" />
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
             messages.map((msg) => {
-            if (msg.role === "thought") {
-              return (
-                <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
-                  <div className="h-1.5 w-1.5 rounded-full bg-zinc-900 animate-pulse" />
-                  {msg.content}
-                </div>
-              );
-            }
-            const isUser = msg.role === "user";
-            return (
-              <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                <div
-                  className="max-w-[94%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm"
-                  style={
-                    isUser
-                      ? { background: "#09090b", color: "#ffffff", borderRadius: "14px 14px 2px 14px" }
-                      : { background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "2px 14px 14px 14px", color: "#18181b" }
-                  }
-                >
-                  <div className="text-[10px] font-mono mb-1.5 flex items-center gap-1.5" style={{ color: isUser ? "#a1a1aa" : "#71717a" }}>
-                    {isUser ? (
-                      <>
-                        <User className="h-3 w-3 text-white" />
-                        <span className="font-semibold text-white">Operator</span>
-                      </>
-                    ) : (
-                      <>
-                        <PersonaIcon className="h-3 w-3 text-zinc-900" />
-                        <span className="font-semibold text-zinc-900">{pm.agent}</span>
-                      </>
-                    )}
-                    <span>· {msg.timestamp}</span>
+              if (msg.role === "thought") {
+                return (
+                  <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+                    <div className="h-1.5 w-1.5 rounded-full bg-zinc-900 animate-pulse" />
+                    {msg.content}
                   </div>
+                );
+              }
 
-                  {msg.content.split("\n").map((line, i) => {
-                    const bold = line.replace(/\*\*(.+?)\*\*/g, `<strong class='${isUser ? "font-bold text-white" : "font-bold text-black"}'>$1</strong>`);
-                    return (
-                      <p key={i} className="mb-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: bold }} />
-                    );
-                  })}
-
-                  {/* Reference Image Attachment */}
-                  {msg.referenceImage && (
-                    <div className="mt-3 rounded-xl overflow-hidden border border-zinc-200 bg-white shadow-sm">
-                      <img
-                        src={msg.referenceImage.src}
-                        alt={msg.referenceImage.caption}
-                        className="w-full h-36 object-cover"
-                      />
-                      <div className="px-2.5 py-1.5 text-[10px] font-mono text-zinc-700 flex items-center gap-1.5 border-t border-zinc-100 bg-zinc-50">
-                        <ImageIcon className="h-3 w-3 text-zinc-500" />
-                        <span>{msg.referenceImage.caption}</span>
+              // Dynamic Report Generation Progress Card
+              if (msg.isReportProgress && msg.progressData) {
+                const p = msg.progressData;
+                const isComplete = !!msg.generatedReport;
+                return (
+                  <div key={msg.id} className="p-4 rounded-xl border border-zinc-200 bg-white shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isComplete ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 text-[#1F4E8C] animate-spin" />
+                        )}
+                        <span className="text-xs font-bold text-zinc-900">
+                          {isComplete ? "Report Complete" : p.stageName}
+                        </span>
                       </div>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Stage {p.stage}/{p.totalStages}
+                      </span>
                     </div>
-                  )}
 
-                  {msg.streaming && (
-                    <span className="inline-block text-zinc-900 animate-pulse ml-0.5 font-bold">▋</span>
-                  )}
+                    <p className="text-[11px] text-zinc-600 leading-relaxed whitespace-pre-line">
+                      {msg.content || p.message}
+                    </p>
 
-                  {/* Report CTA */}
-                  {!isUser && !msg.streaming && msg.content.length > 200 && (
-                    <div className="mt-3 pt-2.5 border-t border-zinc-100">
+                    <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                      <div
+                        className="h-full bg-[#1F4E8C] transition-all duration-300 rounded-full"
+                        style={{ width: `${isComplete ? 100 : p.progressPercent}%` }}
+                      />
+                    </div>
+
+                    {isComplete && (
                       <button
                         onClick={onOpenReport}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#1F4E8C] hover:bg-[#173F72] text-white text-xs font-semibold shadow-xs transition mt-1"
                       >
                         <FileText className="h-3.5 w-3.5" />
-                        Generate Full Intelligence Dossier ▼
+                        <span>Open Generated Dossier ▼</span>
                       </button>
+                    )}
+                  </div>
+                );
+              }
+
+              const isUser = msg.role === "user";
+              return (
+                <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className="max-w-[94%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm"
+                    style={
+                      isUser
+                        ? { background: "#09090b", color: "#ffffff", borderRadius: "14px 14px 2px 14px" }
+                        : { background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "2px 14px 14px 14px", color: "#18181b" }
+                    }
+                  >
+                    <div className="text-[10px] font-mono mb-1.5 flex items-center gap-1.5" style={{ color: isUser ? "#a1a1aa" : "#71717a" }}>
+                      {isUser ? (
+                        <>
+                          <User className="h-3 w-3 text-white" />
+                          <span className="font-semibold text-white">Operator</span>
+                        </>
+                      ) : (
+                        <>
+                          <PersonaIcon className="h-3 w-3 text-zinc-900" />
+                          <span className="font-semibold text-zinc-900">{pm.agent}</span>
+                        </>
+                      )}
+                      <span>· {msg.timestamp}</span>
                     </div>
-                  )}
+
+                    {msg.content.split("\n").map((line, i) => {
+                      const bold = line.replace(/\*\*(.+?)\*\*/g, `<strong class='${isUser ? "font-bold text-white" : "font-bold text-black"}'>$1</strong>`);
+                      return (
+                        <p key={i} className="mb-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: bold }} />
+                      );
+                    })}
+
+                    {msg.streaming && (
+                      <span className="inline-block text-zinc-900 animate-pulse ml-0.5 font-bold">▋</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })
           )}
           <div ref={bottomRef} />
         </div>
@@ -483,34 +650,43 @@ function AIChatDrawer({
         {/* Input Area */}
         <div className="border-t border-zinc-200 px-4 py-3 flex-shrink-0 space-y-2 bg-white">
           <div className="flex items-center gap-2">
-            <button className="text-zinc-500 hover:text-black transition p-1.5 rounded-lg hover:bg-zinc-100">
+            <button className="text-zinc-500 hover:text-black transition p-1.5 rounded-lg hover:bg-zinc-100" title="Audio Input">
               <Mic className="h-4 w-4" />
             </button>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Query sea state, thermal fronts, 5km coordinates..."
+              placeholder="Ask question, or type 'Generate report on...'"
               className="flex-1 bg-zinc-100/90 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 focus:bg-white transition"
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || streaming}
-              className="p-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-30 active:scale-95 shadow-sm"
+              disabled={!input.trim() || streaming || isGenerating}
+              className="p-2 rounded-xl bg-[#1F4E8C] text-white hover:bg-[#173F72] transition disabled:opacity-30 active:scale-95 shadow-sm"
+              title="Send Message"
             >
               <Send className="h-3.5 w-3.5" />
             </button>
           </div>
 
           <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-1">
-            <span>5km × 5km Mesh Ground-Station</span>
-            <span className="text-zinc-900 font-semibold">vLLM 4-bit AWQ Local</span>
+            <span>5km × 5km Mesh Telemetry</span>
+            <button
+              onClick={() => triggerReportGeneration(input)}
+              disabled={isGenerating || streaming}
+              className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1"
+            >
+              <FileText className="h-3 w-3" />
+              <span>Generate Report</span>
+            </button>
           </div>
         </div>
       </motion.div>
     </>
   );
 }
+
 
 // ─── Left Layer Dock (Crisp White Theme) ───────────────────────────────────────
 function LayerDock({ persona, visible }: { persona: Persona; visible: boolean }) {
@@ -531,9 +707,8 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
 
   return (
     <div
-      className={`fixed left-0 top-0 h-screen z-40 flex transition-opacity duration-300 ${
-        visible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-      }`}
+      className={`fixed left-0 top-0 h-screen z-40 flex transition-opacity duration-300 ${visible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
     >
@@ -649,11 +824,10 @@ function LayerDock({ persona, visible }: { persona: Persona; visible: boolean })
                     <button
                       key={b}
                       onClick={() => setBasemap(b)}
-                      className={`w-full flex items-center justify-between text-xs font-sans px-2.5 py-1.5 rounded-lg transition ${
-                        basemap === b
+                      className={`w-full flex items-center justify-between text-xs font-sans px-2.5 py-1.5 rounded-lg transition ${basemap === b
                           ? "bg-[#F0F4FA] text-[#1F4E8C] font-semibold border border-[#CBD5E1]"
                           : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA] border border-transparent"
-                      }`}
+                        }`}
                     >
                       <span className="capitalize">{b} Mode</span>
                       {basemap === b && <CheckCircle2 className="h-3 w-3 text-[#1F4E8C]" />}
@@ -682,6 +856,15 @@ function AppContent() {
   const [selectedSpecies, setSelectedSpecies] = useState("yellowfin");
   const [navOpen, setNavOpen] = useState(false);
   const [scrolledPastGlobe, setScrolledPastGlobe] = useState(false);
+  const [activeReport, setActiveReport] = useState<Report>(DEFAULT_TUNA_REPORT);
+
+  useEffect(() => {
+    setActiveReport(reportStore.getActiveReport());
+    const unsub = reportStore.subscribe((_, cur) => {
+      setActiveReport(cur);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -711,15 +894,63 @@ function AppContent() {
 
   return (
     <div
-      className="relative w-screen min-h-screen overflow-x-hidden overflow-y-auto select-none scroll-smooth bg-[#f8fafc]"
+      className="relative w-full min-h-screen select-none scroll-smooth bg-[#f8fafc]"
       style={{ fontFamily: "Inter, system-ui, sans-serif", color: "#09090b" }}
     >
       {/* ══════════════════════════════ 100VH GLOBE SECTION ══════════════════════ */}
       <div className="relative w-full h-screen overflow-hidden flex-shrink-0 bg-[#f8fafc]">
+        {/* Base Sharp Geodetic Grid Mesh at the back of Earth */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(51, 65, 85, 0.20) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(51, 65, 85, 0.20) 1px, transparent 1px)
+            `,
+            backgroundSize: "64px 64px",
+            backgroundPosition: "center center",
+          }}
+        />
+
+        {/* ── Dynamic Depth of Field (DoF): Subtle lens softening closest to Earth, clean falloff ── */}
+        {/* Tier 1: Soft Close Blur (Gentle 6px optical blur closest to Earth rim) */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(51, 65, 85, 0.20) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(51, 65, 85, 0.20) 1px, transparent 1px)
+            `,
+            backgroundSize: "64px 64px",
+            backgroundPosition: "center center",
+            filter: "blur(6px)",
+            WebkitFilter: "blur(6px)",
+            maskImage: "radial-gradient(circle at 50% 50%, transparent calc(var(--earth-r, 380px) * 0.98), black calc(var(--earth-r, 380px) + 6px), black calc(var(--earth-r, 380px) + 24px), transparent calc(var(--earth-r, 380px) + 55px))",
+            WebkitMaskImage: "radial-gradient(circle at 50% 50%, transparent calc(var(--earth-r, 380px) * 0.98), black calc(var(--earth-r, 380px) + 6px), black calc(var(--earth-r, 380px) + 24px), transparent calc(var(--earth-r, 380px) + 55px))",
+          }}
+        />
+
+        {/* Tier 2: Subtle Transition Blur (Light 2.5px softening fading to sharp grid) */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(51, 65, 85, 0.16) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(51, 65, 85, 0.16) 1px, transparent 1px)
+            `,
+            backgroundSize: "64px 64px",
+            backgroundPosition: "center center",
+            filter: "blur(2.5px)",
+            WebkitFilter: "blur(2.5px)",
+            maskImage: "radial-gradient(circle at 50% 50%, transparent calc(var(--earth-r, 380px) + 15px), black calc(var(--earth-r, 380px) + 30px), black calc(var(--earth-r, 380px) + 50px), transparent calc(var(--earth-r, 380px) + 90px))",
+            WebkitMaskImage: "radial-gradient(circle at 50% 50%, transparent calc(var(--earth-r, 380px) + 15px), black calc(var(--earth-r, 380px) + 30px), black calc(var(--earth-r, 380px) + 50px), transparent calc(var(--earth-r, 380px) + 90px))",
+          }}
+        />
+
         {/* Globe Canvas (Real NASA Satellite Earth, 5km Grid, Double-Click Lock) */}
         <div
           ref={globeRef}
-          className="absolute inset-0 z-0 cursor-crosshair"
+          className="absolute inset-0 z-[1] cursor-crosshair"
         >
           <ThreeGlobe
             autoRotate={!selectedCoord}
@@ -758,13 +989,13 @@ function AppContent() {
           const currentBasinInfo = selectedCoord
             ? getSovereignBasin(selectedCoord.lat, selectedCoord.lon)
             : {
-                id: basin,
-                short: BASINS.find((b) => b.id === basin)?.short || "Arabian Sea",
-                label: BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin",
-                sovereignStatus: "Indian EEZ Sovereign Baseline",
-                isEEZ: true,
-                imblDistanceKm: 74.2,
-              };
+              id: basin,
+              short: BASINS.find((b) => b.id === basin)?.short || "Arabian Sea",
+              label: BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin",
+              sovereignStatus: "Indian EEZ Sovereign Baseline",
+              isEEZ: true,
+              imblDistanceKm: 74.2,
+            };
 
           return (
             <>
@@ -788,11 +1019,10 @@ function AppContent() {
                       <span className="text-zinc-500 text-[10px] border-l border-zinc-200 pl-2 whitespace-nowrap">
                         {currentBasinInfo.short} · [IN-EEZ-{(selectedCoord.lat * 100).toFixed(0)}-{(selectedCoord.lon * 100).toFixed(0)}]
                       </span>
-                      <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${
-                        currentBasinInfo.isEEZ
+                      <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${currentBasinInfo.isEEZ
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                           : "bg-amber-50 text-amber-700 border-amber-200"
-                      }`}>
+                        }`}>
                         {currentBasinInfo.isEEZ ? "EEZ Safe" : "High Seas"}
                       </span>
                       <button
@@ -823,7 +1053,11 @@ function AppContent() {
               </AnimatePresence>
 
               {/* Scroll Cue to Report Button (Compact White Capsule) */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+              <div
+                className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 ${
+                  scrolledPastGlobe ? "opacity-0 pointer-events-none" : "opacity-100"
+                }`}
+              >
                 <button
                   onClick={scrollToReport}
                   className="group flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm bg-white/95 hover:bg-white text-zinc-800 border-zinc-200 hover:border-zinc-300 backdrop-blur-md"
@@ -843,6 +1077,7 @@ function AppContent() {
       {/* ══════════════════════════════ SCROLL-DOWN REPORT DOSSIER ══════════════ */}
       <div className="relative z-20">
         <ReportView
+          report={activeReport}
           persona={persona}
           selectedSpeciesId={selectedSpecies}
           coordinates={selectedCoord || { lat: 20.75, lon: 70.19 }}
@@ -980,18 +1215,17 @@ function AppContent() {
         {/* Navigation Actions - Subtle Neutral with Active Blue */}
         <div className="hidden md:flex items-center gap-0.5 flex-shrink-0">
           {[
-            { icon: Map,      label: "Globe",   onClick: scrollToGlobe, active: true },
-            { icon: Database, label: "Data",    href: "/research/data" },
-            { icon: FileText, label: "Advisory",onClick: scrollToReport },
-            { icon: BookOpen, label: "Vault",   href: "/report" },
-            { icon: Network,  label: "Swarm",   href: "/dashboard/agents" },
+            { icon: Map, label: "Globe", onClick: scrollToGlobe, active: true },
+            { icon: Database, label: "Data", href: "/research/data" },
+            { icon: FileText, label: "Advisory", onClick: scrollToReport },
+            { icon: BookOpen, label: "Vault", href: "/report" },
+            { icon: Network, label: "Swarm", href: "/dashboard/agents" },
           ].map((item: any) => {
             const ItemIcon = item.icon;
-            const itemClasses = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-              item.active
+            const itemClasses = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${item.active
                 ? "text-[#1F4E8C] bg-[#F0F4FA] font-semibold"
                 : "text-[#667085] hover:text-[#202124] hover:bg-[#F6F8FA]"
-            }`;
+              }`;
 
             return item.href ? (
               <Link key={item.label} href={item.href} className={itemClasses}>
@@ -1025,7 +1259,18 @@ function AppContent() {
         isOpen={chatOpen}
         onToggle={() => setChatOpen((p) => !p)}
         onOpenReport={scrollToReport}
+        onReportGenerated={(newReport) => {
+          setActiveReport(newReport);
+          setTimeout(() => {
+            scrollToReport();
+          }, 600);
+        }}
         selectedCoord={selectedCoord}
+        basinLabel={
+          selectedCoord
+            ? getSovereignBasin(selectedCoord.lat, selectedCoord.lon).label
+            : BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin"
+        }
       />
     </div>
   );

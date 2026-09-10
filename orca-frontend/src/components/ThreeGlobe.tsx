@@ -868,6 +868,12 @@ export default function ThreeGlobe({
       // Smooth camera zoom interpolation
       camera.position.z += (targetCamDist - camera.position.z) * 0.09;
 
+      // Real-time zero-lag dynamic Earth screen radius for CSS Depth of Field tracking
+      const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
+      const screenH = mount.clientHeight || window.innerHeight;
+      const screenRadiusPx = Math.round((radius / (camera.position.z * tanHalfFov)) * (screenH / 2));
+      document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
+
       const altitude = Math.max(0.05, camera.position.z - radius);
 
       // Update zoom readout badge directly in DOM (no React re-renders)

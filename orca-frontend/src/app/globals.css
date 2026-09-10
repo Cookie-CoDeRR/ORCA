@@ -9,6 +9,7 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
 }
 
 body {
@@ -16,6 +17,7 @@ body {
   color: #09090b;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   letter-spacing: -0.015em;
+  overflow-x: clip;
 }
 
 code, kbd, samp, pre {
@@ -39,6 +41,15 @@ code, kbd, samp, pre {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a1a1aa;
+}
+
+/* Hide scrollbars utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Subtle Spatial Atmosphere Dots */
