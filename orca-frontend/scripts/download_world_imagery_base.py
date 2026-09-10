@@ -8,11 +8,13 @@ import numpy as np
 
 # We fetch zoom 3 tiles (8x8 = 64 tiles) to form a high-resolution 2048x2048 Web Mercator image,
 # then reproject to 2048x1024 Equirectangular plate carree.
-Z = 3
-N = 1 << Z # 8
+# We fetch zoom 4 tiles (16x16 = 256 tiles) to form a 4K 4096x4096 Web Mercator image,
+# then reproject to 4096x2048 Equirectangular plate carree.
+Z = 4
+N = 1 << Z # 16
 TILE_SIZE = 256
-MERCATOR_W = N * TILE_SIZE # 2048
-MERCATOR_H = N * TILE_SIZE # 2048
+MERCATOR_W = N * TILE_SIZE # 4096
+MERCATOR_H = N * TILE_SIZE # 4096
 
 print(f"Downloading {N*N} ArcGIS World Imagery tiles at zoom {Z}...")
 
@@ -21,7 +23,7 @@ def download_tile(coord):
     url = f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{Z}/{ty}/{tx}.jpg"
     req = urllib.request.Request(url, headers={"User-Agent": "ORCA-GIS-Engine/2.0"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=12) as resp:
             data = resp.read()
             img = Image.open(io.BytesIO(data)).convert("RGB")
             return (tx, ty, img)
@@ -33,19 +35,19 @@ def download_tile(coord):
 coords = [(x, y) for y in range(N) for x in range(N)]
 mercator_img = Image.new("RGB", (MERCATOR_W, MERCATOR_H))
 
-with ThreadPoolExecutor(max_workers=16) as executor:
+with ThreadPoolExecutor(max_workers=32) as executor:
     results = executor.map(download_tile, coords)
     for tx, ty, tile_img in results:
         mercator_img.paste(tile_img, (tx * TILE_SIZE, ty * TILE_SIZE))
 
-print("All tiles downloaded. Stitching and reprojecting to Equirectangular (2048x1024)...")
+print("All tiles downloaded. Stitching and reprojecting to 4K Equirectangular (4096x2048)...")
 
 # Convert Mercator image to numpy array
 merc_arr = np.array(mercator_img)
 
-# Target Equirectangular dimensions
-TARGET_W = 2048
-TARGET_H = 1024
+# Target Equirectangular dimensions (4K)
+TARGET_W = 4096
+TARGET_H = 2048
 
 # Equirectangular latitudes: +90 to -90 deg
 # Web Mercator max valid latitude is ~85.051129 deg

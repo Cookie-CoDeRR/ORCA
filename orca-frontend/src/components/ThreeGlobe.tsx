@@ -72,74 +72,7 @@ const vec3ToLatLon = (vec3: THREE.Vector3): { lat: number; lon: number } => {
   return { lat, lon };
 };
 
-// ── Slippy Map Tile Pyramid Helpers (XYZ Web Mercator) ─────────────
-const latLonToTile = (lat: number, lon: number, z: number): { x: number; y: number } => {
-  const n = 1 << z;
-  const x = Math.floor(((lon + 180) / 360) * n);
-  const clampedLat = Math.max(-85.0511, Math.min(85.0511, lat));
-  const latRad = (clampedLat * Math.PI) / 180;
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
-  );
-  return { x: Math.max(0, Math.min(n - 1, x)), y: Math.max(0, Math.min(n - 1, y)) };
-};
 
-const tileToBounds = (
-  x: number,
-  y: number,
-  z: number
-): { latMin: number; latMax: number; lonMin: number; lonMax: number } => {
-  const n = 1 << z;
-  const lonMin = (x / n) * 360 - 180;
-  const lonMax = ((x + 1) / n) * 360 - 180;
-  const latMax = (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI;
-  const latMin = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n))) * 180) / Math.PI;
-  return { latMin, latMax, lonMin, lonMax };
-};
-
-const createTileGeometry = (
-  latMin: number,
-  latMax: number,
-  lonMin: number,
-  lonMax: number,
-  r: number,
-  segs = 6
-): THREE.BufferGeometry => {
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-
-  for (let j = 0; j <= segs; j++) {
-    const v = j / segs;
-    const lat = latMax - v * (latMax - latMin);
-    for (let i = 0; i <= segs; i++) {
-      const u = i / segs;
-      const lon = lonMin + u * (lonMax - lonMin);
-      const pt = latLonToVec3(lat, lon, r);
-      positions.push(pt.x, pt.y, pt.z);
-      uvs.push(u, 1.0 - v);
-    }
-  }
-
-  const stride = segs + 1;
-  for (let j = 0; j < segs; j++) {
-    for (let i = 0; i < segs; i++) {
-      const a = j * stride + i;
-      const b = (j + 1) * stride + i;
-      const c = (j + 1) * stride + (i + 1);
-      const d = j * stride + (i + 1);
-      indices.push(a, b, d);
-      indices.push(d, b, c);
-    }
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return geo;
-};
 
 export default function ThreeGlobe({
   className = "",
@@ -296,10 +229,10 @@ export default function ThreeGlobe({
       t.anisotropy = 8;
     });
 
-    const rasterGeo = new THREE.SphereGeometry(radius + 0.012, 64, 64);
+    const rasterGeo = new THREE.SphereGeometry(radius + 0.005, 64, 64);
     const rasterMat = new THREE.MeshBasicMaterial({
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.55,
       depthWrite: false,
       side: THREE.FrontSide,
     });
@@ -346,125 +279,7 @@ export default function ThreeGlobe({
     });
     globeGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
 
-    // ── 6. DYNAMIC TILED SATELLITE IMAGERY (Tile Pyramid Method) ─────
-    // High-resolution satellite tiles loaded on-demand per active cluster
-    // Off-screen tiles are immediately disposed to prevent memory clogging
-    const tiledSatelliteGroup = new THREE.Group();
-    globeGroup.add(tiledSatelliteGroup);
 
-    interface TileCacheItem {
-      mesh: THREE.Mesh;
-      texture: THREE.Texture;
-      geo: THREE.BufferGeometry;
-    }
-    const tileCache = new Map<string, TileCacheItem>();
-
-    const tileLoader = new THREE.TextureLoader();
-    tileLoader.setCrossOrigin("anonymous");
-
-    const updateTiledSatellite = (cLat: number, cLon: number, altitude: number) => {
-      // Determine optimal slippy map zoom level based on camera altitude
-      let z = 0;
-      if (altitude > 45) {
-        z = 0; // Bedrock world_imagery_base.jpg covers high orbit perfectly
-      } else if (altitude > 20) {
-        z = 5; // Basin wide
-      } else if (altitude > 7.0) {
-        z = 7; // Sub-regional shelf
-      } else if (altitude > 2.2) {
-        z = 9; // Sector tactical (~200m/pixel)
-      } else if (altitude > 0.8) {
-        z = 11; // Fine coastal (~50m/pixel)
-      } else if (altitude > 0.28) {
-        z = 13; // Harbor docks, breakwaters (~12m/pixel)
-      } else if (altitude > 0.09) {
-        z = 15; // Piers, shipping channels (~3m/pixel)
-      } else {
-        z = 17; // Tactical ultra-resolution (~0.8m/pixel: individual vessels, berths)
-      }
-
-      if (z === 0) {
-        // Free all cached tiles when zoomed far out
-        for (const [key, item] of tileCache.entries()) {
-          tiledSatelliteGroup.remove(item.mesh);
-          item.geo.dispose();
-          item.texture.dispose();
-          (item.mesh.material as THREE.Material).dispose();
-          tileCache.delete(key);
-        }
-        return;
-      }
-
-      const centerTile = latLonToTile(cLat, cLon, z);
-      const n = 1 << z;
-      const activeKeys = new Set<string>();
-
-      // Cluster span: 3x3 for moderate zoom, 5x5 for close-in, 7x7 for ultra close-in to prevent edge cutoffs
-      const span = z >= 13 ? 3 : z >= 9 ? 2 : 1;
-
-      for (let dx = -span; dx <= span; dx++) {
-        for (let dy = -span; dy <= span; dy++) {
-          const tx = (centerTile.x + dx + n) % n;
-          const ty = centerTile.y + dy;
-          if (ty < 0 || ty >= n) continue;
-
-          const key = `${z}/${ty}/${tx}`;
-          activeKeys.add(key);
-
-          if (!tileCache.has(key)) {
-            const bounds = tileToBounds(tx, ty, z);
-            // Elevated slightly above bedrock sphere with polygonOffset to guarantee visibility
-            const geo = createTileGeometry(
-              bounds.latMin,
-              bounds.latMax,
-              bounds.lonMin,
-              bounds.lonMax,
-              radius + 0.005,
-              6
-            );
-
-            const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}.jpg`;
-            const texture = tileLoader.load(
-              url,
-              (tex) => {
-                tex.colorSpace = THREE.SRGBColorSpace;
-                tex.anisotropy = 16;
-                mat.needsUpdate = true;
-              },
-              undefined,
-              () => {
-                // Graceful fallback if individual tile is unavailable
-              }
-            );
-
-            const mat = new THREE.MeshBasicMaterial({
-              map: texture,
-              side: THREE.DoubleSide,
-              transparent: true,
-              opacity: 1.0,
-              polygonOffset: true,
-              polygonOffsetFactor: -3,
-              polygonOffsetUnits: -3,
-            });
-
-            const mesh = new THREE.Mesh(geo, mat);
-            tiledSatelliteGroup.add(mesh);
-            tileCache.set(key, { mesh, texture, geo });
-          }
-        }
-      }
-
-      // Evict and dispose all off-screen tiles (prevents asset memory bloat)
-      for (const [key, item] of tileCache.entries()) {
-        if (!activeKeys.has(key)) {
-          tiledSatelliteGroup.remove(item.mesh);
-          item.geo.dispose();
-          item.texture.dispose();
-          (item.mesh.material as THREE.Material).dispose();
-          tileCache.delete(key);
-        }
-      }
-    };
 
     // ── 7. PROGRESSIVE MULTI-TIER COORDINATE GRIDS (Google Maps Style) ─
     // As you zoom in, more grids form continuously:
@@ -738,8 +553,8 @@ export default function ThreeGlobe({
       { name: "Andaman Trench Basin", lat: 11.62, lon: 92.72, color: 0xf59e0b },
     ];
 
-    const beaconCoreGeo = new THREE.SphereGeometry(0.35, 16, 16);
-    const ringGeo = new THREE.RingGeometry(0.25, 0.95, 32);
+    const beaconCoreGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const ringGeo = new THREE.RingGeometry(0.08, 0.28, 32);
 
     PFZ_HOTSPOTS.forEach((loc, idx) => {
       const pos = latLonToVec3(loc.lat, loc.lon, radius + 0.18);
@@ -904,22 +719,22 @@ export default function ThreeGlobe({
         rasterMesh.visible = false;
       } else if (raster === "sst") {
         rasterMat.map = sstTexture;
-        rasterMat.opacity = 0.85;
+        rasterMat.opacity = 0.55;
         rasterMesh.visible = true;
         rasterMat.needsUpdate = true;
       } else if (raster === "chlorophyll") {
         rasterMat.map = chlTexture;
-        rasterMat.opacity = 0.88;
+        rasterMat.opacity = 0.55;
         rasterMesh.visible = true;
         rasterMat.needsUpdate = true;
       } else if (raster === "currents") {
         rasterMat.map = currentsRasterTexture;
-        rasterMat.opacity = 0.85;
+        rasterMat.opacity = 0.55;
         rasterMesh.visible = true;
         rasterMat.needsUpdate = true;
       } else if (raster === "bathymetry") {
         rasterMat.map = bathyTexture;
-        rasterMat.opacity = 0.88;
+        rasterMat.opacity = 0.55;
         rasterMesh.visible = true;
         rasterMat.needsUpdate = true;
       }
@@ -962,7 +777,6 @@ export default function ThreeGlobe({
 
       createTargetBox(lat, lon);
       updateRemoteGrid(lat, lon);
-      updateTiledSatellite(lat, lon, 0.95);
     };
 
     if (targetCoordsRef.current) {
@@ -981,10 +795,6 @@ export default function ThreeGlobe({
         const newAltitude = Math.max(0.025, currentAltitude * 0.55);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
-      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
-      const { lat, lon } = vec3ToLatLon(centerLocal);
-      const alt = Math.max(0.025, targetCamDist - radius);
-      updateTiledSatellite(lat, lon, alt);
     };
 
     zoomInRef.current = () => applyZoom(-1);
@@ -1008,7 +818,6 @@ export default function ThreeGlobe({
         remoteGridMesh.geometry.dispose();
         remoteGridMesh = null;
       }
-      updateTiledSatellite(19.0, 71.0, DEFAULT_DIST - radius);
       if (onLocationSelectRef.current) {
         onLocationSelectRef.current(null);
       }
@@ -1045,10 +854,6 @@ export default function ThreeGlobe({
         const newAltitude = Math.max(0.025, currentAltitude * inFactor);
         targetCamDist = Math.max(MIN_DIST, radius + newAltitude);
       }
-      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
-      const { lat, lon } = vec3ToLatLon(centerLocal);
-      const alt = Math.max(0.025, targetCamDist - radius);
-      updateTiledSatellite(lat, lon, alt);
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -1060,10 +865,6 @@ export default function ThreeGlobe({
 
     const onMouseUp = () => {
       isDragging = false;
-      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
-      const { lat, lon } = vec3ToLatLon(centerLocal);
-      const alt = Math.max(0.05, camera.position.z - radius);
-      updateTiledSatellite(lat, lon, alt);
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -1155,10 +956,6 @@ export default function ThreeGlobe({
     const onTouchEnd = () => {
       isDragging = false;
       touchDistanceStart = 0;
-      const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
-      const { lat, lon } = vec3ToLatLon(centerLocal);
-      const alt = Math.max(0.05, camera.position.z - radius);
-      updateTiledSatellite(lat, lon, alt);
     };
 
     mount.addEventListener("wheel", onWheel, { passive: false });
@@ -1225,11 +1022,11 @@ export default function ThreeGlobe({
       // Delicate cloud atmospheric drift
       cloudsMesh.rotation.y += 0.00015;
 
-      // Animate PFZ beacon pulsing rings
+      // Animate PFZ beacon pulsing rings (tactical radar beacon pulse)
       pulseRings.forEach((pr) => {
-        const s = 1.0 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.8 + pr.phase));
+        const s = 1.0 + 0.30 * (0.5 + 0.5 * Math.sin(t * 2.8 + pr.phase));
         pr.mesh.scale.set(s, s, s);
-        pr.mat.opacity = Math.max(0.12, 0.85 - 0.45 * (s - 1.0));
+        pr.mat.opacity = Math.max(0.20, 0.80 - 0.50 * (s - 1.0));
       });
 
       // Animate subtle flow on currents streamline arrows
@@ -1263,15 +1060,6 @@ export default function ThreeGlobe({
       // Fades in smoothly as altitude drops below 6.5, reaches full opacity below alt 4
       const fineAlpha = altitude > 6.5 ? 0 : Math.min(1.0, (6.5 - altitude) / 2.5);
       fineMat.opacity = fineAlpha * 0.70;
-
-      // Periodic tile check during camera movements
-      if (frameCount % 10 === 0 && Math.abs(altitude - lastCheckedAlt) > 0.04 && !isDragging) {
-        lastCheckedAlt = altitude;
-        const centerLocal = globeGroup.worldToLocal(new THREE.Vector3(0, 0, radius));
-        const { lat, lon } = vec3ToLatLon(centerLocal);
-        updateTiledSatellite(lat, lon, altitude);
-      }
-
 
       renderer.render(scene, camera);
     };
@@ -1309,15 +1097,6 @@ export default function ThreeGlobe({
       chlTexture.dispose();
       currentsRasterTexture.dispose();
       bathyTexture.dispose();
-
-      // Dispose all active tile cache meshes and textures
-      for (const [, item] of tileCache.entries()) {
-        tiledSatelliteGroup.remove(item.mesh);
-        item.geo.dispose();
-        item.texture.dispose();
-        (item.mesh.material as THREE.Material).dispose();
-      }
-      tileCache.clear();
     };
   }, [radius]);
 

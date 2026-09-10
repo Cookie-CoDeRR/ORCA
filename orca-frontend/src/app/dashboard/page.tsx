@@ -1033,7 +1033,7 @@ function AppContent() {
     return unsub;
   }, []);
 
-  const [activeRaster, setActiveRaster] = useState<EnvironmentalRasterType>("sst");
+  const [activeRaster, setActiveRaster] = useState<EnvironmentalRasterType>("none");
   const [vectorOverlays, setVectorOverlays] = useState<VectorOverlayToggles>({
     pfz: true,
     imbl: true,

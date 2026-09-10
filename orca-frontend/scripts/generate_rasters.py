@@ -5,9 +5,15 @@ import numpy as np
 os.makedirs("public/textures", exist_ok=True)
 
 # Load specular mask (water = 255, land = 0)
+from PIL import ImageFilter
 spec_img = Image.open("public/textures/earth_specular.jpg").convert("L")
-WIDTH, HEIGHT = 2048, 1024
-mask = np.array(spec_img.resize((WIDTH, HEIGHT), Image.Resampling.BILINEAR)) > 100
+WIDTH, HEIGHT = 4096, 2048
+mask_img = spec_img.resize((WIDTH, HEIGHT), Image.Resampling.BILINEAR)
+mask = np.array(mask_img) > 100
+
+# Smooth coastal feathering for soft alpha blending
+smooth_mask = np.array(mask_img.filter(ImageFilter.GaussianBlur(radius=3))) / 255.0
+WATER_ALPHA = (smooth_mask * 155).astype(np.uint8)
 
 # Coordinate grids for equirectangular projection
 # Lat: +90 to -90, Lon: -180 to +180
@@ -75,9 +81,7 @@ def apply_sst_colormap(val):
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
 sst_rgb = apply_sst_colormap(norm_sst)
-# Alpha: 0 on land, 230 on water for smooth semi-transparency over satellite bathymetry
-sst_alpha = np.where(mask, 225, 0).astype(np.uint8)
-sst_rgba = np.dstack([sst_rgb, sst_alpha])
+sst_rgba = np.dstack([sst_rgb, WATER_ALPHA])
 Image.fromarray(sst_rgba, "RGBA").save("public/textures/sst_raster.png", optimize=True)
 print("Saved sst_raster.png")
 
@@ -145,8 +149,7 @@ def apply_chl_colormap(val):
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
 chl_rgb = apply_chl_colormap(norm_chl)
-chl_alpha = np.where(mask, 230, 0).astype(np.uint8)
-chl_rgba = np.dstack([chl_rgb, chl_alpha])
+chl_rgba = np.dstack([chl_rgb, WATER_ALPHA])
 Image.fromarray(chl_rgba, "RGBA").save("public/textures/chlorophyll_raster.png", optimize=True)
 print("Saved chlorophyll_raster.png")
 
@@ -195,8 +198,7 @@ def apply_currents_colormap(val):
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
 curr_rgb = apply_currents_colormap(norm_speed)
-curr_alpha = np.where(mask, 220, 0).astype(np.uint8)
-curr_rgba = np.dstack([curr_rgb, curr_alpha])
+curr_rgba = np.dstack([curr_rgb, WATER_ALPHA])
 Image.fromarray(curr_rgba, "RGBA").save("public/textures/currents_raster.png", optimize=True)
 print("Saved currents_raster.png")
 
@@ -206,8 +208,6 @@ print("Saved currents_raster.png")
 # -------------------------------------------------------------
 print("Generating Bathymetry Relief Raster...")
 # Invert distance to coast/land to simulate shelf vs abyssal depth
-# Coast buffer: we can blur the land mask slightly to detect shallow waters
-from PIL import ImageFilter
 blurred_land = np.array(Image.fromarray((~mask).astype(np.uint8)*255).filter(ImageFilter.GaussianBlur(radius=7)))
 shallow_shelf = (blurred_land > 20) & mask
 
@@ -245,8 +245,8 @@ def apply_bathy_colormap(val):
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
 bathy_rgb = apply_bathy_colormap(bathy_norm)
-bathy_alpha = np.where(mask, 235, 0).astype(np.uint8)
-bathy_rgba = np.dstack([bathy_rgb, bathy_alpha])
+bathy_rgba = np.dstack([bathy_rgb, WATER_ALPHA])
 Image.fromarray(bathy_rgba, "RGBA").save("public/textures/bathymetry_raster.png", optimize=True)
+print("Saved bathymetry_raster.png")
 print("Saved bathymetry_raster.png")
 print("ALL 4 RASTERS GENERATED SUCCESSFULLY!")
