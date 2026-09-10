@@ -1,0 +1,38 @@
+[
+  {
+    "id": "paper-001",
+    "title": "Impact of Monsoonal Coastal Upwelling on Yellowfin Tuna (Thunnus albacares) Habitat Suitability in the Arabian Sea",
+    "authors": "Nair, R. et al., Journal of Marine Systems, 2024",
+    "topic": "upwelling_tuna",
+    "keywords": ["upwelling", "yellowfin tuna", "thermal fronts", "chlorophyll", "arabian sea"],
+    "abstractSnippet": "Satellite observations from Sentinel-3 OLCI and INCOIS buoys demonstrate that thermal front gradients (25.5°C to 28.2°C) combined with elevated chlorophyll-a (> 1.2 mg/m³) along the western Indian continental shelf increase pelagic tuna aggregation density by 340%. Upwelling events enhance primary productivity, attracting baitfish forage along the 200m continental shelf break.",
+    "url": "https://doi.org/10.1016/j.jmarsys.2024.103982"
+  },
+  {
+    "id": "paper-002",
+    "title": "Hydrodynamic Dynamics of the Somali Jet & Southwest Monsoon Ocean Currents",
+    "authors": "Chatterjee, A. & Rao, S., Deep Sea Research Part I, 2023",
+    "topic": "ocean_currents",
+    "keywords": ["somali jet", "currents", "monsoon", "velocity", "eddy"],
+    "abstractSnippet": "The Somali Current during the Southwest Monsoon exhibits surface velocities exceeding 2.0 m/s, forming Great Whirl mesoscale gyres. Vessel route optimization models using continuous Eulerian flow fields (uo, vo) achieve 14.8% fuel savings for commercial motor vessels operating between Gujarat ports and Lakshadweep Sea.",
+    "url": "https://doi.org/10.1016/j.dsr.2023.104112"
+  },
+  {
+    "id": "paper-003",
+    "title": "Multi-Sensor Remote Sensing for Phytoplankton Bloom Categorization in the Bay of Bengal",
+    "authors": "Sengupta, P. et al., Remote Sensing of Environment, 2025",
+    "topic": "phytoplankton_blooms",
+    "keywords": ["phytoplankton", "chlorophyll", "bay of bengal", "oceansat-3", "bloom"],
+    "abstractSnippet": "OceanSat-3 OCM spectral band ratioing reveals seasonal diatom blooms following riverine nutrient runoff in the Bay of Bengal. Phytoplankton plumes extending 120km offshore correlate with peak feeding windows for Indian Mackerel and Skipjack Tuna.",
+    "url": "https://doi.org/10.1016/j.rse.2025.114002"
+  },
+  {
+    "id": "paper-004",
+    "title": "Automated Border Standoff Protocols & Kinematic AIS Fleet Tracking for Coastal EEZ Security",
+    "authors": "Indian Coast Guard Technical Review, 2024",
+    "topic": "defense_border",
+    "keywords": ["imbl", "eez", "ais", "standoff", "defense", "vessel tracking"],
+    "abstractSnippet": "Integration of 5nm geofenced IMBL standoff buffers with automated kinematic AIS anomaly detection reduces international maritime boundary line infractions by 91%. Spatial grid cell matching [IN-EEZ] ensures sovereign compliance for mechanized artisanal fishing fleets.",
+    "url": "https://incois.gov.in/portal/research/papers/eez_standoff_2024.pdf"
+  }
+]

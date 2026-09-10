@@ -37,6 +37,8 @@ interface ChatMessage {
   isReportProgress?: boolean;
   progressData?: ReportGenerationProgress;
   generatedReport?: Report;
+  agentBadge?: string;
+  toolUsed?: string;
 }
 
 interface LayerItem {
@@ -215,8 +217,12 @@ const studioGlass = {
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <button
-      onClick={onChange}
-      className="relative flex-shrink-0 h-4.5 w-8 rounded-full transition-colors duration-150 focus:outline-none"
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
+      className="relative flex-shrink-0 h-4.5 w-8 rounded-full transition-colors duration-150 focus:outline-none cursor-pointer"
       style={{ background: on ? "#18181b" : "#E4E4E7" }}
     >
       <span
@@ -337,14 +343,110 @@ function getConversationalResponse(q: string, coords: { lat: number; lon: number
   return `**ORCA Mission Copilot Telemetry (${basinName}):**\n\nObserving 5km × 5km cell at **${latStr}°N, ${lonStr}°E**.\n\n• **SST:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m · **IMBL:** 74.2 km SAFE\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\nI can answer questions regarding ocean physics, species suitability, and safety standoffs, or formulate a full intelligence dossier when requested.`;
 }
 
-// ─── AI Chat Drawer (Sleek Crisp White Mission Copilot) ────────────────────────
-function AIChatDrawer({
-  persona, isOpen, onToggle, onOpenReport, onReportGenerated, selectedCoord, basinLabel,
+// ─── Scroll-To-Chat Bottom Intercept Component ──────────────────────────────
+function ScrollToChatIntercept({
+  onIntersect,
+  activeBaseLayer,
+  selectedCoord,
+  basinLabel,
+  onOpenChat,
 }: {
-  persona: Persona; isOpen: boolean; onToggle: () => void; onOpenReport?: () => void;
-  onReportGenerated?: (report: Report) => void;
+  onIntersect: () => void;
+  activeBaseLayer: string;
+  selectedCoord: { lat: number; lon: number } | null;
+  basinLabel?: string;
+  onOpenChat: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const triggeredRef = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !triggeredRef.current) {
+          triggeredRef.current = true;
+          onIntersect();
+          setTimeout(() => {
+            triggeredRef.current = false;
+          }, 5000);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+    return () => observer.disconnect();
+  }, [onIntersect]);
+
+  const latStr = (selectedCoord?.lat ?? 20.75).toFixed(3);
+  const lonStr = (selectedCoord?.lon ?? 70.19).toFixed(3);
+
+  return (
+    <div ref={ref} id="orca-report-section" className="w-full py-20 px-4 flex justify-center bg-slate-50 border-t border-slate-200">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="max-w-xl w-full p-8 rounded-2xl border-2 border-dashed border-slate-300 bg-white/90 shadow-sm flex flex-col items-center text-center space-y-4 backdrop-blur-md"
+      >
+        <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shadow-xs">
+          <Sparkles className="h-6 w-6 animate-pulse" />
+        </div>
+
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Dynamic Ocean Intelligence Terminal</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
+            Need insights? Ask the ORCA agent in the side chat to generate a dynamic report based on your current map view.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-slate-600 bg-slate-50 px-3.5 py-1.5 rounded-full border border-slate-200">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+          <span className="font-semibold text-slate-800">Map Context:</span>
+          <span>[{activeBaseLayer}]</span>
+          <span>·</span>
+          <span>[{latStr}°N, {lonStr}°E]</span>
+          <span>·</span>
+          <span>{basinLabel || "Arabian Sea"}</span>
+        </div>
+
+        <button
+          onClick={onOpenChat}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer mt-1"
+        >
+          <Sparkles className="h-4 w-4" />
+          <span>Ask Agent in Side Chat &rarr;</span>
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── AI Chat Drawer (Sleek Crisp White Mission Copilot with Multi-Agent Router) ──
+function AIChatDrawer({
+  persona,
+  isOpen,
+  onToggle,
+  selectedCoord,
+  basinLabel,
+  activeBaseLayer,
+  activeOverlays,
+  sstRange,
+  waveMax,
+  pulse = false,
+}: {
+  persona: Persona;
+  isOpen: boolean;
+  onToggle: () => void;
   selectedCoord?: { lat: number; lon: number } | null;
   basinLabel?: string;
+  activeBaseLayer: string;
+  activeOverlays: Set<string>;
+  sstRange: [number, number];
+  waveMax: number;
+  pulse?: boolean;
 }) {
   const pm = PERSONA_META[persona];
   const PersonaIcon = pm.icon;
@@ -352,189 +454,145 @@ function AIChatDrawer({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatingProgress, setGeneratingProgress] = useState<ReportGenerationProgress | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Method 1 & 2: Report Generation Pipeline Trigger
-  const triggerReportGeneration = useCallback(async (customTopic?: string) => {
-    if (isGenerating || streaming) return;
-    const targetTopic = (customTopic && customTopic.trim()) || input.trim() || "Comprehensive Ocean State & Advisory Report";
-    setInput("");
+  const handleSend = useCallback(
+    async (overrideText?: string) => {
+      const q = (overrideText && overrideText.trim()) || input.trim();
+      if (!q || streaming) return;
 
-    const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
-    const basinNameToUse = basinLabel || "Arabian Sea Basin";
+      setInput("");
+      const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
+      setMessages((m) => [...m, userMsg]);
+      setStreaming(true);
 
-    const userMsg: ChatMessage = {
-      id: uid(),
-      role: "user",
-      content: `Generate report: ${targetTopic}`,
-      timestamp: now(),
-    };
-    setMessages((m) => [...m, userMsg]);
-    setIsGenerating(true);
+      const qLower = q.toLowerCase();
+      const isReport = qLower.includes("report") || qLower.includes("dossier") || qLower.includes("generate");
 
-    const progressMsgId = uid();
-    const initialProgress: ReportGenerationProgress = {
-      stage: 1,
-      totalStages: 6,
-      stageName: "Understanding request",
-      message: `Analyzing intent & extracting topic from: "${targetTopic}"...`,
-      progressPercent: 16,
-    };
+      const thoughts = isReport
+        ? [
+            "🧠 Router → Classifying query intent: [Sequential 4-Agent Pipeline]",
+            `📊 [1/4 Report Agent] Ingesting 5km × 5km cell telemetry at [${(selectedCoord?.lat ?? 20.75).toFixed(3)}°N, ${(selectedCoord?.lon ?? 70.19).toFixed(3)}°E]...`,
+            "📖 [2/4 Glossary Agent] Parsing marine terminology & 5nm EEZ standoff rules...",
+            "🔬 [3/4 Research Agent] Executing RAG search on Oceanographic KB & DOI papers...",
+            "📰 [4/4 News Agent] Fetching live IMD weather bulletins & public news feeds...",
+            "✍️ Synthesizing multi-agent operational dossier...",
+          ]
+        : [
+            "🧠 Router → Classifying intent & active map layer...",
+            `📡 Context Ingestion → Base: [${activeBaseLayer}], Coordinates: [${(selectedCoord?.lat ?? 20.75).toFixed(3)}°N, ${(selectedCoord?.lon ?? 70.19).toFixed(3)}°E]`,
+            "⚡ Sub-Agent Dispatch → Querying knowledge base & executing tool...",
+          ];
 
-    setMessages((m) => [
-      ...m,
-      {
-        id: progressMsgId,
-        role: "system",
-        content: "",
-        timestamp: now(),
-        isReportProgress: true,
-        progressData: initialProgress,
-      },
-    ]);
+      for (const t of thoughts) {
+        await new Promise((r) => setTimeout(r, 160));
+        setMessages((m) => [...m, { id: uid(), role: "thought", content: t, timestamp: now() }]);
+      }
 
-    try {
-      const newReport = await generateReportPipeline(
-        targetTopic,
-        {
-          lat: coordToUse.lat,
-          lon: coordToUse.lon,
-          basinLabel: basinNameToUse,
-          isEEZ: true,
-          imblDistanceKm: 74.2,
-        },
-        (progress) => {
-          setGeneratingProgress(progress);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === progressMsgId ? { ...msg, progressData: progress } : msg
-            )
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [...messages, userMsg],
+            mapContext: {
+              activeBaseLayer,
+              activeOverlays: Array.from(activeOverlays),
+              selectedCoord,
+              basinLabel,
+              sstRange,
+              waveMax,
+            },
+          }),
+        });
+
+        if (!res.ok) throw new Error("Chat API failed");
+        const data = await res.json();
+
+        // ── Live Typewriter Stream Engine (Gemini/Claude Style) ──
+        const fullContent: string = data.content || "";
+        const aiMsgId = uid();
+
+        // 1. Insert initial streaming AI bubble
+        setMessages((m) => [
+          ...m,
+          {
+            id: aiMsgId,
+            role: "ai",
+            content: "",
+            timestamp: now(),
+            streaming: true,
+            agentBadge: data.agent,
+            toolUsed: data.toolUsed,
+          },
+        ]);
+
+        // 2. Stream text live chunk-by-chunk
+        const chunkSize = 12;
+        for (let i = 0; i < fullContent.length; i += chunkSize) {
+          const chunk = fullContent.slice(0, i + chunkSize);
+          await new Promise((r) => setTimeout(r, 12));
+          setMessages((m) =>
+            m.map((item) => (item.id === aiMsgId ? { ...item, content: chunk } : item))
           );
         }
-      );
 
-      // Complete
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === progressMsgId
-            ? {
-              ...msg,
-              content: `✅ **Report Complete: ${newReport.title}**\n\nGenerated ${newReport.sections.length} dynamic sections for ${newReport.location}. Automatically opening report view...`,
-              generatedReport: newReport,
-            }
-            : msg
-        )
-      );
+        // 3. Finalize response state
+        setMessages((m) =>
+          m.map((item) =>
+            item.id === aiMsgId ? { ...item, content: fullContent, streaming: false } : item
+          )
+        );
 
-      setIsGenerating(false);
-      setGeneratingProgress(null);
-
-      // Automatically navigate to the newly generated report
-      if (onReportGenerated) {
-        onReportGenerated(newReport);
-      }
-    } catch (err) {
-      console.error("Report generation error:", err);
-      setIsGenerating(false);
-      setGeneratingProgress(null);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: "ai",
-          content: "⚠️ **Report Generation Error**\n\nReport generation could not be completed. Please check connection and try again.",
-          timestamp: now(),
-        },
-      ]);
-    }
-  }, [isGenerating, streaming, input, selectedCoord, basinLabel, onReportGenerated]);
-
-  const handleSend = useCallback(async () => {
-    const q = input.trim();
-    if (!q || streaming || isGenerating) return;
-
-    // Check intent: Is this explicitly asking to generate/create a report?
-    if (isReportRequest(q)) {
-      triggerReportGeneration(q);
-      return;
-    }
-
-    // Normal conversational inquiry
-    setInput("");
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
-    setMessages((m) => [...m, userMsg]);
-    setStreaming(true);
-
-    const thoughts = [
-      "Supervisor → Query Intent classified as conversational",
-      "Telemetry Engine → Ingesting localized sensor state",
-      "Domain Agent → Synthesizing response without report creation",
-    ];
-
-    for (const t of thoughts) {
-      await new Promise((r) => setTimeout(r, 160));
-      setMessages((m) => [...m, { id: uid(), role: "thought", content: t, timestamp: now() }]);
-    }
-
-    const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
-    const basinToUse = basinLabel || "Arabian Sea Basin";
-    const responseText = getConversationalResponse(userMsg.content, coordToUse, basinToUse);
-
-    const aiId = uid();
-    setMessages((m) => [
-      ...m,
-      {
-        id: aiId,
-        role: "ai",
-        content: "",
-        timestamp: now(),
-        streaming: true,
-      },
-    ]);
-
-    let chars = 0;
-    const interval = setInterval(() => {
-      chars += 5;
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === aiId
-            ? { ...msg, content: responseText.slice(0, chars), streaming: chars < responseText.length }
-            : msg
-        )
-      );
-      if (chars >= responseText.length) {
-        clearInterval(interval);
         setStreaming(false);
+      } catch (err) {
+        console.error("Chat API fetch error:", err);
+        setStreaming(false);
+        const latStr = (selectedCoord?.lat ?? 20.75).toFixed(3);
+        const lonStr = (selectedCoord?.lon ?? 70.19).toFixed(3);
+        setMessages((m) => [
+          ...m,
+          {
+            id: uid(),
+            role: "ai",
+            content: `### 📊 ORCA Local Briefing (${basinLabel || "Arabian Sea Basin"})\n\n**Location:** ${latStr}°N, ${lonStr}°E\n• **Active Base Layer:** ${activeBaseLayer}\n• **Sea Surface Temp:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\n*Agent system active and observing current map context.*`,
+            timestamp: now(),
+            agentBadge: "Report Agent (Fallback)",
+            toolUsed: "fetch_layer_data",
+          },
+        ]);
       }
-    }, 12);
-  }, [input, streaming, isGenerating, selectedCoord, basinLabel, triggerReportGeneration]);
+    },
+    [input, streaming, messages, activeBaseLayer, activeOverlays, selectedCoord, basinLabel, sstRange, waveMax]
+  );
 
   return (
     <>
-      {/* Pull Tab (Clean White) */}
+      {/* Pull Tab */}
       <button
         onClick={onToggle}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center justify-center gap-1.5 rounded-l-xl border-l border-t border-b py-4 transition-all duration-300 hover:pr-1 bg-white border-zinc-200 text-zinc-900 shadow-lg"
-        style={{ width: 34 }}
+        className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center justify-center gap-1.5 rounded-l-xl border-l border-t border-b py-4 transition-all duration-300 hover:pr-1 bg-white border-zinc-200 text-zinc-900 shadow-lg cursor-pointer ${
+          pulse ? "ring-4 ring-blue-500 animate-pulse bg-blue-50 border-blue-400" : ""
+        }`}
+        style={{ width: 36 }}
         title={isOpen ? "Close Mission Copilot" : "Open Mission Copilot"}
       >
-        <Sparkles className="h-4 w-4 text-zinc-900" />
+        <Sparkles className={`h-4 w-4 ${pulse ? "text-blue-600 animate-spin" : "text-zinc-900"}`} />
         <div
           className="text-[9px] font-mono font-bold text-zinc-800"
           style={{ writingMode: "vertical-rl", letterSpacing: "0.12em" }}
         >
           AI COPILOT
         </div>
-        {isOpen
-          ? <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
-          : <ChevronLeft className="h-3.5 w-3.5 text-zinc-500" />
-        }
+        {isOpen ? (
+          <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
+        ) : (
+          <ChevronLeft className="h-3.5 w-3.5 text-zinc-500" />
+        )}
       </button>
 
       {/* Drawer */}
@@ -549,39 +607,34 @@ function AIChatDrawer({
         <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-200 flex-shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900">
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4 text-blue-600" />
             </div>
             <div>
               <div className="text-sm font-bold text-zinc-900 tracking-tight">ORCA AI Mission Copilot</div>
               <div className="text-[10px] font-mono flex items-center gap-1.5 text-zinc-500">
                 <PersonaIcon className="h-3 w-3 text-zinc-800" />
-                {pm.agent} · 100% Air-Gapped Sovereign
+                {pm.agent} · Multi-Agent Router Active
               </div>
             </div>
           </div>
-          <button onClick={onToggle} className="text-zinc-500 hover:text-black transition p-1 rounded-lg hover:bg-zinc-100">
+          <button onClick={onToggle} className="text-zinc-500 hover:text-black transition p-1 rounded-lg hover:bg-zinc-100 cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Action Header Strip with Generate Report Action Button */}
+        {/* Action Header Strip */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 flex-shrink-0 text-[11px] font-mono bg-zinc-50/80">
           <div className="flex items-center gap-2">
-            <span className="text-zinc-500">Mode:</span>
-            <select
-              className="bg-transparent text-zinc-900 outline-none cursor-pointer font-mono font-semibold text-xs"
-              defaultValue="conversational"
-            >
-              <option value="conversational">Conversational</option>
-              <option value="advisory">Advisory Brief</option>
-              <option value="scientific">Scientific Telemetry</option>
-            </select>
+            <span className="text-zinc-500">Active Layer:</span>
+            <span className="font-semibold text-zinc-900 bg-white px-2 py-0.5 rounded border border-zinc-200">
+              {activeBaseLayer}
+            </span>
           </div>
 
           <button
-            onClick={() => triggerReportGeneration(input)}
-            disabled={isGenerating || streaming}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-medium transition disabled:opacity-40 shadow-none active:scale-95"
+            onClick={() => handleSend("Generate a comprehensive ocean intelligence report for current map view.")}
+            disabled={streaming}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-medium transition disabled:opacity-40 shadow-none active:scale-95 cursor-pointer"
             title="Generate a dynamic report for current topic and coordinates"
           >
             <FileText className="h-3 w-3" />
@@ -597,7 +650,7 @@ function AIChatDrawer({
                 <PersonaIcon className="h-6 w-6 text-zinc-800" />
               </div>
               <div className="text-xs font-bold text-zinc-900 mb-1">
-                {pm.agent} Mission Terminal Ready
+                {pm.agent} Multi-Agent Router Ready
               </div>
               {selectedCoord ? (
                 <div className="text-[10px] font-mono text-zinc-700 mb-3 bg-white px-3 py-1 rounded-full border border-zinc-200 shadow-xs">
@@ -609,101 +662,46 @@ function AIChatDrawer({
                 </div>
               )}
               <p className="text-[11px] text-zinc-500 max-w-xs leading-relaxed mb-6">
-                Ask normal questions for conversational answers, or explicitly request a report to dynamically generate a formal dossier.
+                Ask questions or request reports. The ORCA Router will automatically dispatch your query to Report, Glossary, Research, or News sub-agents.
               </p>
 
               {/* Quick Query Starters */}
               <div className="w-full space-y-1.5 max-w-xs text-left">
                 <div className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
-                  Quick Queries
+                  4 Sub-Agent Router Commands
                 </div>
                 {[
-                  "What is the SST at this location?",
-                  "Why is chlorophyll important?",
-                  "What information goes into a fishing report?",
-                ].map((promptText) => (
-                  <button
-                    key={promptText}
-                    onClick={() => setInput(promptText)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group"
-                  >
-                    <span className="truncate">{promptText}</span>
-                    <span className="text-zinc-300 group-hover:text-zinc-600 text-xs ml-1 flex-shrink-0">&rarr;</span>
-                  </button>
-                ))}
-
-                <div className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider pt-2">
-                  Report Commands
-                </div>
-                {[
-                  "Generate a report about high wave conditions",
-                  "Prepare a chlorophyll bloom report",
-                  "Generate a Yellowfin Tuna fishing advisory",
-                ].map((reportPrompt) => (
-                  <button
-                    key={reportPrompt}
-                    onClick={() => triggerReportGeneration(reportPrompt)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group"
-                  >
-                    <span className="truncate">{reportPrompt}</span>
-                    <FileText className="h-3 w-3 text-zinc-400 group-hover:text-zinc-600 flex-shrink-0 ml-1" />
-                  </button>
-                ))}
+                  { text: "Generate a report for current map view", icon: FileText, label: "Report Agent" },
+                  { text: "What is PFZ and how is it detected?", icon: BookOpen, label: "Glossary Agent" },
+                  { text: "How does upwelling affect Yellowfin Tuna?", icon: Microscope, label: "Research Agent" },
+                  { text: "Are there any active cyclone alerts or fishing bans?", icon: Radio, label: "News Agent" },
+                ].map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <button
+                      key={item.text}
+                      onClick={() => handleSend(item.text)}
+                      className="w-full text-left px-2.5 py-2 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-1">
+                        <ItemIcon className="h-3.5 w-3.5 text-zinc-400 group-hover:text-blue-600 shrink-0" />
+                        <span className="truncate">{item.text}</span>
+                      </div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 shrink-0">
+                        {item.label.split(" ")[0]}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (
             messages.map((msg) => {
               if (msg.role === "thought") {
                 return (
-                  <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
-                    <div className="h-1.5 w-1.5 rounded-full bg-zinc-900 animate-pulse" />
+                  <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 py-0.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
                     {msg.content}
-                  </div>
-                );
-              }
-
-              // Dynamic Report Generation Progress Card
-              if (msg.isReportProgress && msg.progressData) {
-                const p = msg.progressData;
-                const isComplete = !!msg.generatedReport;
-                return (
-                  <div key={msg.id} className="p-4 rounded-xl border border-zinc-200 bg-white shadow-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isComplete ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        ) : (
-                          <Sparkles className="h-4 w-4 text-[#1F4E8C] animate-spin" />
-                        )}
-                        <span className="text-xs font-bold text-zinc-900">
-                          {isComplete ? "Report Complete" : p.stageName}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        Stage {p.stage}/{p.totalStages}
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-zinc-600 leading-relaxed whitespace-pre-line">
-                      {msg.content || p.message}
-                    </p>
-
-                    <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                      <div
-                        className="h-full bg-[#1F4E8C] transition-all duration-300 rounded-full"
-                        style={{ width: `${isComplete ? 100 : p.progressPercent}%` }}
-                      />
-                    </div>
-
-                    {isComplete && (
-                      <button
-                        onClick={onOpenReport}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#1F4E8C] hover:bg-[#173F72] text-white text-xs font-semibold shadow-xs transition mt-1"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        <span>Open Generated Dossier ▼</span>
-                      </button>
-                    )}
                   </div>
                 );
               }
@@ -712,37 +710,66 @@ function AIChatDrawer({
               return (
                 <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className="max-w-[94%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-sm"
+                    className="max-w-[95%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs"
                     style={
                       isUser
                         ? { background: "#09090b", color: "#ffffff", borderRadius: "14px 14px 2px 14px" }
                         : { background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "2px 14px 14px 14px", color: "#18181b" }
                     }
                   >
-                    <div className="text-[10px] font-mono mb-1.5 flex items-center gap-1.5" style={{ color: isUser ? "#a1a1aa" : "#71717a" }}>
-                      {isUser ? (
-                        <>
-                          <User className="h-3 w-3 text-white" />
-                          <span className="font-semibold text-white">Operator</span>
-                        </>
-                      ) : (
-                        <>
-                          <PersonaIcon className="h-3 w-3 text-zinc-900" />
-                          <span className="font-semibold text-zinc-900">{pm.agent}</span>
-                        </>
+                    <div className="text-[10px] font-mono mb-1.5 flex items-center justify-between gap-1.5 border-b border-zinc-100/60 pb-1" style={{ color: isUser ? "#a1a1aa" : "#71717a" }}>
+                      <div className="flex items-center gap-1.5">
+                        {isUser ? (
+                          <>
+                            <User className="h-3 w-3 text-white" />
+                            <span className="font-semibold text-white">Operator</span>
+                          </>
+                        ) : (
+                          <>
+                            <PersonaIcon className="h-3 w-3 text-zinc-900" />
+                            <span className="font-semibold text-zinc-900">{pm.agent}</span>
+                          </>
+                        )}
+                        <span>· {msg.timestamp}</span>
+                      </div>
+
+                      {!isUser && msg.agentBadge && (
+                        <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-mono text-[9px] font-medium border border-blue-200">
+                          {msg.agentBadge}
+                        </span>
                       )}
-                      <span>· {msg.timestamp}</span>
                     </div>
 
                     {msg.content.split("\n").map((line, i) => {
-                      const bold = line.replace(/\*\*(.+?)\*\*/g, `<strong class='${isUser ? "font-bold text-white" : "font-bold text-black"}'>$1</strong>`);
+                      const formatted = line
+                        .replace(/\*\*(.+?)\*\*/g, `<strong class='${isUser ? "font-bold text-white" : "font-bold text-black"}'>$1</strong>`)
+                        .replace(/`([^`]+)`/g, `<code class='font-mono px-1 py-0.5 rounded bg-zinc-100 text-zinc-800 text-[10px]'>$1</code>`)
+                        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a href='$2' target='_blank' rel='noopener noreferrer' class='${isUser ? "text-blue-300 underline" : "text-blue-600 hover:text-blue-800 underline font-medium"}'>$1 ↗</a>`);
                       return (
-                        <p key={i} className="mb-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: bold }} />
+                        <p key={i} className="mb-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
                       );
                     })}
 
                     {msg.streaming && (
                       <span className="inline-block text-zinc-900 animate-pulse ml-0.5 font-bold">▋</span>
+                    )}
+
+                    {!isUser && !msg.streaming && msg.content && (
+                      <div className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between">
+                        <button
+                          onClick={() =>
+                            handleSend(
+                              `Generate a comprehensive operational report based on: ${msg.content.replace(/[#*`]/g, '').slice(0, 60)}...`
+                            )
+                          }
+                          disabled={streaming}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-mono font-medium transition active:scale-95 cursor-pointer shadow-xs"
+                          title="Generate a full 4-agent report for this specific answer"
+                        >
+                          <FileText className="h-3 w-3 text-blue-400" />
+                          <span>Generate Report for this Answer</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -762,13 +789,13 @@ function AIChatDrawer({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Ask question, or type 'Generate report on...'"
+              placeholder="Ask question, define term, or request report..."
               className="flex-1 bg-zinc-100/90 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 focus:bg-white transition"
             />
             <button
-              onClick={handleSend}
-              disabled={!input.trim() || streaming || isGenerating}
-              className="p-2 rounded-xl bg-[#1F4E8C] text-white hover:bg-[#173F72] transition disabled:opacity-30 active:scale-95 shadow-sm"
+              onClick={() => handleSend()}
+              disabled={!input.trim() || streaming}
+              className="p-2 rounded-xl bg-[#1F4E8C] text-white hover:bg-[#173F72] transition disabled:opacity-30 active:scale-95 shadow-sm cursor-pointer"
               title="Send Message"
             >
               <Send className="h-3.5 w-3.5" />
@@ -778,9 +805,9 @@ function AIChatDrawer({
           <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-1">
             <span>5km × 5km Mesh Telemetry</span>
             <button
-              onClick={() => triggerReportGeneration(input)}
-              disabled={isGenerating || streaming}
-              className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1"
+              onClick={() => handleSend("Generate an operational report for current map telemetry.")}
+              disabled={streaming}
+              className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
             >
               <FileText className="h-3 w-3" />
               <span>Generate Report</span>
@@ -798,10 +825,10 @@ function AIChatDrawer({
 function LayerDock({
   persona,
   visible,
-  activeRaster,
-  onSelectRaster,
-  vectorOverlays,
-  onToggleVectorOverlay,
+  activeBaseLayer,
+  onSelectBaseLayer,
+  activeOverlays,
+  onToggleOverlay,
   sstRange,
   setSstRange,
   waveMax,
@@ -809,10 +836,10 @@ function LayerDock({
 }: {
   persona: Persona;
   visible: boolean;
-  activeRaster: EnvironmentalRasterType;
-  onSelectRaster: (raster: EnvironmentalRasterType) => void;
-  vectorOverlays: VectorOverlayToggles;
-  onToggleVectorOverlay: (key: keyof VectorOverlayToggles) => void;
+  activeBaseLayer: string;
+  onSelectBaseLayer: (baseId: string) => void;
+  activeOverlays: Set<string>;
+  onToggleOverlay: (overlayId: string) => void;
   sstRange: [number, number];
   setSstRange: (range: [number, number]) => void;
   waveMax: number;
@@ -823,11 +850,9 @@ function LayerDock({
 
   const [expanded, setExpanded] = useState(false);
 
-  const activeVectorsCount = Object.values(vectorOverlays).filter(Boolean).length;
-  const currentRasterDef = ENVIRONMENTAL_RASTERS.find((r) => r.id === activeRaster) || ENVIRONMENTAL_RASTERS[0];
-  const CurrentRasterIcon = currentRasterDef.icon;
-
-  const totalActive = activeVectorsCount + (activeRaster !== "none" ? 1 : 0);
+  const activeVectorsCount = activeOverlays.size;
+  const isBaseActive = activeBaseLayer !== "none" && activeBaseLayer !== "natural_satellite";
+  const totalActive = activeVectorsCount + (isBaseActive ? 1 : 0);
 
   return (
     <div
@@ -877,26 +902,47 @@ function LayerDock({
 
             {/* Scrollable Controls */}
             <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-4">
-              {/* ── SECTION 1: ENVIRONMENTAL COLOR RASTERS ── */}
+              {/* ── SECTION 1: ENVIRONMENTAL COLOR RASTERS (MUTUALLY EXCLUSIVE) ── */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
-                    Environmental Layers
+                    Environmental Layers (Base Heatmaps)
                   </span>
-                  <span className="text-[9px] font-mono text-zinc-400">1 active</span>
+                  <span className="text-[9px] font-mono text-[#1F4E8C] font-semibold">1 active</span>
                 </div>
 
                 <div className="space-y-1">
                   {ENVIRONMENTAL_RASTERS.map((r) => {
-                    const isActive = activeRaster === r.id;
+                    const isActive =
+                      (activeBaseLayer === "natural_satellite" || activeBaseLayer === "none")
+                        ? r.id === "none"
+                        : (activeBaseLayer === "sst_thermal" || activeBaseLayer === "sst")
+                        ? r.id === "sst"
+                        : (activeBaseLayer === "chlorophyll_plumes" || activeBaseLayer === "chlorophyll")
+                        ? r.id === "chlorophyll"
+                        : (activeBaseLayer === "currents_velocity" || activeBaseLayer === "currents")
+                        ? r.id === "currents"
+                        : (activeBaseLayer === "bathymetric_depth" || activeBaseLayer === "bathymetry")
+                        ? r.id === "bathymetry"
+                        : activeBaseLayer === (r.id as string);
+
                     return (
                       <button
                         key={r.id}
                         type="button"
-                        onClick={() => onSelectRaster(r.id)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg transition border text-xs flex items-center justify-between ${
+                        onClick={() => {
+                          const targetId =
+                            r.id === "none" ? "natural_satellite" :
+                            r.id === "sst" ? "sst_thermal" :
+                            r.id === "chlorophyll" ? "chlorophyll_plumes" :
+                            r.id === "currents" ? "currents_velocity" :
+                            r.id === "bathymetry" ? "bathymetric_depth" :
+                            (r.id as string);
+                          onSelectBaseLayer(targetId);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg transition border text-xs flex items-center justify-between cursor-pointer ${
                           isActive
-                            ? "bg-zinc-100 border-zinc-300 text-zinc-900 font-medium"
+                            ? "bg-blue-50/80 border-blue-200 text-zinc-900 font-semibold shadow-xs"
                             : "bg-white hover:bg-zinc-50 border-zinc-200/80 text-zinc-600"
                         }`}
                       >
@@ -920,7 +966,7 @@ function LayerDock({
                           </div>
                         </div>
                         {isActive && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-900 flex-shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-600 flex-shrink-0" />
                         )}
                       </button>
                     );
@@ -928,7 +974,7 @@ function LayerDock({
                 </div>
               </div>
 
-              {/* ── SECTION 2: DIRECT MAP OVERLAYS ── */}
+              {/* ── SECTION 2: DIRECT MAP OVERLAYS (ADDITIVE STACKABLE) ── */}
               <div>
                 <div className="flex items-center justify-between mb-1.5 pt-2 border-t border-zinc-100">
                   <span className="text-[10px] font-mono font-medium text-zinc-400 uppercase tracking-wider">
@@ -940,16 +986,28 @@ function LayerDock({
                 <div className="space-y-1">
                   {VECTOR_OVERLAYS_DEF.map((v) => {
                     const LayerIcon = v.icon;
-                    const isOn = vectorOverlays[v.id];
+                    const isOn =
+                      (v.id === "pfz" && (activeOverlays.has("pfz") || activeOverlays.has("pfz_hotspots"))) ||
+                      (v.id === "imbl" && (activeOverlays.has("imbl") || activeOverlays.has("imbl_sovereign"))) ||
+                      (v.id === "ais" && (activeOverlays.has("ais") || activeOverlays.has("ais_fleet"))) ||
+                      (v.id === "route" && (activeOverlays.has("route") || activeOverlays.has("optimal_route"))) ||
+                      (v.id === "currentsFlow" && (activeOverlays.has("currentsFlow") || activeOverlays.has("current_flow"))) ||
+                      (v.id === "mesh" && (activeOverlays.has("mesh") || activeOverlays.has("tactical_mesh"))) ||
+                      (v.id === "graticule" && activeOverlays.has("graticule")) ||
+                      activeOverlays.has(v.id as string);
+
                     return (
                       <div
                         key={v.id}
-                        className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-zinc-50 transition"
+                        className={`flex items-center justify-between py-1 px-1.5 rounded-lg border transition cursor-pointer ${
+                          isOn ? "bg-zinc-50 border-zinc-300 text-zinc-900" : "bg-white hover:bg-zinc-50 border-zinc-200/80 text-zinc-600"
+                        }`}
+                        onClick={() => onToggleOverlay(v.id)}
                       >
                         <div className="flex items-center gap-2 truncate pr-2">
-                          <LayerIcon className="h-3.5 w-3.5 flex-shrink-0 text-zinc-400" />
+                          <LayerIcon className={`h-3.5 w-3.5 flex-shrink-0 ${isOn ? "text-zinc-900" : "text-zinc-400"}`} />
                           <div className="truncate">
-                            <div className={`text-[11px] leading-tight truncate ${isOn ? "text-zinc-900 font-medium" : "text-zinc-500"}`}>
+                            <div className={`text-[11px] leading-tight truncate ${isOn ? "text-zinc-900 font-semibold" : "text-zinc-500"}`}>
                               {v.label}
                             </div>
                             <div className="text-[9px] text-zinc-400 truncate leading-tight">
@@ -957,7 +1015,7 @@ function LayerDock({
                             </div>
                           </div>
                         </div>
-                        <Toggle on={isOn} onChange={() => onToggleVectorOverlay(v.id)} />
+                        <Toggle on={isOn} onChange={() => onToggleOverlay(v.id)} />
                       </div>
                     );
                   })}
@@ -1016,6 +1074,7 @@ function AppContent() {
   const persona = (searchParams.get("persona") as Persona) || "navigator";
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [pulseChat, setPulseChat] = useState(false);
   const [basin, setBasin] = useState<Basin>("arabian_sea");
   const [searchFocus, setSearchFocus] = useState(false);
   const [searchVal, setSearchVal] = useState("");
@@ -1033,21 +1092,40 @@ function AppContent() {
     return unsub;
   }, []);
 
-  const [activeRaster, setActiveRaster] = useState<EnvironmentalRasterType>("none");
-  const [vectorOverlays, setVectorOverlays] = useState<VectorOverlayToggles>({
-    pfz: true,
-    imbl: true,
-    ais: true,
-    route: true,
-    currentsFlow: true,
-    mesh: true,
-    graticule: false,
-  });
+  const [activeBaseLayer, setActiveBaseLayer] = useState<string>("natural_satellite");
+  const [activeOverlays, setActiveOverlays] = useState<Set<string>>(
+    new Set([
+      "pfz_hotspots",
+      "imbl_sovereign",
+      "ais_fleet",
+      "optimal_route",
+      "current_flow",
+      "tactical_mesh",
+    ])
+  );
   const [sstRange, setSstRange] = useState<[number, number]>([24, 32]);
   const [waveMax, setWaveMax] = useState(4.0);
 
-  const toggleVectorOverlay = (key: keyof VectorOverlayToggles) => {
-    setVectorOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleOverlay = (id: string) => {
+    setActiveOverlays((prev) => {
+      const next = new Set(prev);
+      const canonicalId =
+        id === "pfz" ? "pfz_hotspots" :
+        id === "imbl" ? "imbl_sovereign" :
+        id === "ais" ? "ais_fleet" :
+        id === "route" ? "optimal_route" :
+        id === "currentsFlow" ? "current_flow" :
+        id === "mesh" ? "tactical_mesh" :
+        id;
+
+      if (next.has(canonicalId) || next.has(id)) {
+        next.delete(canonicalId);
+        next.delete(id);
+      } else {
+        next.add(canonicalId);
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -1068,8 +1146,6 @@ function AppContent() {
   const scrollToGlobe = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
-
-
 
   const pm = PERSONA_META[persona];
   const PersonaIcon = pm.icon;
@@ -1143,8 +1219,8 @@ function AppContent() {
             showControls={true}
             targetCoords={selectedCoord}
             chatOpen={chatOpen}
-            activeRaster={activeRaster}
-            vectorLayers={vectorOverlays}
+            activeBaseLayer={activeBaseLayer}
+            activeOverlays={activeOverlays}
             onLocationSelect={(coords) => {
               if (coords) {
                 setSelectedCoord(coords);
@@ -1171,10 +1247,10 @@ function AppContent() {
         <LayerDock
           persona={persona}
           visible={!scrolledPastGlobe}
-          activeRaster={activeRaster}
-          onSelectRaster={setActiveRaster}
-          vectorOverlays={vectorOverlays}
-          onToggleVectorOverlay={toggleVectorOverlay}
+          activeBaseLayer={activeBaseLayer}
+          onSelectBaseLayer={setActiveBaseLayer}
+          activeOverlays={activeOverlays}
+          onToggleOverlay={toggleOverlay}
           sstRange={sstRange}
           setSstRange={setSstRange}
           waveMax={waveMax}
@@ -1271,20 +1347,22 @@ function AppContent() {
         })()}
       </div>
 
-      {/* ══════════════════════════════ SCROLL-DOWN REPORT DOSSIER ══════════════ */}
+      {/* ══════════════════════════════ SCROLL-DOWN INTERCEPT SECTION ══════════════ */}
       <div className="relative z-20">
-        <ReportView
-          report={activeReport}
-          persona={persona}
-          selectedSpeciesId={selectedSpecies}
-          coordinates={selectedCoord || { lat: 20.75, lon: 70.19 }}
-          basinName={
+        <ScrollToChatIntercept
+          onIntersect={() => {
+            if (!chatOpen) setChatOpen(true);
+            setPulseChat(true);
+            setTimeout(() => setPulseChat(false), 2400);
+          }}
+          activeBaseLayer={activeBaseLayer}
+          selectedCoord={selectedCoord}
+          basinLabel={
             selectedCoord
               ? getSovereignBasin(selectedCoord.lat, selectedCoord.lon).label
               : BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin"
           }
-          onBackToGlobe={scrollToGlobe}
-          showBackToGlobeButton={true}
+          onOpenChat={() => setChatOpen(true)}
         />
       </div>
 
@@ -1455,19 +1533,17 @@ function AppContent() {
         persona={persona}
         isOpen={chatOpen}
         onToggle={() => setChatOpen((p) => !p)}
-        onOpenReport={scrollToReport}
-        onReportGenerated={(newReport) => {
-          setActiveReport(newReport);
-          setTimeout(() => {
-            scrollToReport();
-          }, 600);
-        }}
         selectedCoord={selectedCoord}
         basinLabel={
           selectedCoord
             ? getSovereignBasin(selectedCoord.lat, selectedCoord.lon).label
             : BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin"
         }
+        activeBaseLayer={activeBaseLayer}
+        activeOverlays={activeOverlays}
+        sstRange={sstRange}
+        waveMax={waveMax}
+        pulse={pulseChat}
       />
     </div>
   );

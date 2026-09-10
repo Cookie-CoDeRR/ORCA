@@ -34,8 +34,12 @@ export interface ThreeGlobeProps {
   onLocationSelect?: (coords: { lat: number; lon: number } | null) => void;
   /** Whether the right chat drawer is open (shifts controls out from under drawer) */
   chatOpen?: boolean;
+  /** Mutually exclusive environmental base layer */
+  activeBaseLayer?: string;
   /** Mutually exclusive environmental color field raster */
   activeRaster?: EnvironmentalRasterType;
+  /** Direct map vector & point overlays (Set or Array of overlay IDs) */
+  activeOverlays?: Set<string> | string[];
   /** Direct map vector & point overlays */
   vectorLayers?: Partial<VectorOverlayToggles>;
   /** Layer toggles (legacy support) */
@@ -47,6 +51,42 @@ export interface ThreeGlobeProps {
     mesh?: boolean;
     graticule?: boolean;
     atmosphere?: boolean;
+  };
+}
+
+export function normalizeBaseLayer(layer: string | EnvironmentalRasterType | undefined): EnvironmentalRasterType {
+  if (!layer) return "none";
+  if (layer === "sst" || layer === "sst_thermal") return "sst";
+  if (layer === "chlorophyll" || layer === "chlorophyll_plumes") return "chlorophyll";
+  if (layer === "currents" || layer === "currents_velocity") return "currents";
+  if (layer === "bathymetry" || layer === "bathymetric_depth") return "bathymetry";
+  return "none";
+}
+
+export function normalizeOverlays(
+  activeOverlays: Set<string> | string[] | undefined,
+  vectorLayers: Partial<VectorOverlayToggles> | undefined
+): VectorOverlayToggles {
+  if (activeOverlays) {
+    const set = activeOverlays instanceof Set ? activeOverlays : new Set(activeOverlays);
+    return {
+      pfz: set.has("pfz") || set.has("pfz_hotspots"),
+      imbl: set.has("imbl") || set.has("imbl_sovereign"),
+      ais: set.has("ais") || set.has("ais_fleet"),
+      route: set.has("route") || set.has("optimal_route"),
+      currentsFlow: set.has("currentsFlow") || set.has("current_flow") || set.has("currents_flow"),
+      mesh: set.has("mesh") || set.has("tactical_mesh") || set.has("5x5_mesh"),
+      graticule: set.has("graticule") || set.has("global_graticule"),
+    };
+  }
+  return {
+    pfz: vectorLayers?.pfz ?? true,
+    imbl: vectorLayers?.imbl ?? true,
+    ais: vectorLayers?.ais ?? true,
+    route: vectorLayers?.route ?? true,
+    currentsFlow: vectorLayers?.currentsFlow ?? true,
+    mesh: vectorLayers?.mesh ?? true,
+    graticule: vectorLayers?.graticule ?? false,
   };
 }
 
@@ -170,6 +210,58 @@ interface TileCacheItem {
   z: number;
 }
 
+const parseGeoJSONToLineSegments = (geojson: any, r: number): THREE.BufferGeometry => {
+  const points: THREE.Vector3[] = [];
+
+  const processRing = (ring: number[][]) => {
+    if (!ring || ring.length < 2) return;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const p1 = ring[i];
+      const p2 = ring[i + 1];
+      if (p1 && p2 && p1.length >= 2 && p2.length >= 2) {
+        const lon1 = p1[0];
+        const lat1 = p1[1];
+        const lon2 = p2[0];
+        const lat2 = p2[1];
+        if (Math.abs(lat1) <= 90 && Math.abs(lon1) <= 180 && Math.abs(lat2) <= 90 && Math.abs(lon2) <= 180) {
+          points.push(latLonToVec3(lat1, lon1, r), latLonToVec3(lat2, lon2, r));
+        }
+      }
+    }
+  };
+
+  const processGeometry = (geom: any) => {
+    if (!geom || !geom.type || !geom.coordinates) return;
+    if (geom.type === "Polygon") {
+      for (const ring of geom.coordinates) {
+        processRing(ring);
+      }
+    } else if (geom.type === "MultiPolygon") {
+      for (const poly of geom.coordinates) {
+        for (const ring of poly) {
+          processRing(ring);
+        }
+      }
+    } else if (geom.type === "LineString") {
+      processRing(geom.coordinates);
+    } else if (geom.type === "MultiLineString") {
+      for (const line of geom.coordinates) {
+        processRing(line);
+      }
+    }
+  };
+
+  if (geojson && geojson.features) {
+    for (const feature of geojson.features) {
+      if (feature.geometry) {
+        processGeometry(feature.geometry);
+      }
+    }
+  }
+
+  return new THREE.BufferGeometry().setFromPoints(points);
+};
+
 export default function ThreeGlobe({
   className = "",
   autoRotate = true,
@@ -180,7 +272,9 @@ export default function ThreeGlobe({
   targetCoords = null,
   onLocationSelect,
   chatOpen = false,
+  activeBaseLayer,
   activeRaster = "none",
+  activeOverlays,
   vectorLayers,
   layers,
 }: ThreeGlobeProps) {
@@ -196,20 +290,21 @@ export default function ThreeGlobe({
 
   const [gridActive, setGridActive] = useState(true);
 
+  // Normalize inputs to standard engine format
+  const effectiveBaseLayer = activeBaseLayer || activeRaster || "natural_satellite";
+  const effectiveRaster = normalizeBaseLayer(effectiveBaseLayer);
+  const effectiveVectorOverlays = normalizeOverlays(activeOverlays, vectorLayers);
+
   // Sync prop changes via refs so Three.js NEVER re-mounts or jitters
-  const activeRasterRef = useRef(activeRaster);
-  const vectorLayersRef = useRef(vectorLayers);
+  const activeRasterRef = useRef(effectiveRaster);
+  const vectorLayersRef = useRef(effectiveVectorOverlays);
   const updateLayersRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    activeRasterRef.current = activeRaster;
+    activeRasterRef.current = effectiveRaster;
+    vectorLayersRef.current = effectiveVectorOverlays;
     updateLayersRef.current();
-  }, [activeRaster]);
-
-  useEffect(() => {
-    vectorLayersRef.current = vectorLayers;
-    updateLayersRef.current();
-  }, [vectorLayers]);
+  }, [effectiveRaster, effectiveVectorOverlays]);
 
   // Sync prop changes via refs so Three.js NEVER re-mounts or jitters
   const autoRotateRef = useRef(autoRotate);
@@ -314,32 +409,45 @@ export default function ThreeGlobe({
 
     // ── 4a. Dynamic High-Resolution Satellite Tile Group (ArcGIS World Imagery) ──
     const tiledSatelliteGroup = new THREE.Group();
+    tiledSatelliteGroup.renderOrder = 1;
     globeGroup.add(tiledSatelliteGroup);
 
     const tileCache = new Map<string, TileCacheItem>();
     const tileLoader = new THREE.TextureLoader();
     tileLoader.setCrossOrigin("anonymous");
 
-    // ── 4b. Environmental Color Raster Layer (Mutually Exclusive) ──
+    // ── 4b. Environmental Color Raster Layer (Mutually Exclusive & Cached) ──
     // Continuous colour field rasters: SST Thermal, Chlorophyll-a, Ocean Currents velocity, Bathymetry relief.
     // Strictly ONE raster mode active at a time so colors never mix or muddy each other.
-    const sstTexture = textureLoader.load("/textures/sst_raster.png");
-    const chlTexture = textureLoader.load("/textures/chlorophyll_raster.png");
-    const currentsRasterTexture = textureLoader.load("/textures/currents_raster.png");
-    const bathyTexture = textureLoader.load("/textures/bathymetry_raster.png");
-    [sstTexture, chlTexture, currentsRasterTexture, bathyTexture].forEach((t) => {
+    const textureMapCache: Record<string, THREE.Texture> = {
+      sst: textureLoader.load("/textures/sst_raster.png"),
+      chlorophyll: textureLoader.load("/textures/chlorophyll_raster.png"),
+      currents: textureLoader.load("/textures/currents_raster.png"),
+      bathymetry: textureLoader.load("/textures/bathymetry_raster.png"),
+    };
+
+    Object.values(textureMapCache).forEach((t) => {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
     });
 
-    const rasterGeo = new THREE.SphereGeometry(radius + 0.006, 64, 64);
+    const sstTexture = textureMapCache.sst;
+    const chlTexture = textureMapCache.chlorophyll;
+    const currentsRasterTexture = textureMapCache.currents;
+    const bathyTexture = textureMapCache.bathymetry;
+
+    const rasterGeo = new THREE.SphereGeometry(radius + 0.015, 64, 64);
     const rasterMat = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0.55,
       depthWrite: false,
       side: THREE.FrontSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     });
     const rasterMesh = new THREE.Mesh(rasterGeo, rasterMat);
+    rasterMesh.renderOrder = 10;
     rasterMesh.visible = false;
     globeGroup.add(rasterMesh);
 
@@ -802,62 +910,66 @@ export default function ThreeGlobe({
     });
     currentsFlowGroup.add(new THREE.LineSegments(flowGeo, flowMat));
 
-    // ── 9. DYNAMIC LAYER SYNC CALLBACK (No WebGL context recreation) ─────
-    updateLayersRef.current = () => {
-      // 1. Environmental Color Raster (MUTUALLY EXCLUSIVE)
-      const raster = activeRasterRef.current;
-      if (!raster || raster === "none") {
-        rasterMesh.visible = false;
-      } else if (raster === "sst") {
-        rasterMat.map = sstTexture;
-        rasterMat.opacity = 0.55;
-        rasterMesh.visible = true;
-        rasterMat.needsUpdate = true;
-      } else if (raster === "chlorophyll") {
-        rasterMat.map = chlTexture;
-        rasterMat.opacity = 0.55;
-        rasterMesh.visible = true;
-        rasterMat.needsUpdate = true;
-      } else if (raster === "currents") {
-        rasterMat.map = currentsRasterTexture;
-        rasterMat.opacity = 0.55;
-        rasterMesh.visible = true;
-        rasterMat.needsUpdate = true;
-      } else if (raster === "bathymetry") {
-        rasterMat.map = bathyTexture;
-        rasterMat.opacity = 0.55;
-        rasterMesh.visible = true;
-        rasterMat.needsUpdate = true;
+    // ── 8f. Computed Vector Coastlines & Country Boundaries via GeoJSON ──
+    const geojsonGroup = new THREE.Group();
+    geojsonGroup.renderOrder = 20; // Renders ABOVE base black sphere (Layer 0) and marine rasters (Layer 1)
+    globeGroup.add(geojsonGroup);
+
+    const coastlineMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8, // Sharp tactical Cyan / Slate border
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+    });
+
+    fetch("/data/world_coastlines.geojson")
+      .then((res) => res.json())
+      .then((data) => {
+        const coastlineGeo = parseGeoJSONToLineSegments(data, radius + 0.025);
+        const coastlineMesh = new THREE.LineSegments(coastlineGeo, coastlineMat);
+        coastlineMesh.renderOrder = 20;
+        geojsonGroup.add(coastlineMesh);
+      })
+      .catch((err) => {
+        console.warn("Failed to load world coastlines GeoJSON:", err);
+      });
+
+    // ── 8g. Programmatic Spherical Coordinate Graticule (Lat/Lon Grid) ──
+    const graticulePoints: THREE.Vector3[] = [];
+    for (let lat = -75; lat <= 75; lat += 15) {
+      for (let lon = -180; lon < 180; lon += 5) {
+        graticulePoints.push(
+          latLonToVec3(lat, lon, radius + 0.022),
+          latLonToVec3(lat, lon + 5, radius + 0.022)
+        );
       }
-
-      // 2. Direct Map Vector & Point Overlays (INDEPENDENT MULTI-SELECT)
-      const vl = vectorLayersRef.current;
-      if (vl) {
-        pfzGroup.visible = vl.pfz !== false;
-        imblGroup.visible = vl.imbl !== false;
-        aisGroup.visible = vl.ais !== false;
-        routeGroup.visible = vl.route !== false;
-        currentsFlowGroup.visible = vl.currentsFlow !== false;
-        gridMeshGroup.visible = vl.mesh !== false || vl.graticule !== false;
+    }
+    for (let lon = -180; lon < 180; lon += 15) {
+      for (let lat = -80; lat < 80; lat += 5) {
+        graticulePoints.push(
+          latLonToVec3(lat, lon, radius + 0.022),
+          latLonToVec3(lat + 5, lon, radius + 0.022)
+        );
       }
-    };
-
-    // Initial layer sync
-    updateLayersRef.current();
-
-    // ── 10. Initial Orientation: Focused on India / Arabian Sea ─────
-    const DEFAULT_ROT_X = (19.0 * Math.PI) / 180;
-    const DEFAULT_ROT_Y = -((71.0 + 90.0) * Math.PI) / 180;
-    globeGroup.rotation.x = DEFAULT_ROT_X;
-    globeGroup.rotation.y = DEFAULT_ROT_Y;
-
-    let targetRotY = DEFAULT_ROT_Y;
-    let targetRotX = DEFAULT_ROT_X;
-
-    // ── 10a. Dynamic High-Resolution Tile Fetcher & Seamless Stacking ──
+    }
+    const graticuleGeo = new THREE.BufferGeometry().setFromPoints(graticulePoints);
+    const graticuleMat = new THREE.LineBasicMaterial({
+      color: 0x475569, // Subtle tactical Slate-600
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    });
+    const graticuleMesh = new THREE.LineSegments(graticuleGeo, graticuleMat);
+    graticuleMesh.renderOrder = 15;
+    globeGroup.add(graticuleMesh);
     let lastTileUpdate = 0;
 
     const updateTiledSatellite = (force = false) => {
+      const raster = activeRasterRef.current;
+      if (raster && raster !== "none") {
+        tiledSatelliteGroup.visible = false;
+        return;
+      }
       const now = performance.now();
       if (!force && now - lastTileUpdate < 150) return;
       lastTileUpdate = now;
@@ -978,6 +1090,69 @@ export default function ThreeGlobe({
         }
       }
     };
+
+    // ── 9b. DYNAMIC LAYER SYNC CALLBACK (Data Mode & Satellite Mode Swapping) ─────
+    updateLayersRef.current = () => {
+      const raster = activeRasterRef.current;
+      const isDataMode = Boolean(raster && raster !== "none");
+      const targetTexture = isDataMode ? textureMapCache[raster] : null;
+
+      if (isDataMode) {
+        // DATA MODE: Pitch Black Base Earth Bedrock + High-Contrast Ocean Data Raster
+        if (earthMat.map !== null) {
+          earthMat.map = null;
+          earthMat.specularMap = null;
+          earthMat.color.setHex(0x050505); // Pitch black landmasses
+          earthMat.needsUpdate = true;
+        }
+
+        // Turn off satellite tiles completely so they never protrude or Z-fight
+        tiledSatelliteGroup.visible = false;
+
+        // Show data raster directly over black bedrock
+        if (rasterMat.map !== targetTexture) {
+          rasterMat.map = targetTexture;
+          rasterMat.needsUpdate = true;
+        }
+        rasterMat.opacity = 0.95;
+        rasterMesh.visible = true;
+      } else {
+        // SATELLITE MODE: Standard High-Resolution Photorealistic Earth
+        if (earthMat.map !== earthDayMap) {
+          earthMat.map = earthDayMap;
+          earthMat.specularMap = earthSpecularMap;
+          earthMat.color.setHex(0xffffff);
+          earthMat.needsUpdate = true;
+        }
+
+        rasterMesh.visible = false;
+        // Tile group visibility managed by altitude in updateTiledSatellite
+        updateTiledSatellite(true);
+      }
+
+      // 2. Direct Map Vector & Point Overlays (INDEPENDENT MULTI-SELECT)
+      const vl = vectorLayersRef.current;
+      if (vl) {
+        pfzGroup.visible = vl.pfz !== false;
+        imblGroup.visible = vl.imbl !== false;
+        aisGroup.visible = vl.ais !== false;
+        routeGroup.visible = vl.route !== false;
+        currentsFlowGroup.visible = vl.currentsFlow !== false;
+        gridMeshGroup.visible = vl.mesh !== false || vl.graticule !== false;
+      }
+    };
+
+    // Initial layer sync
+    updateLayersRef.current();
+
+    // ── 10. Initial Orientation: Focused on India / Arabian Sea ─────
+    const DEFAULT_ROT_X = (19.0 * Math.PI) / 180;
+    const DEFAULT_ROT_Y = -((71.0 + 90.0) * Math.PI) / 180;
+    globeGroup.rotation.x = DEFAULT_ROT_X;
+    globeGroup.rotation.y = DEFAULT_ROT_Y;
+
+    let targetRotY = DEFAULT_ROT_Y;
+    let targetRotX = DEFAULT_ROT_X;
 
     // External target coordinate setter: smooth centering and deep tactical zoom
     updateTargetRef.current = (lat: number, lon: number) => {

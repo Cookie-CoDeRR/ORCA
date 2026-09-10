@@ -1,0 +1,58 @@
+[
+  {
+    "term": "SST",
+    "fullName": "Sea Surface Temperature",
+    "definition": "The water temperature close to the ocean surface (typically upper 1mm to a few meters). Measured by Sentinel-3 SLSTR radiometers and NOAA AVHRR. Crucial for identifying thermal fronts, upwelling zones, and tropical cyclone intensity.",
+    "category": "Ocean Physics",
+    "typicalRange": "24.0°C – 32.5°C in Indian EEZ"
+  },
+  {
+    "term": "Chlorophyll-a",
+    "fullName": "Chlorophyll-a Biomass Concentration",
+    "definition": "The primary photosynthetic pigment in ocean phytoplankton, measured in mg/m³ by OceanSat-3 OCM and Sentinel-3 OLCI. High concentrations signify coastal upwelling and rich feeding grounds for pelagic fish species like Yellowfin Tuna and Mackerel.",
+    "category": "Marine Biology",
+    "typicalRange": "0.08 – 4.80 mg/m³"
+  },
+  {
+    "term": "PFZ",
+    "fullName": "Potential Fishing Zone",
+    "definition": "Geospatial sectors identified by INCOIS (Indian National Centre for Ocean Information Services) combining thermal gradients (SST) and ocean color (Chlorophyll-a) to locate high-density pelagic fish aggregations.",
+    "category": "Fisheries Management",
+    "confidenceInterval": "85% - 95% Satellite Grounded Validation"
+  },
+  {
+    "term": "IMBL",
+    "fullName": "International Maritime Boundary Line",
+    "definition": "Sovereign maritime border dividing national territorial waters and Exclusive Economic Zones. ORCA enforces a 5nm (9.26 km) automated standoff safety buffer to prevent accidental border violations.",
+    "category": "Maritime Defense & Border Security",
+    "standoffBuffer": "5.0 Nautical Miles"
+  },
+  {
+    "term": "EEZ",
+    "fullName": "Exclusive Economic Zone",
+    "definition": "Sea zone prescribed by UNCLOS (United Nations Convention on the Law of the Sea) extending up to 200 nautical miles from the coastal baseline, over which a sovereign state has special rights regarding exploration and use of marine resources.",
+    "category": "Sovereign Governance",
+    "extent": "200 Nautical Miles (370.4 km)"
+  },
+  {
+    "term": "SWH",
+    "fullName": "Significant Wave Height",
+    "definition": "Average height of the highest one-third of waves in a given sea state spectrum. Measured in meters by radar altimeters. SWH above 3.5m poses operational hazards for mechanized fishing trawlers.",
+    "category": "Hydrodynamics",
+    "hazardThreshold": "> 3.5 meters"
+  },
+  {
+    "term": "Ekman Upwelling",
+    "fullName": "Ekman Layer Surface Upwelling",
+    "definition": "Wind-driven motion where wind blowing parallel to a coastline combined with Coriolis effect pushes surface water offshore, forcing cold, nutrient-rich deep water to ascend to the photic zone.",
+    "category": "Physical Oceanography",
+    "primarySeason": "Southwest Monsoon (June - September)"
+  },
+  {
+    "term": "Bathymetry",
+    "fullName": "Seafloor Topography & Depth Relief",
+    "definition": "Measurement of ocean depth from sea surface to ocean floor. Structural seafloor features like continental shelf breaks (200m contour) create physical upwelling currents favoring demersal and pelagic species.",
+    "category": "Geomorphology",
+    "depthRange": "0m to 4,500m Abyssal Plain"
+  }
+]

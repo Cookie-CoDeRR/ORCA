@@ -4,136 +4,251 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Layers,
-  CloudRain,
-  Waves,
-  Mountain,
+  Globe,
+  Thermometer,
   Fish,
-  Navigation,
+  Wind,
+  Mountain,
   ShieldAlert,
+  Ship,
+  Navigation,
+  LayoutGrid,
+  Grid,
   ChevronDown,
-  Eye,
-  EyeOff,
-  Lock,
   Info,
   X,
+  Lock,
+  Sliders,
 } from "lucide-react";
 
-export interface LayerVisibility {
-  weather: boolean;
-  currents: boolean;
-  resources: boolean;
-  fishingZones: boolean;
-  transport: boolean;
-  military: boolean;
+// ─── Types & Definitions ──────────────────────────────────────────────────────
+
+export interface BaseLayerDef {
+  id: string;
+  label: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string; // Color indicator dot
+  rangeText: string;
 }
 
-interface LayerDef {
-  id: keyof LayerVisibility;
+export interface OverlayDef {
+  id: string;
   label: string;
-  description: string;
+  subtitle: string;
   icon: React.ComponentType<{ className?: string }>;
-  color: string;           // dot / swatch color (Tailwind bg-*)
-  swatchStyle: "dot" | "line";
+  color: string;
   requiresDefense?: boolean;
 }
 
-const LAYER_DEFS: LayerDef[] = [
+export const BASE_LAYERS: BaseLayerDef[] = [
   {
-    id: "weather",
-    label: "Weather & Atmosphere",
-    description: "Sea Surface Temperature (SST) thermal gradient heatmap, significant wave height, and IMD cyclone alert zones.",
-    icon: CloudRain,
-    color: "bg-sky-400",
-    swatchStyle: "dot",
+    id: "natural_satellite",
+    label: "Natural Satellite",
+    subtitle: "NASA Blue Marble True-Color Bedrock",
+    icon: Globe,
+    color: "bg-blue-500",
+    rangeText: "Visible Spectrum Bedrock",
   },
   {
-    id: "currents",
-    label: "Water Currents & Hydrodynamics",
-    description: "Eulerian ocean current vector arrows (uo, vo), mesoscale eddy assist paths, and monsoon gyre drift markers.",
-    icon: Waves,
-    color: "bg-cyan-300",
-    swatchStyle: "line",
+    id: "sst_thermal",
+    label: "SST Thermal Raster",
+    subtitle: "Sea Surface Temp & Coastal Thermal Fronts",
+    icon: Thermometer,
+    color: "bg-amber-500",
+    rangeText: "24.0°C – 32.5°C Envelope",
   },
   {
-    id: "resources",
-    label: "Ocean Resources & Bathymetry",
-    description: "3D seabed elevation relief, 200m continental shelf break contours, coral reef protected boundaries, and benthic mineral indicators.",
-    icon: Mountain,
-    color: "bg-amber-400",
-    swatchStyle: "dot",
-  },
-  {
-    id: "fishingZones",
-    label: "Potential Fishing Zones (PFZ)",
-    description: "AI-detected thermal front and chlorophyll-a aggregation zones with species confidence scores and diurnal feeding window timing.",
+    id: "chlorophyll_plumes",
+    label: "Chlorophyll-a Plumes",
+    subtitle: "OceanSat-3 OCM Phytoplankton Bloom Density",
     icon: Fish,
-    color: "bg-emerald-400",
-    swatchStyle: "dot",
+    color: "bg-emerald-500",
+    rangeText: "0.08 – 4.80 mg/m³ Upwelling",
   },
   {
-    id: "transport",
-    label: "Transport Routes & Logistics",
-    description: "Fuel-optimal continuous A* vector route with waypoint nodes, projected transit time, and coastal harbor clearance SOPs.",
-    icon: Navigation,
-    color: "bg-white",
-    swatchStyle: "line",
+    id: "currents_velocity",
+    label: "Currents Velocity Heatmap",
+    subtitle: "Eulerian Hydrodynamic Velocity Field (uo, vo)",
+    icon: Wind,
+    color: "bg-sky-500",
+    rangeText: "0.15 – 2.05 m/s Somali Jet Drift",
   },
   {
-    id: "military",
-    label: "Military / Defense Overlays",
-    description: "RESTRICTED: IMBL sovereign border standoff buffer, no-trawl/EEZ geofence violations, and dark vessel drift intercept vector projections.",
-    icon: ShieldAlert,
-    color: "bg-rose-500",
-    swatchStyle: "line",
-    requiresDefense: true,
+    id: "bathymetric_depth",
+    label: "Bathymetric Depth Relief",
+    subtitle: "GEBCO Seafloor Topography & Shelf Break",
+    icon: Mountain,
+    color: "bg-indigo-500",
+    rangeText: "0m – 4,500m Abyssal Plain",
   },
 ];
 
-interface LayerControlPanelProps {
-  visibility: LayerVisibility;
-  onToggle: (id: keyof LayerVisibility) => void;
+export const DIRECT_OVERLAYS: OverlayDef[] = [
+  {
+    id: "pfz_hotspots",
+    label: "PFZ Hotspots",
+    subtitle: "14 INCOIS Verified Fish Clusters & Confidence",
+    icon: Fish,
+    color: "bg-amber-400",
+  },
+  {
+    id: "imbl_sovereign",
+    label: "IMBL Sovereign Zone",
+    subtitle: "Border Standoff & 5nm Safety Buffer",
+    icon: ShieldAlert,
+    color: "bg-rose-500",
+    requiresDefense: true,
+  },
+  {
+    id: "ais_fleet",
+    label: "AIS Vessel Fleet",
+    subtitle: "Real-Time Fleet AIS & Kinematic Courses",
+    icon: Ship,
+    color: "bg-sky-400",
+  },
+  {
+    id: "optimal_route",
+    label: "Optimal Route Line",
+    subtitle: "Hydrodynamic Fuel-Efficient A* Path",
+    icon: Navigation,
+    color: "bg-blue-600",
+  },
+  {
+    id: "current_flow",
+    label: "Current Flow Vectors",
+    subtitle: "Directional Streamline Flow Arrows",
+    icon: Wind,
+    color: "bg-cyan-400",
+  },
+  {
+    id: "tactical_mesh",
+    label: "Tactical Mesh (5x5 km)",
+    subtitle: "Geodetic Sector Grid with Reticle Lock",
+    icon: LayoutGrid,
+    color: "bg-zinc-800",
+  },
+  {
+    id: "graticule",
+    label: "Global Graticule",
+    subtitle: "15° Spherical Lat/Lon Parallels & Meridians",
+    icon: Grid,
+    color: "bg-slate-400",
+  },
+];
+
+export interface LayerControlPanelProps {
+  /** Mutually exclusive environmental base layer */
+  activeBaseLayer?: string;
+  onSelectBaseLayer?: (layerId: string) => void;
+
+  /** Additively stackable vector overlays (Set or Array of overlay IDs) */
+  activeOverlays?: Set<string> | string[];
+  onToggleOverlay?: (overlayId: string) => void;
+
+  /** Global Sensor Threshold Filters */
+  sstRange?: [number, number];
+  onSstRangeChange?: (range: [number, number]) => void;
+  waveMax?: number;
+  onWaveMaxChange?: (val: number) => void;
+
+  /** User Defense clearance */
   isDefenseUser?: boolean;
+
+  /** Legacy toggle callbacks for backwards compatibility */
+  visibility?: Record<string, boolean>;
+  onToggle?: (id: string) => void;
 }
 
 export default function LayerControlPanel({
+  activeBaseLayer = "natural_satellite",
+  onSelectBaseLayer,
+  activeOverlays = new Set([
+    "pfz_hotspots",
+    "imbl_sovereign",
+    "ais_fleet",
+    "optimal_route",
+    "current_flow",
+    "tactical_mesh",
+  ]),
+  onToggleOverlay,
+  sstRange = [24, 32],
+  onSstRangeChange,
+  waveMax = 4.0,
+  onWaveMaxChange,
+  isDefenseUser = true,
   visibility,
   onToggle,
-  isDefenseUser = false,
 }: LayerControlPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tooltip, setTooltip] = useState<string | null>(null);
 
-  const activeCount = Object.values(visibility).filter(Boolean).length;
+  // Convert activeOverlays to a Set for O(1) checks
+  const overlaySet = React.useMemo(() => {
+    if (activeOverlays instanceof Set) return activeOverlays;
+    if (Array.isArray(activeOverlays)) return new Set(activeOverlays);
+    return new Set<string>();
+  }, [activeOverlays]);
+
+  // Normalize base layer string
+  const currentBase = React.useMemo(() => {
+    if (activeBaseLayer === "none" || activeBaseLayer === "natural_satellite") return "natural_satellite";
+    if (activeBaseLayer === "sst") return "sst_thermal";
+    if (activeBaseLayer === "chlorophyll") return "chlorophyll_plumes";
+    if (activeBaseLayer === "currents") return "currents_velocity";
+    if (activeBaseLayer === "bathymetry") return "bathymetric_depth";
+    return activeBaseLayer;
+  }, [activeBaseLayer]);
+
+  const handleBaseClick = (id: string) => {
+    if (onSelectBaseLayer) {
+      onSelectBaseLayer(id);
+    } else if (onToggle) {
+      onToggle(id);
+    }
+  };
+
+  const handleOverlayToggle = (id: string) => {
+    if (onToggleOverlay) {
+      onToggleOverlay(id);
+    } else if (onToggle) {
+      onToggle(id);
+    }
+  };
+
+  const activeOverlayCount = overlaySet.size;
+  const isBaseActive = currentBase !== "natural_satellite";
+  const totalActive = activeOverlayCount + (isBaseActive ? 1 : 0);
 
   return (
     <div className="relative z-30">
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen((o) => !o)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-xl border shadow-sm transition-all cursor-pointer text-xs font-semibold ${
+        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border shadow-sm transition-all cursor-pointer text-xs font-semibold ${
           isOpen
             ? "bg-zinc-900 text-white border-zinc-900"
             : "bg-white text-zinc-800 border-zinc-200 hover:bg-zinc-50"
         }`}
-        title="Toggle Map Layers"
+        title="Toggle Map Layers & Overlays"
       >
-        <Layers className="h-4 w-4 shrink-0" />
-        <span className="hidden sm:inline">Layers</span>
-        {activeCount > 0 && (
+        <Layers className="h-4 w-4 shrink-0 text-blue-600" />
+        <span className="hidden sm:inline">Layers Control</span>
+        {totalActive > 0 && (
           <span
-            className={`flex items-center justify-center h-4 w-4 rounded-full text-[9px] font-bold ${
+            className={`flex items-center justify-center h-4.5 w-4.5 rounded-full text-[10px] font-mono font-bold ${
               isOpen ? "bg-white text-zinc-900" : "bg-blue-600 text-white"
             }`}
           >
-            {activeCount}
+            {totalActive}
           </span>
         )}
         <ChevronDown
-          className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
-      {/* Dropdown Panel */}
+      {/* Dropdown Control Panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -141,152 +256,204 @@ export default function LayerControlPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.18 }}
-            className="absolute right-0 top-12 w-72 max-h-[65vh] rounded-2xl border border-zinc-200 bg-white shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col z-40"
+            className="absolute left-0 sm:left-auto sm:right-0 top-12 w-80 max-h-[75vh] rounded-2xl border border-zinc-200 bg-white shadow-2xl backdrop-blur-2xl overflow-hidden flex flex-col z-40"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 shrink-0 bg-zinc-50/60">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 shrink-0 bg-zinc-50/70">
               <div className="flex items-center gap-2">
                 <Layers className="h-4 w-4 text-blue-600" />
-                <span className="text-xs font-bold text-zinc-900">Map Layer Controls</span>
+                <div>
+                  <div className="text-xs font-bold text-zinc-900">Tactical Layer Controls</div>
+                  <div className="text-[9px] font-mono text-zinc-500">Mutually Exclusive Base & Additive Vector Overlays</div>
+                </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer p-1 rounded-lg hover:bg-zinc-100"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Layer Rows with Scrollbar */}
-            <div className="p-2 space-y-1 overflow-y-auto flex-1">
-              {LAYER_DEFS.map((layer) => {
-                const Icon = layer.icon;
-                const isOn = visibility[layer.id];
-                const isLocked = layer.requiresDefense && !isDefenseUser;
+            {/* Scrollable Layer Stack */}
+            <div className="p-3 space-y-4 overflow-y-auto flex-1">
+              
+              {/* ── SECTION 1: ENVIRONMENTAL LAYERS (MUTUALLY EXCLUSIVE RADIO LOGIC) ── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider">
+                    1. Environmental Base Layers (Mutually Exclusive)
+                  </span>
+                  <span className="text-[9px] font-mono text-blue-600 font-semibold">1 Active</span>
+                </div>
 
-                return (
-                  <div
-                    key={layer.id}
-                    className={`group relative flex items-center gap-3 p-2.5 rounded-xl transition-all ${
-                      isLocked
-                        ? "opacity-50 cursor-not-allowed"
-                        : isOn
-                        ? "bg-blue-50/70 border border-blue-100 cursor-pointer"
-                        : "cursor-pointer hover:bg-zinc-50"
-                    }`}
-                    onClick={() => !isLocked && onToggle(layer.id)}
-                  >
-                    {/* Color Swatch */}
-                    <div className="shrink-0 flex items-center justify-center w-6">
-                      {layer.swatchStyle === "dot" ? (
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${layer.color} ${
-                            isOn ? "ring-2 ring-blue-400" : "opacity-40"
-                          }`}
-                        />
-                      ) : (
-                        <span
-                          className={`h-1 w-5 rounded-full ${layer.color} ${
-                            isOn ? "opacity-100" : "opacity-30"
-                          }`}
-                        />
-                      )}
-                    </div>
+                <div className="space-y-1">
+                  {BASE_LAYERS.map((base) => {
+                    const Icon = base.icon;
+                    const isSelected = currentBase === base.id;
 
-                    {/* Icon & Label */}
-                    <Icon
-                      className={`h-3.5 w-3.5 shrink-0 ${
-                        isLocked
-                          ? "text-zinc-400"
-                          : isOn
-                          ? "text-blue-600"
-                          : "text-zinc-400"
-                      }`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`text-[11px] font-semibold truncate ${
-                            isLocked ? "text-zinc-400" : isOn ? "text-zinc-900" : "text-zinc-600"
+                    return (
+                      <button
+                        key={base.id}
+                        type="button"
+                        onClick={() => handleBaseClick(base.id)}
+                        className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between group cursor-pointer ${
+                          isSelected
+                            ? "bg-blue-50/80 border-blue-200 text-zinc-900 shadow-xs"
+                            : "bg-white hover:bg-zinc-50 border-zinc-200/80 text-zinc-600"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          {/* Radio Button Circle Indicator */}
+                          <div
+                            className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-zinc-300 bg-white group-hover:border-zinc-400"
+                            }`}
+                          >
+                            {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs font-semibold truncate ${isSelected ? "text-zinc-900" : "text-zinc-700"}`}>
+                                {base.label}
+                              </span>
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${base.color}`} />
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-mono truncate leading-tight">
+                              {base.subtitle}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Range Badge */}
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 shrink-0 border border-zinc-200">
+                          {base.rangeText.split(" ")[0]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── SECTION 2: DIRECT MAP OVERLAYS (ADDITIVELY STACKABLE TOGGLE LOGIC) ── */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5 px-1 pt-2 border-t border-zinc-100">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider">
+                    2. Direct Map Overlays (Additive Stackable)
+                  </span>
+                  <span className="text-[9px] font-mono text-zinc-500 font-semibold">{activeOverlayCount} Active</span>
+                </div>
+
+                <div className="space-y-1">
+                  {DIRECT_OVERLAYS.map((overlay) => {
+                    const Icon = overlay.icon;
+                    const isToggled = overlaySet.has(overlay.id);
+                    const isLocked = overlay.requiresDefense && !isDefenseUser;
+
+                    return (
+                      <div
+                        key={overlay.id}
+                        onClick={() => !isLocked && handleOverlayToggle(overlay.id)}
+                        className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
+                          isLocked
+                            ? "opacity-50 cursor-not-allowed border-zinc-200 bg-zinc-50"
+                            : isToggled
+                            ? "bg-zinc-50 border-zinc-300 text-zinc-900 cursor-pointer"
+                            : "bg-white hover:bg-zinc-50/70 border-zinc-200/70 text-zinc-600 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <Icon className={`h-4 w-4 shrink-0 ${isToggled ? "text-zinc-900" : "text-zinc-400"}`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs font-medium truncate ${isToggled ? "text-zinc-900 font-semibold" : "text-zinc-700"}`}>
+                                {overlay.label}
+                              </span>
+                              {isLocked && <Lock className="h-3 w-3 text-rose-500 shrink-0" />}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 truncate leading-tight font-mono">
+                              {overlay.subtitle}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Toggle Switch */}
+                        <button
+                          type="button"
+                          disabled={isLocked}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isLocked) handleOverlayToggle(overlay.id);
+                          }}
+                          className={`relative h-4.5 w-8 rounded-full transition-colors duration-150 shrink-0 cursor-pointer ${
+                            isToggled ? "bg-zinc-900" : "bg-zinc-200"
                           }`}
                         >
-                          {layer.label}
-                        </span>
-                        {isLocked && (
-                          <Lock className="h-2.5 w-2.5 text-rose-500 shrink-0" />
-                        )}
-                        {layer.requiresDefense && isDefenseUser && (
-                          <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-rose-50 text-rose-600 border border-rose-200 shrink-0">
-                            DEFENSE
-                          </span>
-                        )}
+                          <span
+                            className="absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-xs transition-all duration-150"
+                            style={{ left: isToggled ? "calc(100% - 16px)" : "2px" }}
+                          />
+                        </button>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                    {/* Toggle Switch */}
-                    <div
-                      className={`shrink-0 relative flex items-center h-5 w-9 rounded-full transition-colors ${
-                        isLocked
-                          ? "bg-zinc-200"
-                          : isOn
-                          ? "bg-blue-600"
-                          : "bg-zinc-300"
-                      }`}
-                    >
-                      <span
-                        className={`absolute h-3.5 w-3.5 rounded-full shadow transition-all ${
-                          isLocked
-                            ? "bg-zinc-400 left-[2px]"
-                            : isOn
-                            ? "bg-white left-[calc(100%-16px)]"
-                            : "bg-white left-[2px]"
-                        }`}
-                      />
-                    </div>
+              {/* ── SECTION 3: SENSOR THRESHOLDS (GLOBAL MODIFIER SLIDERS) ── */}
+              <div className="pt-2 border-t border-zinc-100">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                    <Sliders className="h-3 w-3 text-zinc-500" /> 3. Sensor Thresholds (Global Filters)
+                  </span>
+                </div>
 
-                    {/* Info Tooltip Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setTooltip(tooltip === layer.id ? null : layer.id);
-                      }}
-                      className="shrink-0 text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
-                    >
-                      <Info className="h-3 w-3" />
-                    </button>
+                <div className="space-y-3 bg-zinc-50/70 p-2.5 rounded-xl border border-zinc-200/80">
+                  {/* SST Range Slider */}
+                  <div>
+                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1">
+                      <span>SST Filter Range</span>
+                      <span className="text-zinc-900 font-bold">{sstRange[0]}°C – {sstRange[1]}°C</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={20}
+                      max={35}
+                      step={0.5}
+                      value={sstRange[1]}
+                      onChange={(e) => onSstRangeChange && onSstRangeChange([sstRange[0], Number(e.target.value)])}
+                      className="w-full h-1.5 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-blue-600"
+                    />
                   </div>
-                );
-              })}
+
+                  {/* Wave Max SWH Slider */}
+                  <div>
+                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1">
+                      <span>Max SWH (Swell Cap)</span>
+                      <span className="text-zinc-900 font-bold">{waveMax}m</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={8}
+                      step={0.5}
+                      value={waveMax}
+                      onChange={(e) => onWaveMaxChange && onWaveMaxChange(Number(e.target.value))}
+                      className="w-full h-1.5 rounded-full appearance-none bg-zinc-200 cursor-pointer accent-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            {/* Tooltip Info Box */}
-            <AnimatePresence>
-              {tooltip && (
-                <motion.div
-                  key={tooltip}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="border-t border-zinc-200 px-4 py-3 text-[11px] text-zinc-600 leading-relaxed bg-zinc-50"
-                >
-                  <strong className="text-zinc-900 text-xs block mb-0.5">
-                    {LAYER_DEFS.find((l) => l.id === tooltip)?.label}
-                  </strong>
-                  {LAYER_DEFS.find((l) => l.id === tooltip)?.description}
-                  {LAYER_DEFS.find((l) => l.id === tooltip)?.requiresDefense && !isDefenseUser && (
-                    <p className="mt-1.5 text-rose-600 font-semibold flex items-center gap-1">
-                      <Lock className="h-3 w-3" /> Requires Defense / Coast Guard authentication.
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Footer hint */}
-            <div className="px-4 py-2 border-t border-zinc-100 text-[10px] text-zinc-400 font-mono bg-zinc-50/60">
-              {isDefenseUser
-                ? "Defense clearance active — all layers unlocked."
-                : "Military layer requires Defense portal login."}
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-zinc-100 text-[10px] text-zinc-400 font-mono bg-zinc-50/60 flex items-center justify-between">
+              <span>ORCA Layer Engine v2.4</span>
+              <span className="text-emerald-600 font-semibold">100% Real-Time WebGL</span>
             </div>
           </motion.div>
         )}
