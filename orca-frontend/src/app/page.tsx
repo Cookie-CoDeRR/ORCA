@@ -1,9 +1,11 @@
 import Navbar       from "@/components/landing/Navbar";
 import Hero          from "@/components/landing/Hero";
-import FeaturedNews  from "@/components/landing/FeaturedNews";
+import TelemetryBar  from "@/components/landing/TelemetryBar";
 import StatsBar      from "@/components/landing/StatsBar";
+import FeaturedNews  from "@/components/landing/FeaturedNews";
 import FeatureStory  from "@/components/landing/FeatureStory";
 import ImageGallery  from "@/components/landing/ImageGallery";
+import GraticuleBar  from "@/components/landing/GraticuleBar";
 import ResourceLinks from "@/components/landing/ResourceLinks";
 import ArticleGrid   from "@/components/landing/ArticleGrid";
 import Newsletter    from "@/components/landing/Newsletter";
@@ -18,28 +20,34 @@ export default function HomePage() {
       {/* 1. Hero — full screen, Indian Ocean from ISS */}
       <Hero />
 
-      {/* 2. Stats bar */}
+      {/* 2. Subtle Dark Telemetry Bar */}
+      <TelemetryBar />
+
+      {/* 3. Stats bar */}
       <StatsBar />
 
-      {/* 3. Featured alerts / news grid */}
+      {/* 4. Featured alerts / news grid */}
       <FeaturedNews />
 
-      {/* 4. Feature story — cyclone agent prediction */}
+      {/* 5. Feature story — cyclone agent prediction */}
       <FeatureStory />
 
-      {/* 5. Image gallery strip */}
+      {/* 6. Image gallery strip (NASA Earth Science style) */}
       <ImageGallery />
 
-      {/* 6. Reference data sources */}
+      {/* 7. Subtle Dark Geodetic Coordinate Bar */}
+      <GraticuleBar />
+
+      {/* 8. Reference data sources */}
       <ResourceLinks />
 
-      {/* 7. Article grid — deep dives */}
+      {/* 9. Article grid — deep dives & research publications */}
       <ArticleGrid />
 
-      {/* 8. Newsletter CTA */}
+      {/* 10. Dark Newsletter CTA */}
       <Newsletter />
 
-      {/* 9. Footer */}
+      {/* 11. NASA-style Deep Black Footer */}
       <Footer />
     </div>
   );
