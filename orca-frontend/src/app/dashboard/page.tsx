@@ -596,10 +596,12 @@ function AIChatDrawer({
   const triggerReportGeneration = useCallback(
     async (customTopic?: string) => {
       if (isGenerating || streaming) return;
+      const lastUserMsg = messages.slice().reverse().find((m) => m.role === "user")?.content;
       const targetTopic =
         (customTopic && customTopic.trim()) ||
         input.trim() ||
-        "Comprehensive Ocean State & Advisory Report";
+        lastUserMsg ||
+        "Marine Pelagic Fisheries & Regional Species Distribution";
       setInput("");
 
       const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
@@ -1056,10 +1058,12 @@ function AIChatDrawer({
 
           <button
             onClick={() => {
-              if (!input.trim() && messages.filter((m) => m.role === "user").length === 0) {
+              const lastUser = messages.slice().reverse().find((m) => m.role === "user")?.content;
+              const topic = input.trim() || lastUser || "";
+              if (!topic) {
                 handleSend("generate report");
               } else {
-                triggerReportGeneration(input);
+                triggerReportGeneration(topic);
               }
             }}
             disabled={isGenerating || streaming}
@@ -1153,7 +1157,7 @@ function AIChatDrawer({
               </div>
             </div>
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, mIdx) => {
               if (msg.role === "thought") {
                 const cleanContent = msg.content
                   .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA70}-\u{1FAFF}]/gu, "")
@@ -1341,11 +1345,16 @@ function AIChatDrawer({
                     {!isUser && !msg.streaming && msg.content && (
                       <div className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between">
                         <button
-                          onClick={() =>
-                            triggerReportGeneration(
-                              `Generate an operational dossier based on: ${msg.content.replace(/[#*`]/g, '').slice(0, 60)}`
-                            )
-                          }
+                          onClick={() => {
+                            const precedingUserMsg = messages
+                              .slice(0, mIdx)
+                              .reverse()
+                              .find((m) => m.role === "user");
+                            const topicToReport =
+                              precedingUserMsg?.content ||
+                              msg.content.replace(/[#*`]/g, "").slice(0, 80);
+                            triggerReportGeneration(topicToReport);
+                          }}
                           disabled={isGenerating || streaming}
                           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-mono font-medium transition active:scale-95 cursor-pointer shadow-xs disabled:opacity-40"
                           title="Generate a full 4-agent report for this specific answer"
@@ -1410,7 +1419,10 @@ function AIChatDrawer({
           <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-1">
             <span>5km × 5km Mesh Telemetry</span>
             <button
-              onClick={() => triggerReportGeneration(input)}
+              onClick={() => {
+                const lastUser = messages.slice().reverse().find((m) => m.role === "user")?.content;
+                triggerReportGeneration(input.trim() || lastUser || "");
+              }}
               disabled={isGenerating || streaming}
               className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
             >

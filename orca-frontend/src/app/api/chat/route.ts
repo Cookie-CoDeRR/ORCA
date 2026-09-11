@@ -177,15 +177,52 @@ export async function POST(req: NextRequest) {
     const basin = mapContext.basinLabel || "Arabian Sea Basin";
     const reportData = fetchLayerDataTool(mapContext);
 
-    // Direct dynamic fallback answer
-    const fallbackAnswer = `**Fish Concentration & Habitat Analysis (${latStr}°N, ${lonStr}°E):**
+    const userMsgLower = userMessage.toLowerCase();
+    const isFishQuery = [
+      "fish", "fishes", "species", "catch", "pelagic", "tuna", "mackerel", "sardine",
+      "seer", "surmai", "bangda", "ayala", "tarli", "mathi"
+    ].some((k) => userMsgLower.includes(k));
+
+    let fallbackAnswer = "";
+    if (isFishQuery) {
+      fallbackAnswer = `### Marine Fish Species in this Sector (${latStr}°N, ${lonStr}°E)
+
+Here are the primary fish species commonly found swimming in this ocean area:
+
+1. **Indian Mackerel (*Rastrelliger kanagurta*)**
+   • **Local Names:** **Bangda** (Marathi/Hindi) · **Ayala** (Malayalam) · **Kumla** (Tamil) · **Bangdi** (Gujarati)
+   • **Where they swim:** Upper coastal waters (10m – 40m depth) in dense, glittering schools.
+
+2. **Oil Sardine (*Sardinella longiceps*)**
+   • **Local Names:** **Tarli** (Marathi/Hindi) · **Mathi** (Malayalam) · **Kavalai** (Tamil)
+   • **Where they swim:** Sunlit surface layers (0m – 30m depth), grazing directly on nutrient-rich phytoplankton.
+
+3. **Yellowfin Tuna (*Thunnus albacares*)**
+   • **Local Names:** **Kera** (Malayalam) · **Toora** (Gujarati) · **Gedar** (Marathi)
+   • **Where they swim:** Deeper open waters (40m – 120m depth) near the continental shelf break, hunting smaller fish.
+
+4. **King Seer Fish (*Scomberomorus commerson*)**
+   • **Local Names:** **Surmai** (Hindi/Marathi) · **Neymeen** (Malayalam) · **Vanjaram** (Tamil)
+   • **Where they swim:** Mid-water predator (15m – 60m depth) cruising around reefs and current streamlines.
+
+**Why are they found here?**
+The water temperature here is warm and pleasant (${reportData.telemetry.sst}) and satellite data shows abundant microscopic food (plankton / Chlorophyll-a: ${reportData.telemetry.chlorophyll}). This creates a natural underwater banquet where small forage fish gather to eat microscopic algae, attracting larger ocean hunters.
+
+**Best Sighting & Feeding Times:**
+• **Early Morning (04:30 – 07:30 IST)** and **Late Afternoon (17:30 – 20:30 IST)** when fish rise to the surface.
+
+💡 *Student Tip: Mackerel and sardines form the foundation of our ocean ecosystem, converting sunlight and algae into energy for the entire marine food web!*`;
+    } else {
+      fallbackAnswer = `**Ocean State & Advisory (${latStr}°N, ${lonStr}°E):**
 
 Based on active Sentinel-3 and OceanSat-3 satellite telemetry:
 • **Chlorophyll-a Biomass:** ${reportData.telemetry.chlorophyll} — Indicates moderate primary phytoplankton production.
-• **Thermal Window (SST):** ${reportData.telemetry.sst} — Preferred operational envelope for pelagic species (Yellowfin Tuna & Indian Mackerel).
+• **Thermal Window (SST):** ${reportData.telemetry.sst} — Preferred operational envelope for pelagic species.
+• **Significant Wave Height:** ${reportData.telemetry.significantWaveHeight} — Operable sea state.
 • **Habitat Suitability Index:** **${reportData.suitabilityIndex}** along this 5km × 5km cell.
 
 *Recommendation:* Type "Generate Report" for full multi-agent breakdown.`;
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // 0. STREAMING ROUTE: SSE STREAM FROM DOCKER FASTAPI BACKEND
