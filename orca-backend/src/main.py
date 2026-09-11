@@ -24,6 +24,7 @@ from .agents.ocean_analytics.tools import get_sst_and_chlorophyll, find_nearby_p
 from .agents.risk_geofencing.tools import check_imbl_proximity, check_protected_area_intersection, check_active_cyclone_warnings
 from .agents.policy_rag.tools import retrieve_maritime_policy_circulars
 from .agents.research_rag.tools import retrieve_research_papers
+from .services.live_currents import live_currents_service
 
 from .navigation.router import compute_optimal_marine_route
 from .navigation.colregs import evaluate_colregs_for_traffic, ColregsEvaluation, RiskLevel
@@ -401,18 +402,38 @@ async def get_surface_current_vector_grid():
         raise HTTPException(status_code=404, detail="Vector dataset not found. Run scripts/10_fetch_current_vectors.py.")
 
 
+@app.get("/api/v1/ocean/currents/live", tags=["Ocean Telemetry"])
+async def get_live_ocean_currents(
+    lat: float = Query(..., ge=-10.0, le=35.0),
+    lon: float = Query(..., ge=40.0, le=110.0),
+    force: bool = Query(False, description="Bypass 10-minute cache and fetch latest external reading")
+):
+    """
+    Returns authentic real-time tracked ocean currents (velocity, direction, drift vectors u/v,
+    wave coupling, flow regime) from Copernicus Marine assimilation, protected by a 10-minute cache delay.
+    """
+    try:
+        data = await live_currents_service.get_live_current(lat, lon, force_refresh=force)
+        return data
+    except Exception as e:
+        logger.error(f"Live ocean currents endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/v1/ocean/telemetry", tags=["Ocean Telemetry"])
 async def get_ocean_telemetry(lat: float = Query(..., ge=0.0, le=25.0), lon: float = Query(..., ge=50.0, le=100.0)):
     """
     Returns Sea Surface Temperature (°C), Chlorophyll-a (mg/m³), Significant Wave Height (m),
-    and nearby high-probability Potential Fishing Zone (PFZ) clusters for specified coordinates.
+    real-time tracked ocean currents (with 10m cache delay), and nearby high-probability PFZ clusters.
     """
     try:
         telemetry = get_sst_and_chlorophyll(lat, lon)
+        currents_data = await live_currents_service.get_live_current(lat, lon)
         pfz_clusters = find_nearby_pfz_clusters(lat, lon, radius_km=50.0)
         return {
             "coordinates": [lat, lon],
             "telemetry": telemetry,
+            "currents": currents_data,
             "pfz_clusters_count": len(pfz_clusters),
             "pfz_geojson_features": pfz_clusters
         }

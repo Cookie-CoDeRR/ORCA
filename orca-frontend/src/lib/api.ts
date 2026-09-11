@@ -5,6 +5,28 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
+export interface LiveOceanCurrentResponse {
+  coordinates: [number, number];
+  velocity_mps: number;
+  velocity_knots: number;
+  direction_deg: number;
+  cardinal_direction: string;
+  flow_regime: string;
+  u_vector: number;
+  v_vector: number;
+  wave_height_m: number;
+  wave_direction_deg: number;
+  observation_time: string;
+  cached_at: string;
+  cache_age_seconds: number;
+  next_sync_seconds: number;
+  is_live: boolean;
+  is_cached?: boolean;
+  is_cached_fallback?: boolean;
+  warning?: string;
+  source: string;
+}
+
 export interface OceanTelemetryResponse {
   coordinates: [number, number];
   telemetry: {
@@ -12,6 +34,7 @@ export interface OceanTelemetryResponse {
     chlorophyll_mg_m3: number;
     significant_wave_height_m: number;
   };
+  currents?: LiveOceanCurrentResponse;
   pfz_clusters_count: number;
   pfz_geojson_features: Array<{
     type: "Feature";
@@ -90,6 +113,26 @@ export async function fetchOceanTelemetry(
     return await res.json();
   } catch (err) {
     console.warn("Backend ocean telemetry unreachable, using fallback:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch real-time tracked ocean currents with 10-minute cache delay
+ */
+export async function fetchLiveOceanCurrent(
+  lat: number,
+  lon: number,
+  force: boolean = false
+): Promise<LiveOceanCurrentResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/ocean/currents/live?lat=${lat}&lon=${lon}${force ? "&force=true" : ""}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Backend live currents unreachable, using client approximation:", err);
     return null;
   }
 }

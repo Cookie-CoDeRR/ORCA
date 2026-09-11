@@ -14,11 +14,11 @@ import {
   LayoutGrid, X, Sliders, Layers, Sparkles,
   Thermometer, Navigation, Anchor, Info, CheckCircle2, Compass,
   MapPin, Wind, Ship, Activity, Grid, GraduationCap, Microscope,
-  FlaskConical, Cpu, ArrowDown, Image as ImageIcon
+  FlaskConical, Cpu, ArrowDown, Image as ImageIcon, RefreshCw, Clock
 } from "lucide-react";
 import ThreeGlobe, { EnvironmentalRasterType, VectorOverlayToggles } from "@/components/ThreeGlobe";
 import ReportView from "@/components/ReportView";
-import { sendMultiAgentMessage } from "@/lib/api";
+import { sendMultiAgentMessage, fetchLiveOceanCurrent, LiveOceanCurrentResponse } from "@/lib/api";
 import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
 import { reportStore, DEFAULT_TUNA_REPORT } from "@/lib/reportStore";
 import { Report, ReportGenerationProgress } from "@/lib/reportTypes";
@@ -1567,6 +1567,29 @@ function AppContent() {
   const [sstRange, setSstRange] = useState<[number, number]>([24, 32]);
   const [waveMax, setWaveMax] = useState(4.0);
 
+  const [liveCurrent, setLiveCurrent] = useState<LiveOceanCurrentResponse | null>(null);
+  const [loadingCurrent, setLoadingCurrent] = useState(false);
+  const [currentDetailsOpen, setCurrentDetailsOpen] = useState(false);
+
+  const refreshCurrents = useCallback((force: boolean = false) => {
+    if (!selectedCoord) return;
+    setLoadingCurrent(true);
+    fetchLiveOceanCurrent(selectedCoord.lat, selectedCoord.lon, force)
+      .then((data) => {
+        if (data) setLiveCurrent(data);
+      })
+      .finally(() => setLoadingCurrent(false));
+  }, [selectedCoord]);
+
+  useEffect(() => {
+    if (!selectedCoord) {
+      setLiveCurrent(null);
+      setCurrentDetailsOpen(false);
+      return;
+    }
+    refreshCurrents(false);
+  }, [selectedCoord?.lat, selectedCoord?.lon, refreshCurrents]);
+
   const toggleOverlay = (id: string) => {
     setActiveOverlays((prev) => {
       const next = new Set(prev);
@@ -1743,29 +1766,176 @@ function AppContent() {
                     exit={{ opacity: 0, y: 8 }}
                     className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-20"
                   >
-                    <div
-                      className="flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md bg-white/95 border-zinc-200 text-zinc-900"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse flex-shrink-0" />
-                      <span className="text-zinc-900 font-bold whitespace-nowrap">
-                        {selectedCoord.lat.toFixed(3)}°N, {selectedCoord.lon.toFixed(3)}°E
-                      </span>
-                      <span className="text-zinc-500 text-[10px] border-l border-zinc-200 pl-2 whitespace-nowrap">
-                        {currentBasinInfo.short} · [IN-EEZ-{(selectedCoord.lat * 100).toFixed(0)}-{(selectedCoord.lon * 100).toFixed(0)}]
-                      </span>
-                      <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${currentBasinInfo.isEEZ
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}>
-                        {currentBasinInfo.isEEZ ? "EEZ Safe" : "High Seas"}
-                      </span>
-                      <button
-                        onClick={() => setSelectedCoord(null)}
-                        className="text-zinc-400 hover:text-black transition p-0.5 rounded hover:bg-zinc-100 flex-shrink-0 ml-0.5"
-                        title="Unlock Cell"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                    <div className="flex flex-col items-center gap-1.5">
+                      {/* Expandable Real-Time Hydrodynamic Telemetry Card */}
+                      <AnimatePresence>
+                        {currentDetailsOpen && liveCurrent && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                            className="w-[380px] p-3 rounded-2xl border shadow-xl backdrop-blur-xl bg-white/95 border-zinc-200/90 text-zinc-900 mb-1 z-30"
+                          >
+                            <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                              <div className="flex items-center gap-1.5">
+                                <Waves className="h-4 w-4 text-cyan-600" />
+                                <span className="text-xs font-semibold tracking-tight text-zinc-900">
+                                  Real-Time Ocean Hydrodynamics
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => setCurrentDetailsOpen(false)}
+                                className="text-zinc-400 hover:text-zinc-700 p-0.5 rounded-full hover:bg-zinc-100 transition"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            <div className="my-2">
+                              <div className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100 inline-block">
+                                {liveCurrent.flow_regime}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 my-2 text-left">
+                              <div className="p-2 rounded-xl bg-zinc-50/80 border border-zinc-100">
+                                <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Current Velocity</div>
+                                <div className="text-sm font-mono font-bold text-zinc-900 mt-0.5">
+                                  {liveCurrent.velocity_knots.toFixed(2)} <span className="text-[10px] font-normal text-zinc-500">knots</span>
+                                </div>
+                                <div className="text-[9px] font-mono text-zinc-400">
+                                  ({liveCurrent.velocity_mps.toFixed(2)} m/s)
+                                </div>
+                              </div>
+
+                              <div className="p-2 rounded-xl bg-zinc-50/80 border border-zinc-100">
+                                <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Flow Azimuth</div>
+                                <div className="text-sm font-mono font-bold text-zinc-900 mt-0.5 flex items-center gap-1.5">
+                                  {liveCurrent.direction_deg.toFixed(0)}° {liveCurrent.cardinal_direction}
+                                  <Navigation
+                                    className="h-3.5 w-3.5 text-cyan-600 inline-block transform"
+                                    style={{ transform: `rotate(${liveCurrent.direction_deg}deg)` }}
+                                  />
+                                </div>
+                                <div className="text-[9px] font-mono text-zinc-400">Heading towards</div>
+                              </div>
+
+                              <div className="p-2 rounded-xl bg-zinc-50/80 border border-zinc-100">
+                                <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Eulerian Drift Vectors</div>
+                                <div className="text-[10px] font-mono text-zinc-700 mt-0.5">
+                                  u: <span className="font-semibold">{liveCurrent.u_vector.toFixed(3)}</span> m/s (E)
+                                </div>
+                                <div className="text-[10px] font-mono text-zinc-700">
+                                  v: <span className="font-semibold">{liveCurrent.v_vector.toFixed(3)}</span> m/s (N)
+                                </div>
+                              </div>
+
+                              <div className="p-2 rounded-xl bg-zinc-50/80 border border-zinc-100">
+                                <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Coupled Wave State</div>
+                                <div className="text-sm font-mono font-bold text-zinc-900 mt-0.5">
+                                  {liveCurrent.wave_height_m.toFixed(2)}m <span className="text-[10px] font-normal text-zinc-500">SWH</span>
+                                </div>
+                                <div className="text-[9px] font-mono text-zinc-400">
+                                  @ {liveCurrent.wave_direction_deg.toFixed(0)}° azimuth
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 10-Minute Caching Delay Indicator */}
+                            <div className="p-2 rounded-xl bg-cyan-50/60 border border-cyan-100/80 text-[10px] font-mono flex items-center justify-between gap-2 mt-2">
+                              <div className="flex items-center gap-1.5 truncate text-cyan-900">
+                                <Clock className="h-3 w-3 text-cyan-600 flex-shrink-0" />
+                                <span className="truncate">
+                                  {liveCurrent.is_cached
+                                    ? `10m cache active · synced ${Math.floor(liveCurrent.cache_age_seconds / 60)}m ago`
+                                    : "Live observation fetched"}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => refreshCurrents(true)}
+                                disabled={loadingCurrent}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-cyan-100 border border-cyan-200 text-[9px] font-semibold text-cyan-800 transition flex-shrink-0 shadow-2xs cursor-pointer"
+                                title="Bypass 10-minute cache and fetch latest reading"
+                              >
+                                <RefreshCw className={`h-2.5 w-2.5 ${loadingCurrent ? "animate-spin" : ""}`} />
+                                Sync Now
+                              </button>
+                            </div>
+
+                            <div className="text-[8px] font-mono text-zinc-400 mt-1.5 text-center truncate">
+                              Source: {liveCurrent.source}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="flex items-center gap-2">
+                        {/* Primary Coordinate Badge */}
+                        <div
+                          className="flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md bg-white/95 border-zinc-200 text-zinc-900"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse flex-shrink-0" />
+                          <span className="text-zinc-900 font-bold whitespace-nowrap">
+                            {selectedCoord.lat.toFixed(3)}°N, {selectedCoord.lon.toFixed(3)}°E
+                          </span>
+                          <span className="text-zinc-500 text-[10px] border-l border-zinc-200 pl-2 whitespace-nowrap">
+                            {currentBasinInfo.short} · [IN-EEZ-{(selectedCoord.lat * 100).toFixed(0)}-{(selectedCoord.lon * 100).toFixed(0)}]
+                          </span>
+                          <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${currentBasinInfo.isEEZ
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                            {currentBasinInfo.isEEZ ? "EEZ Safe" : "High Seas"}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedCoord(null);
+                              setCurrentDetailsOpen(false);
+                            }}
+                            className="text-zinc-400 hover:text-black transition p-0.5 rounded hover:bg-zinc-100 flex-shrink-0 ml-0.5"
+                            title="Unlock Cell"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Real-Time Ocean Currents Telemetry Capsule */}
+                        <div
+                          onClick={() => setCurrentDetailsOpen(!currentDetailsOpen)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md transition cursor-pointer select-none ${
+                            currentDetailsOpen
+                              ? "bg-cyan-50 border-cyan-400 text-cyan-950 ring-2 ring-cyan-200"
+                              : "bg-white/95 hover:bg-cyan-50/60 border-cyan-200/90 text-zinc-800"
+                          }`}
+                          title="Click to inspect real-time ocean current hydrodynamics (10m delay cache)"
+                        >
+                          <Waves className="h-3.5 w-3.5 text-cyan-600 flex-shrink-0" />
+                          {loadingCurrent ? (
+                            <span className="text-zinc-500 text-[10px] flex items-center gap-1">
+                              <RefreshCw className="h-2.5 w-2.5 animate-spin text-cyan-600" />
+                              Syncing...
+                            </span>
+                          ) : liveCurrent ? (
+                            <>
+                              <span className="text-cyan-900 font-bold whitespace-nowrap flex items-center gap-1">
+                                {liveCurrent.velocity_knots.toFixed(1)} kn
+                                <Navigation
+                                  className="h-2.5 w-2.5 text-cyan-600 inline-block transform"
+                                  style={{ transform: `rotate(${liveCurrent.direction_deg}deg)` }}
+                                />
+                                <span className="text-cyan-700 font-normal">{liveCurrent.cardinal_direction}</span>
+                              </span>
+                              <span className="text-cyan-600/80 text-[9px] border-l border-cyan-200 pl-1.5 whitespace-nowrap">
+                                {liveCurrent.is_cached
+                                  ? `10m TTL · ${Math.floor(liveCurrent.cache_age_seconds / 60)}m`
+                                  : "Live"}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-zinc-400 text-[10px]">Currents Telemetry</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ) : (
