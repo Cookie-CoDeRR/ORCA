@@ -363,8 +363,8 @@ export default function ThreeGlobe({
 
     // ── 1. Scene & Camera (Deep Close-Up Tactical Zoom: altitude 0.025 to 139) ──
     const scene = new THREE.Scene();
-    // Near clipping plane 0.008 prevents clipping down to 8mm above surface
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.008, 2000);
+    // Near clipping plane 0.008 prevents clipping down to 8mm above surface; far 1200 sharpens depth buffer
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.008, 1200);
 
     const MIN_DIST = radius + 0.025; // Altitude ~0.025 (ultra-deep harbor berth & pier zoom, >1400x zoom)
     const MAX_DIST = 320;           // High orbit view
@@ -1560,8 +1560,24 @@ export default function ThreeGlobe({
       frameCount++;
       const t = performance.now() * 0.001;
 
-      // Smooth camera zoom interpolation
-      camera.position.z += (targetCamDist - camera.position.z) * 0.09;
+      // Smooth camera zoom interpolation with sub-millimeter settling
+      const camDiff = targetCamDist - camera.position.z;
+      if (Math.abs(camDiff) < 0.0008) {
+        camera.position.z = targetCamDist;
+      } else {
+        camera.position.z += camDiff * 0.09;
+      }
+
+      const altitude = Math.max(0.025, camera.position.z - radius);
+
+      // Dynamically optimize camera.near based on altitude to guarantee razor-sharp 24-bit depth buffer precision:
+      // - Zoomed close (altitude <= 1): near = 0.008 (no clipping down to millimeters)
+      // - Zoomed out (altitude >= 100): near = 1.2 (depth buffer precision improves 150x, eliminating Z-fighting & line jitter)
+      const targetNear = Math.max(0.008, Math.min(1.2, altitude * 0.012));
+      if (Math.abs(camera.near - targetNear) > 0.004) {
+        camera.near = targetNear;
+        camera.updateProjectionMatrix();
+      }
 
       // Real-time zero-lag dynamic Earth screen radius for CSS Depth of Field tracking
       const tanHalfFov = Math.tan((camera.fov * Math.PI) / 360);
@@ -1571,8 +1587,6 @@ export default function ThreeGlobe({
         lastScreenRadiusPx = screenRadiusPx;
         document.documentElement.style.setProperty("--earth-r", `${screenRadiusPx}px`);
       }
-
-      const altitude = Math.max(0.025, camera.position.z - radius);
 
       // Refresh detailed satellite tiles seamlessly during camera translation / zoom
       if (frameCount % 10 === 0) {

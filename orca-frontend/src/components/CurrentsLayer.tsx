@@ -224,30 +224,49 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     float travel = progress * travelDistance * max(0.28, speed);
     vec3 advectedPos = aInitialPosition + surfaceVel * travel;
 
-    vec3 finalSpherePos = normalize(advectedPos) * (uGlobeRadius + 0.09);
+    // Altitude-scaled hover distance: elevated comfortably above globe and rasters to completely eliminate Z-fighting
+    float hoverDist = mix(0.08, 0.32, altFactor);
+    vec3 finalSpherePos = normalize(advectedPos) * (uGlobeRadius + hoverDist);
 
-    // 6. Post-Perspective NDC Screen Direction for arrowhead alignment
-    vec4 projPos = projectionMatrix * modelViewMatrix * vec4(finalSpherePos, 1.0);
-    vec4 projAhead = projectionMatrix * modelViewMatrix * vec4(finalSpherePos + surfaceVel * 0.25, 1.0);
-    vec2 screenDir = (projAhead.xy / max(0.001, projAhead.w)) - (projPos.xy / max(0.001, projPos.w));
-    vFlowAngle = atan(screenDir.y, screenDir.x);
+    // Linear view-space position
+    vec4 viewPos4 = modelViewMatrix * vec4(finalSpherePos, 1.0);
+    vec3 viewPos = viewPos4.xyz;
 
-    // 7. Smooth Fade-In and Fade-Out
+    // 6. Horizon / Silhouette Occlusion Culling:
+    // Culls back-facing particles and smoothly fades particles near the horizon to eliminate limb jitter
+    vec3 viewNormal = normalize(mat3(modelViewMatrix) * normalVec);
+    vec3 toCam = normalize(-viewPos);
+    float horizonDot = dot(viewNormal, toCam);
+    if (horizonDot < 0.02) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      vAlpha = 0.0;
+      return;
+    }
+
+    // 7. Jitter-Free View-Space Screen Direction:
+    // Uses linear 3D view velocity transformed by modelViewMatrix.
+    // +X is screen right, +Y is screen up. Zero NDC cancellation / floating-point truncation jitter!
+    vec3 viewVel = mat3(modelViewMatrix) * surfaceVel;
+    vFlowAngle = atan(viewVel.y, viewVel.x);
+
+    // 8. Smooth Fade-In, Fade-Out, and Horizon Fade
     float fadeIn = smoothstep(0.0, 0.18, progress);
     float fadeOut = 1.0 - smoothstep(0.72, 1.0, progress);
-    vAlpha = fadeIn * fadeOut * smoothstep(0.05, 0.28, speed);
+    float horizonFade = smoothstep(0.02, 0.15, horizonDot);
+    vAlpha = fadeIn * fadeOut * smoothstep(0.05, 0.28, speed) * horizonFade;
 
+    vec4 projPos = projectionMatrix * viewPos4;
     gl_Position = projPos;
 
-    // 8. Dynamic Inverted Size Scaling:
-    // - Zoomed out: arrows are BIGGER than normal size (prominent, bold, readable from orbit)
-    // - Zoomed in: arrows reduce in size (delicate, small, crisp, clearly visible without clutter)
+    // 9. Dynamic Inverted Size Scaling (True Linear Distance from Camera):
+    float camDist = max(0.5, -viewPos.z);
     float sizeScale = mix(0.70, 2.10, altFactor);
     float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.30 + 0.70);
-    gl_PointSize = (baseSize * 72.0) / max(0.65, -projPos.z);
+    gl_PointSize = (baseSize * 72.0) / camDist;
 
     // Zoomed out clamp: [18.0, 28.0] px (bigger than normal size, clearly visible arrows from orbit)
-    // Zoomed in clamp:  [8.0, 13.5] px  (sharp, clear, and visible in tactical zoom, not invisible 4px!)
+    // Zoomed in clamp:  [8.0, 13.5] px  (sharp, clear, and visible in tactical zoom)
     float minSize = mix(8.0, 18.0, altFactor);
     float maxSize = mix(13.5, 28.0, altFactor);
     gl_PointSize = clamp(gl_PointSize, minSize, maxSize);
@@ -440,6 +459,9 @@ export function createCurrentsLayer(
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.0,
+    polygonOffsetUnits: -4.0,
   });
 
   const mesh = new THREE.Points(geometry, material);
