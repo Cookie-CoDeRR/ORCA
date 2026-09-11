@@ -22,6 +22,7 @@ import { sendMultiAgentMessage, fetchLiveOceanCurrent, LiveOceanCurrentResponse 
 import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
 import { reportStore, DEFAULT_TUNA_REPORT } from "@/lib/reportStore";
 import { Report, ReportGenerationProgress } from "@/lib/reportTypes";
+import { isOceanCoordinate } from "@/lib/oceanMask";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Persona = "navigator" | "researcher" | "defense" | "student" | "guest";
@@ -603,6 +604,24 @@ function AIChatDrawer({
       const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
       const basinNameToUse = basinLabel || "Arabian Sea Basin";
 
+      // Landmass check: do not generate fake marine report on land!
+      if (!isOceanCoordinate(coordToUse.lat, coordToUse.lon)) {
+        const userMsg: ChatMessage = {
+          id: uid(),
+          role: "user",
+          content: `Generate report: ${targetTopic}`,
+          timestamp: now(),
+        };
+        const landWarnMsg: ChatMessage = {
+          id: uid(),
+          role: "ai",
+          content: `⚠️ **Ocean not selected**\n\nThe coordinates **${coordToUse.lat.toFixed(3)}°N, ${coordToUse.lon.toFixed(3)}°E** are located on land.\n\nProject ORCA is an ocean intelligence platform calibrated specifically for marine waters, exclusive economic zones (EEZ), and sea states. Reports cannot be compiled for landmasses.\n\nPlease double-click an ocean sector on the 3D globe to select an active marine cell.`,
+          timestamp: now(),
+        };
+        setMessages((m) => [...m, userMsg, landWarnMsg]);
+        return;
+      }
+
       // Scroll immediately to the report section so the user sees live creation in the bottom panel
       if (onOpenReport) {
         onOpenReport();
@@ -724,6 +743,20 @@ function AIChatDrawer({
       // Redirect report requests to the multi-stage report generator
       if (isReport) {
         triggerReportGeneration(q);
+        return;
+      }
+
+      // Check if user is asking questions while on a land coordinate
+      if (selectedCoord && !isOceanCoordinate(selectedCoord.lat, selectedCoord.lon)) {
+        setInput("");
+        const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
+        const landWarnMsg: ChatMessage = {
+          id: uid(),
+          role: "ai",
+          content: `⚠️ **Ocean not selected**\n\nThe coordinates **${selectedCoord.lat.toFixed(3)}°N, ${selectedCoord.lon.toFixed(3)}°E** are located on land.\n\nORCA marine intelligence is dedicated to ocean waters, exclusive economic zones (EEZ), and sea state monitoring.\n\nPlease double-click an ocean location on the 3D globe to analyze marine data.`,
+          timestamp: now(),
+        };
+        setMessages((m) => [...m, userMsg, landWarnMsg]);
         return;
       }
 
@@ -972,12 +1005,19 @@ function AIChatDrawer({
                 {pm.agent} Multi-Agent Router Ready
               </div>
               {selectedCoord ? (
-                <div className="text-[10px] font-mono text-zinc-700 mb-3 bg-white px-3 py-1 rounded-full border border-zinc-200 shadow-xs">
-                  Locked Cell: {selectedCoord.lat.toFixed(3)}°N, {selectedCoord.lon.toFixed(3)}°E
-                </div>
+                isOceanCoordinate(selectedCoord.lat, selectedCoord.lon) ? (
+                  <div className="text-[10px] font-mono text-zinc-700 mb-3 bg-white px-3 py-1 rounded-full border border-zinc-200 shadow-xs">
+                    Locked Cell: {selectedCoord.lat.toFixed(3)}°N, {selectedCoord.lon.toFixed(3)}°E
+                  </div>
+                ) : (
+                  <div className="text-[10px] font-mono text-amber-800 mb-3 bg-amber-50 px-3 py-1 rounded-full border border-amber-300 shadow-xs flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    <span>Landmass Detected · Ocean Not Selected</span>
+                  </div>
+                )
               ) : (
                 <div className="text-[11px] text-zinc-500 mb-3">
-                  Double-click anywhere on the 3D globe to lock coordinates.
+                  Double-click anywhere on ocean waters to lock coordinates.
                 </div>
               )}
               <p className="text-[11px] text-zinc-500 max-w-xs leading-relaxed mb-6">
@@ -1573,7 +1613,11 @@ function AppContent() {
   const [currentDetailsOpen, setCurrentDetailsOpen] = useState(false);
 
   const refreshCurrents = useCallback((force: boolean = false) => {
-    if (!selectedCoord) return;
+    if (!selectedCoord || !isOceanCoordinate(selectedCoord.lat, selectedCoord.lon)) {
+      setLiveCurrent(null);
+      setLoadingCurrent(false);
+      return;
+    }
     setLoadingCurrent(true);
     fetchLiveOceanCurrent(selectedCoord.lat, selectedCoord.lon, force)
       .then((data) => {
@@ -1708,10 +1752,15 @@ function AppContent() {
             activeOverlays={activeOverlays}
             onLocationSelect={(coords) => {
               if (coords) {
+                const isOcean = coords.isOcean ?? isOceanCoordinate(coords.lat, coords.lon);
                 setSelectedCoord(coords);
-                const info = getSovereignBasin(coords.lat, coords.lon);
-                setBasin(info.id);
-                setChatOpen(true);
+                if (!isOcean) {
+                  setChatOpen(false);
+                } else {
+                  const info = getSovereignBasin(coords.lat, coords.lon);
+                  setBasin(info.id);
+                  setChatOpen(true);
+                }
               } else {
                 setSelectedCoord(null);
               }
@@ -1875,19 +1924,34 @@ function AppContent() {
                         <div
                           className="flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md bg-white/95 border-zinc-200 text-zinc-900"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse flex-shrink-0" />
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                              isOceanCoordinate(selectedCoord.lat, selectedCoord.lon)
+                                ? "bg-blue-600 animate-pulse"
+                                : "bg-amber-500"
+                            }`}
+                          />
                           <span className="text-zinc-900 font-bold whitespace-nowrap">
                             {selectedCoord.lat.toFixed(3)}°N, {selectedCoord.lon.toFixed(3)}°E
                           </span>
-                          <span className="text-zinc-500 text-[10px] border-l border-zinc-200 pl-2 whitespace-nowrap">
-                            {currentBasinInfo.short} · [IN-EEZ-{(selectedCoord.lat * 100).toFixed(0)}-{(selectedCoord.lon * 100).toFixed(0)}]
-                          </span>
-                          <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${currentBasinInfo.isEEZ
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}>
-                            {currentBasinInfo.isEEZ ? "EEZ Safe" : "High Seas"}
-                          </span>
+                          {isOceanCoordinate(selectedCoord.lat, selectedCoord.lon) ? (
+                            <>
+                              <span className="text-zinc-500 text-[10px] border-l border-zinc-200 pl-2 whitespace-nowrap">
+                                {currentBasinInfo.short} · [IN-EEZ-{(selectedCoord.lat * 100).toFixed(0)}-{(selectedCoord.lon * 100).toFixed(0)}]
+                              </span>
+                              <span className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${currentBasinInfo.isEEZ
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                                }`}>
+                                {currentBasinInfo.isEEZ ? "EEZ Safe" : "High Seas"}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap flex items-center gap-1">
+                              <span>⚠️</span>
+                              <span>Landmass · Ocean Not Selected</span>
+                            </span>
+                          )}
                           <button
                             onClick={() => {
                               setSelectedCoord(null);
@@ -1900,42 +1964,48 @@ function AppContent() {
                           </button>
                         </div>
 
-                        {/* Real-Time Ocean Currents Telemetry Capsule */}
-                        <div
-                          onClick={() => setCurrentDetailsOpen(!currentDetailsOpen)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md transition cursor-pointer select-none ${
-                            currentDetailsOpen
-                              ? "bg-cyan-50 border-cyan-400 text-cyan-950 ring-2 ring-cyan-200"
-                              : "bg-white/95 hover:bg-cyan-50/60 border-cyan-200/90 text-zinc-800"
-                          }`}
-                          title="Click to inspect real-time ocean current hydrodynamics (10m delay cache)"
-                        >
-                          <Waves className="h-3.5 w-3.5 text-cyan-600 flex-shrink-0" />
-                          {loadingCurrent ? (
-                            <span className="text-zinc-500 text-[10px] flex items-center gap-1">
-                              <RefreshCw className="h-2.5 w-2.5 animate-spin text-cyan-600" />
-                              Syncing...
-                            </span>
-                          ) : liveCurrent ? (
-                            <>
-                              <span className="text-cyan-900 font-bold whitespace-nowrap flex items-center gap-1">
-                                {liveCurrent.velocity_knots.toFixed(1)} kn
-                                <Navigation
-                                  className="h-2.5 w-2.5 text-cyan-600 inline-block transform"
-                                  style={{ transform: `rotate(${liveCurrent.direction_deg}deg)` }}
-                                />
-                                <span className="text-cyan-700 font-normal">{liveCurrent.cardinal_direction}</span>
+                        {/* Real-Time Ocean Currents Telemetry Capsule (Oceans Only) */}
+                        {isOceanCoordinate(selectedCoord.lat, selectedCoord.lon) ? (
+                          <div
+                            onClick={() => setCurrentDetailsOpen(!currentDetailsOpen)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono shadow-sm backdrop-blur-md transition cursor-pointer select-none ${
+                              currentDetailsOpen
+                                ? "bg-cyan-50 border-cyan-400 text-cyan-950 ring-2 ring-cyan-200"
+                                : "bg-white/95 hover:bg-cyan-50/60 border-cyan-200/90 text-zinc-800"
+                            }`}
+                            title="Click to inspect real-time ocean current hydrodynamics (10m delay cache)"
+                          >
+                            <Waves className="h-3.5 w-3.5 text-cyan-600 flex-shrink-0" />
+                            {loadingCurrent ? (
+                              <span className="text-zinc-500 text-[10px] flex items-center gap-1">
+                                <RefreshCw className="h-2.5 w-2.5 animate-spin text-cyan-600" />
+                                Syncing...
                               </span>
-                              <span className="text-cyan-600/80 text-[9px] border-l border-cyan-200 pl-1.5 whitespace-nowrap">
-                                {liveCurrent.is_cached
-                                  ? `10m TTL · ${Math.floor(liveCurrent.cache_age_seconds / 60)}m`
-                                  : "Live"}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-zinc-400 text-[10px]">Currents Telemetry</span>
-                          )}
-                        </div>
+                            ) : liveCurrent ? (
+                              <>
+                                <span className="text-cyan-900 font-bold whitespace-nowrap flex items-center gap-1">
+                                  {liveCurrent.velocity_knots.toFixed(1)} kn
+                                  <Navigation
+                                    className="h-2.5 w-2.5 text-cyan-600 inline-block transform"
+                                    style={{ transform: `rotate(${liveCurrent.direction_deg}deg)` }}
+                                  />
+                                  <span className="text-cyan-700 font-normal">{liveCurrent.cardinal_direction}</span>
+                                </span>
+                                <span className="text-cyan-600/80 text-[9px] border-l border-cyan-200 pl-1.5 whitespace-nowrap">
+                                  {liveCurrent.is_cached
+                                    ? `10m TTL · ${Math.floor(liveCurrent.cache_age_seconds / 60)}m`
+                                    : "Live"}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-zinc-400 text-[10px]">Currents Telemetry</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono shadow-sm backdrop-blur-md bg-amber-50/80 border-amber-200/90 text-amber-800">
+                            <span>No ocean telemetry on land</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>

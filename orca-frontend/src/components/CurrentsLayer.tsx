@@ -2,10 +2,12 @@
 
 import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
+import { isOceanCoordinate } from "../lib/oceanMask";
 
 // ── 1. GPGPU Data Simulation: Velocity DataTexture Generator ────────────────
 /**
  * Generates a 512x256 Float/Byte DataTexture simulating global hydrodynamic ocean currents.
+ * Land pixels are strictly zeroed out (speed = 0, u = 0, v = 0) so no currents exist on land.
  * Encodes horizontal eastward u-velocity into R, vertical northward v-velocity into G,
  * and speed magnitude into B using authentic oceanographic circulation models:
  * - West India Coastal Current (WICC): Southward flow along Gujarat, Maharashtra, Goa, Karnataka, Kerala shelf.
@@ -27,6 +29,16 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
       const lonNorm = i / width; // 0 (-180°) to 1 (+180°)
       const lonDeg = lonNorm * 360.0 - 180.0;
       const lonRad = lonDeg * (Math.PI / 180.0);
+
+      // Check landmask: if on land, strictly zero out velocity & speed!
+      if (!isOceanCoordinate(latDeg, lonDeg)) {
+        const idx = (j * width + i) * 4;
+        data[idx] = 128;     // u = 0 (encoded as 0.5 * 255)
+        data[idx + 1] = 128; // v = 0 (encoded as 0.5 * 255)
+        data[idx + 2] = 0;   // speed = 0
+        data[idx + 3] = 0;   // oceanMask = 0
+        continue;
+      }
 
       // Multi-frequency harmonic streamfunction (incompressible global curl-derived gyres)
       const psi =
@@ -174,6 +186,14 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     float speed = velSample.b;
     vSpeed = speed;
 
+    // Strict Land & Zero-Flow Culling: completely discard vertices on land or with zero velocity
+    if (speed < 0.04) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      vAlpha = 0.0;
+      return;
+    }
+
     // 4. Exact Spherical Surface Tangent Coordinate Frame
     // East vector is along increasing lon: d(pos)/d(lon) = (pos.z, 0, -pos.x)
     vec3 eastVec = vec3(normalVec.z, 0.0, -normalVec.x);
@@ -189,7 +209,7 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     vec3 surfaceVel = eastVec * vel.x + northVec * vel.y;
 
     // 5. Position Advection: smoothly advected along the flow streamlines
-    float localDistance = uFlowDistance * mix(0.14, 1.0, altRatio);
+    float localDistance = uFlowDistance * mix(0.18, 1.0, altRatio);
     float travel = progress * localDistance * max(0.28, speed);
     vec3 advectedPos = aInitialPosition + surfaceVel * travel;
 
@@ -209,11 +229,11 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
 
     gl_Position = projPos;
 
-    // 8. Progressive point size: delicate and crisp at small scales, bold at global overview
-    float sizeScale = mix(0.68, 1.0, altRatio);
-    float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.40 + 0.80);
-    gl_PointSize = (baseSize * 110.0) / max(0.55, -projPos.z);
-    gl_PointSize = clamp(gl_PointSize, 5.0, 28.0);
+    // 8. Delicate & crisp point size (calm, elegant, never a solid sheet of arrows)
+    float sizeScale = mix(0.70, 1.0, altRatio);
+    float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.35 + 0.70);
+    gl_PointSize = (baseSize * 70.0) / max(0.60, -projPos.z);
+    gl_PointSize = clamp(gl_PointSize, 3.5, 14.0);
   }
 `;
 
@@ -262,9 +282,9 @@ const CURRENTS_FRAGMENT_SHADER = /* glsl */ `
 
     float intensity = clamp(edgeAlpha * 0.75 + spineGlow * 0.85 + tipGlow * 0.50, 0.0, 1.0);
 
-    // 4. Vibrant Color: Electric Cyan (#00f0ff) -> Vivid Amber/Gold (#ffd166) by velocity
-    vec3 color = mix(uColorLow, uColorHigh, smoothstep(0.32, 0.85, vSpeed));
-    color += vec3(0.20, 0.35, 0.45) * spineGlow;
+    // 4. Vibrant Color: Electric Cyan (#00d4ff) -> Vivid Amber/Gold (#fbbf24) by velocity
+    vec3 color = mix(uColorLow, uColorHigh, smoothstep(0.35, 0.85, vSpeed));
+    color += vec3(0.18, 0.32, 0.45) * spineGlow;
 
     float alpha = intensity * vAlpha * uOpacity;
     if (alpha < 0.02) discard;
@@ -285,17 +305,14 @@ export interface CurrentsLayerInstance {
 
 /**
  * Creates the high-performance GPU-accelerated CurrentsLayer instance.
- * Features 3-tier particle scattering:
- * - Tier 1: Global oceans (20,000)
- * - Tier 2: Indian Ocean & Arabian Sea basin [45°E - 105°E, -10°S - 28°N] (20,000)
- * - Tier 3: Dense Indian EEZ, shelf, and coastal zone [66°E - 88°E, 6°N - 24°N] (18,000)
- * Total ~58,000 particles guarantees dozens of crisp, active arrows are always visible at any zoom!
+ * Features strict ocean-only particle distribution and balanced tactical density (~14,000 particles)
+ * so currents are clear, calm, and NEVER appear on land!
  */
 export function createCurrentsLayer(
   globeRadius: number,
-  particleCount = 58000
+  particleCount = 14000
 ): CurrentsLayerInstance {
-  // 1. Generate Hydrodynamic Velocity DataTexture
+  // 1. Generate Hydrodynamic Velocity DataTexture with land masking
   const dataTexture = generateVelocityDataTexture(512, 256);
 
   const geometry = new THREE.BufferGeometry();
@@ -316,27 +333,32 @@ export function createCurrentsLayer(
     ];
   };
 
-  const countTier1 = Math.floor(particleCount * 0.35); // Global
+  const countTier1 = Math.floor(particleCount * 0.35); // Global oceans
   const countTier2 = Math.floor(particleCount * 0.35); // Indian Ocean Basin
   const countTier3 = particleCount - countTier1 - countTier2; // Dense Indian Shelf & EEZ
 
   for (let i = 0; i < particleCount; i++) {
     let lat = 0;
     let lon = 0;
+    let attempts = 0;
 
-    if (i < countTier1) {
-      // Tier 1: Uniform global spherical sampling
-      lon = Math.random() * 360.0 - 180.0;
-      lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
-    } else if (i < countTier1 + countTier2) {
-      // Tier 2: Indian Ocean / Arabian Sea / Bay of Bengal basin [45°E - 105°E, -12°S - 27°N]
-      lon = 45.0 + Math.random() * 60.0;
-      lat = -12.0 + Math.random() * 39.0;
-    } else {
-      // Tier 3: High-density Indian EEZ, shelf, and coastal waters [66°E - 88°E, 6°N - 24°N]
-      lon = 66.0 + Math.random() * 22.0;
-      lat = 6.0 + Math.random() * 18.0;
-    }
+    // Strictly ensure EVERY particle is spawned on water/ocean
+    do {
+      if (i < countTier1) {
+        // Tier 1: Uniform global spherical sampling
+        lon = Math.random() * 360.0 - 180.0;
+        lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
+      } else if (i < countTier1 + countTier2) {
+        // Tier 2: Indian Ocean / Arabian Sea / Bay of Bengal basin [45°E - 105°E, -12°S - 27°N]
+        lon = 45.0 + Math.random() * 60.0;
+        lat = -12.0 + Math.random() * 39.0;
+      } else {
+        // Tier 3: High-density Indian EEZ, shelf, and coastal waters [66°E - 88°E, 6°N - 24°N]
+        lon = 66.0 + Math.random() * 22.0;
+        lat = 6.0 + Math.random() * 18.0;
+      }
+      attempts++;
+    } while (!isOceanCoordinate(lat, lon) && attempts < 30);
 
     const [x, y, z] = geodeticPoint(lat, lon, globeRadius);
 
@@ -351,7 +373,7 @@ export function createCurrentsLayer(
 
     life[i] = Math.random();
     speed[i] = 0.75 + Math.random() * 0.50;
-    size[i] = 2.4 + Math.random() * 2.4;
+    size[i] = 2.0 + Math.random() * 2.0;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -368,13 +390,13 @@ export function createCurrentsLayer(
       uVelocityTexture: { value: dataTexture },
       uTime: { value: 0.0 },
       uGlobeRadius: { value: globeRadius },
-      uFlowSpeed: { value: 0.040 }, // Active, hypnotic hydrodynamic flow
-      uFlowDistance: { value: 3.4 }, // Arc travel span at global overview
+      uFlowSpeed: { value: 0.028 }, // Calm, mesmerizing hydrodynamic flow
+      uFlowDistance: { value: 1.8 }, // Crisp, refined streamline travel span
       uAltitude: { value: 70.0 }, // Dynamic zoom LOD scaling
       uPixelRatio: { value: typeof window !== "undefined" ? Math.min(window.devicePixelRatio, 2.0) : 1.0 },
-      uColorLow: { value: new THREE.Color(0x00f0ff) }, // Electric Cyan (#00f0ff)
-      uColorHigh: { value: new THREE.Color(0xffd166) }, // Luminous Golden Amber (#ffd166)
-      uOpacity: { value: 0.95 },
+      uColorLow: { value: new THREE.Color(0x00d4ff) }, // Electric Cyan (#00d4ff)
+      uColorHigh: { value: new THREE.Color(0xfbbf24) }, // Luminous Golden Amber (#fbbf24)
+      uOpacity: { value: 0.85 },
     },
     transparent: true,
     blending: THREE.AdditiveBlending,

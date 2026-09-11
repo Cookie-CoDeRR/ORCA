@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Plus, Minus, Compass, RotateCcw, Grid } from "lucide-react";
 import { createCurrentsLayer } from "./CurrentsLayer";
+import { isOceanCoordinate } from "../lib/oceanMask";
 
 export type EnvironmentalRasterType = "none" | "sst" | "chlorophyll" | "currents" | "bathymetry";
 
@@ -34,7 +35,7 @@ export interface ThreeGlobeProps {
   /** Optional target coordinate to center and zoom into */
   targetCoords?: { lat: number; lon: number } | null;
   /** Callback when user double-clicks a location on the globe */
-  onLocationSelect?: (coords: { lat: number; lon: number } | null) => void;
+  onLocationSelect?: (coords: { lat: number; lon: number; isOcean?: boolean } | null) => void;
   /** Whether the right chat drawer is open (shifts controls out from under drawer) */
   chatOpen?: boolean;
   /** Mutually exclusive environmental base layer */
@@ -296,6 +297,13 @@ export default function ThreeGlobe({
   const toggleGridRef = useRef<() => void>(() => {});
 
   const [gridActive, setGridActive] = useState(true);
+  const [landWarning, setLandWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!landWarning) return;
+    const t = setTimeout(() => setLandWarning(null), 4500);
+    return () => clearTimeout(t);
+  }, [landWarning]);
 
   // Normalize inputs to standard engine format
   const effectiveBaseLayer = activeBaseLayer || activeRaster || "natural_satellite";
@@ -1040,7 +1048,7 @@ export default function ThreeGlobe({
     globeGroup.add(graticuleMesh);
 
     // ── 8h. GPU-Accelerated Hydrodynamic Ocean Current Flow Field (GPGPU Shaders) ──
-    const currentsLayer = createCurrentsLayer(radius, 56000);
+    const currentsLayer = createCurrentsLayer(radius, 14000);
     globeGroup.add(currentsLayer.mesh);
 
     let lastTileUpdate = 0;
@@ -1395,21 +1403,35 @@ export default function ThreeGlobe({
         const hitWorld = intersects[0].point;
         const hitLocal = earthMesh.worldToLocal(hitWorld.clone());
         const { lat, lon } = vec3ToLatLon(hitLocal);
+        const isOcean = isOceanCoordinate(lat, lon);
 
-        isLockedRef.current = true;
-        autoRotateRef.current = false;
-
-        // Moderate regional zoom instead of plunging to 0.95:
-        // If currently at overview or high altitude (>55), zoom to 42.0 altitude.
-        // If already closer, gently zoom in by 30% with a floor of 22.0.
+        // Smooth camera centering
         const currentAltitude = Math.max(0.1, targetCamDist - radius);
         const targetAltitude = currentAltitude > 55 ? 42.0 : Math.max(22.0, currentAltitude * 0.70);
         updateTargetRef.current(lat, lon, targetAltitude);
+
+        if (!isOcean) {
+          isLockedRef.current = false;
+          setLandWarning(`Ocean not selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
+          if (onLocationSelectRef.current) {
+            onLocationSelectRef.current({
+              lat: Number(lat.toFixed(3)),
+              lon: Number(lon.toFixed(3)),
+              isOcean: false,
+            });
+          }
+          return;
+        }
+
+        isLockedRef.current = true;
+        autoRotateRef.current = false;
+        setLandWarning(null);
 
         if (onLocationSelectRef.current) {
           onLocationSelectRef.current({
             lat: Number(lat.toFixed(3)),
             lon: Number(lon.toFixed(3)),
+            isOcean: true,
           });
         }
       } else {
@@ -1441,18 +1463,35 @@ export default function ThreeGlobe({
             const hitWorld = intersects[0].point;
             const hitLocal = earthMesh.worldToLocal(hitWorld.clone());
             const { lat, lon } = vec3ToLatLon(hitLocal);
-
-            isLockedRef.current = true;
-            autoRotateRef.current = false;
+            const isOcean = isOceanCoordinate(lat, lon);
 
             const currentAltitude = Math.max(0.1, targetCamDist - radius);
             const targetAltitude = currentAltitude > 55 ? 42.0 : Math.max(22.0, currentAltitude * 0.70);
             updateTargetRef.current(lat, lon, targetAltitude);
 
+            if (!isOcean) {
+              isLockedRef.current = false;
+              setLandWarning(`Ocean not selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
+              if (onLocationSelectRef.current) {
+                onLocationSelectRef.current({
+                  lat: Number(lat.toFixed(3)),
+                  lon: Number(lon.toFixed(3)),
+                  isOcean: false,
+                });
+              }
+              lastTouchTime = 0;
+              return;
+            }
+
+            isLockedRef.current = true;
+            autoRotateRef.current = false;
+            setLandWarning(null);
+
             if (onLocationSelectRef.current) {
               onLocationSelectRef.current({
                 lat: Number(lat.toFixed(3)),
                 lon: Number(lon.toFixed(3)),
+                isOcean: true,
               });
             }
           }
@@ -1737,6 +1776,14 @@ export default function ThreeGlobe({
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* Floating HUD Landmass Alert Banner */}
+      {landWarning && (
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 pointer-events-none bg-zinc-950/92 text-amber-300 border border-amber-500/60 px-4 py-2 rounded-xl text-xs font-mono shadow-2xl backdrop-blur-md flex items-center gap-2.5 animate-in fade-in slide-in-from-top-3">
+          <span className="text-sm">⚠️</span>
+          <span className="font-semibold">{landWarning}</span>
         </div>
       )}
     </div>
