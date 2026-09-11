@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Plus, Minus, Compass, RotateCcw, Grid } from "lucide-react";
+import { createCurrentsLayer } from "./CurrentsLayer";
 
 export type EnvironmentalRasterType = "none" | "sst" | "chlorophyll" | "currents" | "bathymetry";
 
@@ -929,93 +930,9 @@ export default function ThreeGlobe({
     graticuleMesh.renderOrder = 15;
     globeGroup.add(graticuleMesh);
 
-    // ── 8h. Authentic Hydrodynamic Ocean Currents Animated Flow Streamlines ──
-    const oceanCurrentsGroup = new THREE.Group();
-    oceanCurrentsGroup.renderOrder = 22;
-    globeGroup.add(oceanCurrentsGroup);
-
-    interface CurrentVectorParticle {
-      lon: number;
-      lat: number;
-      u: number;
-      v: number;
-      speed: number;
-      progress: number;
-      len: number;
-    }
-
-    let currentParticles: CurrentVectorParticle[] = [];
-    let currentLineMesh: THREE.LineSegments | null = null;
-    let currentPositions: Float32Array | null = null;
-    let currentPosAttr: THREE.BufferAttribute | null = null;
-
-    fetch("/data/surface_currents_wind.json")
-      .then((res) => res.json())
-      .then((data) => {
-        const rawVectors: Array<{ coords: [number, number]; u: number; v: number; speed_knots: number }> =
-          data.vectors || [];
-
-        currentParticles = rawVectors.map((v) => {
-          const speed = Math.max(0.12, v.speed_knots || 0.12);
-          return {
-            lon: v.coords[0],
-            lat: v.coords[1],
-            u: v.u,
-            v: v.v,
-            speed: speed,
-            progress: Math.random(),
-            len: Math.min(1.6, 0.45 + speed * 0.75),
-          };
-        });
-
-        const count = currentParticles.length;
-        currentPositions = new Float32Array(count * 2 * 3);
-        const currentColors = new Float32Array(count * 2 * 3);
-
-        for (let i = 0; i < count; i++) {
-          const p = currentParticles[i];
-          let r = 0.05, g = 0.75, b = 0.90;
-          if (p.speed >= 1.0) {
-            r = 0.96; g = 0.78; b = 0.18; // High-velocity current jet (amber gold)
-          } else if (p.speed >= 0.45) {
-            r = 0.15; g = 0.90; b = 0.98; // Moderate flow (electric cyan)
-          }
-
-          const baseIdx = i * 6;
-          // Tail vertex
-          currentColors[baseIdx] = r * 0.25;
-          currentColors[baseIdx + 1] = g * 0.25;
-          currentColors[baseIdx + 2] = b * 0.25;
-          // Head vertex
-          currentColors[baseIdx + 3] = r;
-          currentColors[baseIdx + 4] = g;
-          currentColors[baseIdx + 5] = b;
-        }
-
-        const geo = new THREE.BufferGeometry();
-        currentPosAttr = new THREE.BufferAttribute(currentPositions, 3);
-        geo.setAttribute("position", currentPosAttr);
-        geo.setAttribute("color", new THREE.BufferAttribute(currentColors, 3));
-
-        const mat = new THREE.LineBasicMaterial({
-          vertexColors: true,
-          transparent: true,
-          opacity: 0.90,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-
-        currentLineMesh = new THREE.LineSegments(geo, mat);
-        currentLineMesh.renderOrder = 22;
-        oceanCurrentsGroup.add(currentLineMesh);
-
-        // Sync initial visibility with vectorLayers prop
-        const vl = vectorLayersRef.current;
-        oceanCurrentsGroup.visible = Boolean(vl?.oceanCurrents);
-      })
-      .catch((err) => {
-        console.warn("Failed to load surface currents vectors JSON:", err);
-      });
+    // ── 8h. GPU-Accelerated Hydrodynamic Ocean Current Flow Field (GPGPU Shaders) ──
+    const currentsLayer = createCurrentsLayer(radius, 32000);
+    globeGroup.add(currentsLayer.mesh);
 
     let lastTileUpdate = 0;
 
@@ -1208,7 +1125,7 @@ export default function ThreeGlobe({
         aisGroup.visible = vl.ais !== false;
         routeGroup.visible = vl.route !== false;
         gridMeshGroup.visible = vl.mesh !== false || vl.graticule !== false;
-        oceanCurrentsGroup.visible = Boolean(vl.oceanCurrents);
+        currentsLayer.mesh.visible = Boolean(vl.oceanCurrents || vl.currentsFlow);
       }
     };
 
@@ -1550,40 +1467,9 @@ export default function ThreeGlobe({
         pr.mat.opacity = Math.max(0.20, 0.80 - 0.50 * (s - 1.0));
       });
 
-      // Advance animated hydrodynamic ocean current streamlines along (u, v) vectors
-      if (currentLineMesh && currentPositions && currentPosAttr && oceanCurrentsGroup.visible) {
-        const count = currentParticles.length;
-        const rStream = radius + 0.085;
-
-        for (let i = 0; i < count; i++) {
-          const p = currentParticles[i];
-          p.progress = (p.progress + p.speed * 0.007) % 1.0;
-
-          const norm = Math.hypot(p.u, p.v) || 1;
-          const dirLon = p.u / norm;
-          const dirLat = p.v / norm;
-
-          const travelDist = p.progress * p.len;
-          const headLat = p.lat + dirLat * travelDist;
-          const headLon = p.lon + dirLon * travelDist;
-
-          const tailDist = Math.max(0, travelDist - p.len * 0.60);
-          const tailLat = p.lat + dirLat * tailDist;
-          const tailLon = p.lon + dirLon * tailDist;
-
-          const headVec = latLonToVec3(headLat, headLon, rStream);
-          const tailVec = latLonToVec3(tailLat, tailLon, rStream);
-
-          const idx = i * 6;
-          currentPositions[idx] = tailVec.x;
-          currentPositions[idx + 1] = tailVec.y;
-          currentPositions[idx + 2] = tailVec.z;
-          currentPositions[idx + 3] = headVec.x;
-          currentPositions[idx + 4] = headVec.y;
-          currentPositions[idx + 5] = headVec.z;
-        }
-
-        currentPosAttr.needsUpdate = true;
+      // Advance GPU hydrodynamic ocean currents animation (GPGPU Shaders)
+      if (currentsLayer.mesh.visible) {
+        currentsLayer.update(t);
       }
 
       // Direct DOM update for Compass needle and tooltip
@@ -1658,6 +1544,7 @@ export default function ThreeGlobe({
         item.mat.dispose();
       }
       tileCache.clear();
+      currentsLayer.dispose();
     };
   }, [radius]);
 
