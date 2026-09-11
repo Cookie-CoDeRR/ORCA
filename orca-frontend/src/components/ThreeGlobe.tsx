@@ -798,53 +798,162 @@ export default function ThreeGlobe({
       });
     });
 
-    // ── 8c. AIS Vessel Fleet Vectors ──────────────────────────────────────
+    // ── 8c. AIS Vessel Fleet: Tactical Hulls, Kinematic Courses & Badges ───
     const aisGroup = new THREE.Group();
     globeGroup.add(aisGroup);
 
     const AIS_VESSELS = [
-      { lat: 19.12, lon: 71.40, hdg: 215, type: "trawler" },
-      { lat: 18.60, lon: 70.80, hdg: 190, type: "cargo" },
-      { lat: 20.40, lon: 69.80, hdg: 130, type: "tanker" },
-      { lat: 15.20, lon: 72.90, hdg: 165, type: "trawler" },
-      { lat: 10.15, lon: 75.30, hdg: 340, type: "cargo" },
-      { lat: 8.10,  lon: 76.80, hdg: 110, type: "container" },
-      { lat: 6.80,  lon: 79.20, hdg: 270, type: "tanker" },
-      { lat: 12.60, lon: 81.20, hdg: 45,  type: "trawler" },
-      { lat: 14.50, lon: 82.80, hdg: 30,  type: "cargo" },
-      { lat: 18.20, lon: 85.00, hdg: 200, type: "tanker" },
-      { lat: 21.10, lon: 88.40, hdg: 180, type: "trawler" },
-      { lat: 9.20,  lon: 73.10, hdg: 310, type: "patrol" },
-      { lat: 22.20, lon: 68.10, hdg: 150, type: "trawler" },
-      { lat: 11.40, lon: 91.80, hdg: 60,  type: "cargo" },
+      { id: "IND-TR-04", name: "F/V Matsya-04", lat: 19.12, lon: 71.40, hdg: 215, speed: "9.2 kn", type: "trawler" },
+      { id: "IND-CG-18", name: "M/V Ocean Pioneer", lat: 18.60, lon: 70.80, hdg: 190, speed: "14.1 kn", type: "cargo" },
+      { id: "IND-TK-02", name: "M/T Gujarat Spirit", lat: 20.40, lon: 69.80, hdg: 130, speed: "12.8 kn", type: "tanker" },
+      { id: "IND-TR-11", name: "F/V Sagar Ratna", lat: 15.20, lon: 72.90, hdg: 165, speed: "7.5 kn", type: "trawler" },
+      { id: "IND-CG-09", name: "M/V Bharat Pride", lat: 10.15, lon: 75.30, hdg: 340, speed: "16.4 kn", type: "cargo" },
+      { id: "IND-CN-01", name: "C/V Cochin Trader", lat: 8.10,  lon: 76.80, hdg: 110, speed: "18.0 kn", type: "container" },
+      { id: "IND-TK-05", name: "M/T Swarna Mala", lat: 6.80,  lon: 79.20, hdg: 270, speed: "13.5 kn", type: "tanker" },
+      { id: "IND-TR-22", name: "F/V Matsya Kanya", lat: 12.60, lon: 81.20, hdg: 45,  speed: "8.1 kn", type: "trawler" },
+      { id: "IND-CG-14", name: "M/V Bengal Carrier", lat: 14.50, lon: 82.80, hdg: 30,  speed: "15.0 kn", type: "cargo" },
+      { id: "IND-TK-08", name: "M/T Paradip Pride", lat: 18.20, lon: 85.00, hdg: 200, speed: "11.7 kn", type: "tanker" },
+      { id: "IND-TR-30", name: "F/V Sagar Jyoti", lat: 21.10, lon: 88.40, hdg: 180, speed: "6.8 kn", type: "trawler" },
+      { id: "ICG-P-401", name: "ICGS Samarth", lat: 9.20,  lon: 73.10, hdg: 310, speed: "22.5 kn", type: "patrol" },
+      { id: "IND-TR-07", name: "F/V Dwarka Star", lat: 22.20, lon: 68.10, hdg: 150, speed: "8.4 kn", type: "trawler" },
+      { id: "IND-CG-21", name: "M/V Andaman Link", lat: 11.40, lon: 91.80, hdg: 60,  speed: "13.9 kn", type: "cargo" },
     ];
+
+    // Shared reusable geometry for ship hull and superstructure
+    const shipHullShape = new THREE.Shape();
+    shipHullShape.moveTo(0, 0.44); // Sharp pointed bow
+    shipHullShape.lineTo(0.14, 0.16); // Starboard flank
+    shipHullShape.lineTo(0.11, -0.30); // Starboard transom
+    shipHullShape.lineTo(-0.11, -0.30); // Port transom
+    shipHullShape.lineTo(-0.14, 0.16); // Port flank
+    shipHullShape.closePath();
+
+    const hullGeo = new THREE.ExtrudeGeometry(shipHullShape, {
+      depth: 0.12,
+      bevelEnabled: false,
+    });
+    hullGeo.translate(0, 0, -0.06);
+    hullGeo.rotateX(-Math.PI / 2); // +Z is forward bow heading, +Y is upwards into sky
+
+    const cabinGeo = new THREE.BoxGeometry(0.12, 0.14, 0.16);
+    cabinGeo.translate(0, 0.12, -0.08);
+    const cabinMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, depthWrite: false });
+
+    const radarRingGeo = new THREE.RingGeometry(0.38, 0.44, 28);
+    radarRingGeo.rotateX(-Math.PI / 2);
+
+    const createAisBadgeSprite = (label: string, sub: string, borderHex: string) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 280;
+      canvas.height = 70;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "rgba(10, 15, 30, 0.88)";
+        ctx.strokeStyle = borderHex;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(4, 4, 272, 62, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.fillText(label, 140, 28);
+
+        ctx.font = "14px monospace";
+        ctx.fillStyle = borderHex;
+        ctx.fillText(sub, 140, 52);
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.set(3.4, 0.85, 1.0);
+      return sp;
+    };
 
     AIS_VESSELS.forEach((v) => {
       const pos = latLonToVec3(v.lat, v.lon, radius + 0.18);
       const normal = pos.clone().normalize();
 
-      const coneGeo = new THREE.ConeGeometry(0.24, 0.58, 3);
-      const coneMat = new THREE.MeshBasicMaterial({
-        color: v.type === "patrol" ? 0xef4444 : v.type === "trawler" ? 0x22c55e : 0x38bdf8,
+      // Heading orientation on tangent plane
+      const headingRad = (v.hdg * Math.PI) / 180;
+      const endPos = latLonToVec3(
+        v.lat + Math.cos(headingRad) * 0.45,
+        v.lon + Math.sin(headingRad) * 0.45,
+        radius + 0.18
+      );
+      const fwd = endPos.clone().sub(pos).normalize();
+      const right = new THREE.Vector3().crossVectors(fwd, normal).normalize();
+      const trueFwd = new THREE.Vector3().crossVectors(normal, right).normalize();
+
+      const rotMatrix = new THREE.Matrix4().makeBasis(right, normal, trueFwd);
+
+      const vesselNode = new THREE.Group();
+      vesselNode.position.copy(pos);
+      vesselNode.quaternion.setFromRotationMatrix(rotMatrix);
+
+      // Color coding by vessel class
+      const colorVal =
+        v.type === "patrol" ? 0xef4444 :
+        v.type === "trawler" ? 0x22c55e :
+        v.type === "tanker" ? 0xf59e0b :
+        v.type === "container" ? 0x8b5cf6 :
+        0x38bdf8;
+      const colorHex =
+        v.type === "patrol" ? "#ef4444" :
+        v.type === "trawler" ? "#22c55e" :
+        v.type === "tanker" ? "#f59e0b" :
+        v.type === "container" ? "#8b5cf6" :
+        "#38bdf8";
+
+      const hullMat = new THREE.MeshBasicMaterial({ color: colorVal, depthWrite: false });
+      const hullMesh = new THREE.Mesh(hullGeo, hullMat);
+      vesselNode.add(hullMesh);
+
+      const cabinMesh = new THREE.Mesh(cabinGeo, cabinMat);
+      vesselNode.add(cabinMesh);
+
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: colorVal,
+        transparent: true,
+        opacity: 0.45,
+        side: THREE.DoubleSide,
         depthWrite: false,
       });
-      const cone = new THREE.Mesh(coneGeo, coneMat);
-      cone.position.copy(pos);
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-      aisGroup.add(cone);
+      const ringMesh = new THREE.Mesh(radarRingGeo, ringMat);
+      vesselNode.add(ringMesh);
 
-      const headingRad = (v.hdg * Math.PI) / 180;
-      const dLat = Math.cos(headingRad) * 0.55;
-      const dLon = Math.sin(headingRad) * 0.55;
-      const endPos = latLonToVec3(v.lat + dLat, v.lon + dLon, radius + 0.18);
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([pos, endPos]);
+      aisGroup.add(vesselNode);
+
+      // Kinematic Heading Navigation Course Line (distinct forward course vector with milestone tick)
+      const courseLength = 0.85;
+      const courseEnd = pos.clone().add(trueFwd.clone().multiplyScalar(courseLength));
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        pos.clone().add(normal.clone().multiplyScalar(0.04)),
+        courseEnd.clone().add(normal.clone().multiplyScalar(0.04)),
+      ]);
       const lineMat = new THREE.LineBasicMaterial({
-        color: 0xffffff,
+        color: colorVal,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.70,
         depthWrite: false,
       });
       aisGroup.add(new THREE.Line(lineGeo, lineMat));
+
+      // Milestone course pip
+      const pipGeo = new THREE.RingGeometry(0.06, 0.12, 12);
+      const pipMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+      const pipMesh = new THREE.Mesh(pipGeo, pipMat);
+      pipMesh.position.copy(courseEnd.clone().add(normal.clone().multiplyScalar(0.05)));
+      pipMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      aisGroup.add(pipMesh);
+
+      // Floating Tactical AIS Data Badge (clearly indicating ship type, name, speed & heading)
+      const badge = createAisBadgeSprite(`🚢 ${v.name}`, `AIS · ${v.speed} · HDG ${v.hdg}°`, colorHex);
+      badge.position.copy(pos.clone().add(normal.clone().multiplyScalar(0.70)));
+      aisGroup.add(badge);
     });
 
     // ── 8d. Optimal Hydrodynamic Navigation Route ─────────────────────────

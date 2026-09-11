@@ -1557,6 +1557,7 @@ function AppContent() {
   const [activeBaseLayer, setActiveBaseLayer] = useState<string>("natural_satellite");
   const [activeOverlays, setActiveOverlays] = useState<Set<string>>(
     new Set([
+      "ocean_currents",
       "pfz_hotspots",
       "imbl_sovereign",
       "ais_fleet",
