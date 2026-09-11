@@ -931,7 +931,7 @@ export default function ThreeGlobe({
     globeGroup.add(graticuleMesh);
 
     // ── 8h. GPU-Accelerated Hydrodynamic Ocean Current Flow Field (GPGPU Shaders) ──
-    const currentsLayer = createCurrentsLayer(radius, 32000);
+    const currentsLayer = createCurrentsLayer(radius, 56000);
     globeGroup.add(currentsLayer.mesh);
 
     let lastTileUpdate = 0;
@@ -1467,9 +1467,9 @@ export default function ThreeGlobe({
         pr.mat.opacity = Math.max(0.20, 0.80 - 0.50 * (s - 1.0));
       });
 
-      // Advance GPU hydrodynamic ocean currents animation (GPGPU Shaders)
+      // Advance GPU hydrodynamic ocean currents animation (GPGPU Shaders with Progressive Zoom LOD)
       if (currentsLayer.mesh.visible) {
-        currentsLayer.update(t);
+        currentsLayer.update(t, altitude);
       }
 
       // Direct DOM update for Compass needle and tooltip

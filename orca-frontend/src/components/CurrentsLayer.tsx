@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
 
 // ── 1. GPGPU Data Simulation: Velocity DataTexture Generator ────────────────
@@ -49,20 +49,20 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
       const lonDeg = lonNorm * 360 - 180;
       const latDeg = (latNorm - 0.5) * 180;
       if (lonDeg >= 50 && lonDeg <= 75 && latDeg >= 5 && latDeg <= 20) {
-        // Southwest monsoon jet flow towards northeast
-        u += 0.85;
-        v += 0.65;
+        // Southwest monsoon jet flow towards northeast (Somali Jet)
+        u += 0.90;
+        v += 0.70;
       } else if (lonDeg >= 68 && lonDeg <= 75 && latDeg >= 8 && latDeg <= 22) {
-        // West India Coastal Current (WICC) flowing southward
-        u -= 0.30;
-        v -= 0.80;
+        // West India Coastal Current (WICC) flowing southward along shelf
+        u -= 0.35;
+        v -= 0.85;
       } else if (lonDeg >= 80 && lonDeg <= 92 && latDeg >= 10 && latDeg <= 22) {
-        // Bay of Bengal anticyclonic gyre
-        u += 0.60 * Math.cos(latRad * 6.0);
-        v -= 0.60 * Math.sin(lonRad * 4.0);
+        // Bay of Bengal anticyclonic circulation
+        u += 0.65 * Math.cos(latRad * 5.5);
+        v -= 0.65 * Math.sin(lonRad * 3.5);
       }
 
-      // Attenuate flow at polar latitudes (land/ice damping)
+      // Attenuate flow at extreme poles
       const polarDamp = Math.cos(latRad);
       u *= polarDamp;
       v *= polarDamp;
@@ -73,13 +73,9 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
       const mag = Math.min(1.0, speed / 1.6);
 
       const idx = (j * width + i) * 4;
-      // Red: horizontal u [-1, 1] -> [0, 255]
       data[idx] = Math.floor((normU * 0.5 + 0.5) * 255);
-      // Green: vertical v [-1, 1] -> [0, 255]
       data[idx + 1] = Math.floor((normV * 0.5 + 0.5) * 255);
-      // Blue: magnitude/speed [0, 1] -> [0, 255]
       data[idx + 2] = Math.floor(mag * 255);
-      // Alpha: 255
       data[idx + 3] = 255;
     }
   }
@@ -91,8 +87,8 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
     THREE.RGBAFormat,
     THREE.UnsignedByteType
   );
-  texture.wrapS = THREE.RepeatWrapping; // Longitude wraps continuously around the Earth
-  texture.wrapT = THREE.ClampToEdgeWrapping; // Latitude clamps at poles
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = false;
@@ -108,6 +104,7 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
   uniform float uGlobeRadius;
   uniform float uFlowSpeed;
   uniform float uFlowDistance;
+  uniform float uAltitude;
   uniform float uPixelRatio;
 
   attribute vec3 aInitialPosition;
@@ -117,63 +114,68 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
 
   varying float vAlpha;
   varying float vSpeed;
+  varying float vFlowAngle;
 
   const float PI = 3.14159265358979323846;
 
   void main() {
-    // Continuous progress loop (0.0 -> 1.0) wrapped on GPU
-    float progress = fract(aLife + uTime * uFlowSpeed * aSpeed);
+    // 1. Progressive zoom scaling:
+    // As the camera zooms in (uAltitude decreases from 140 to 0.5),
+    // progressive time scaling keeps animation smooth and alive at close zoom
+    float altRatio = clamp(uAltitude / 65.0, 0.04, 1.0);
+    float zoomSpeed = mix(1.65, 1.0, altRatio);
+    float progress = fract(aLife + uTime * uFlowSpeed * zoomSpeed * aSpeed);
 
-    // 1. Spherical to Equirectangular UV coordinate mapping
-    // Initial position on sphere
+    // 2. Spherical to Equirectangular UV coordinate mapping
     float lon = atan(aInitialPosition.x, -aInitialPosition.z);
     float lat = asin(clamp(aInitialPosition.y / uGlobeRadius, -1.0, 1.0));
     vec2 uv = vec2(lon / (2.0 * PI) + 0.5, lat / PI + 0.5);
 
-    // 2. Sample velocity DataTexture: Red = u (eastward), Green = v (northward), Blue = magnitude
+    // 3. Sample velocity DataTexture: Red = u (east), Green = v (north), Blue = speed
     vec4 velSample = texture2D(uVelocityTexture, uv);
     vec2 vel = (velSample.rg * 2.0 - 1.0);
     float speed = velSample.b;
     vSpeed = speed;
 
-    // 3. Spherical Tangent Space Construction
-    // Tangent vectors along East and North on sphere surface
+    // 4. Spherical Surface Tangent Coordinate Frame
     vec3 normalVec = normalize(aInitialPosition);
     vec3 upVec = vec3(0.0, 1.0, 0.0);
-    
-    // East tangent vector (parallel to equator)
     vec3 eastVec = cross(upVec, normalVec);
     if (length(eastVec) < 0.001) {
       eastVec = vec3(1.0, 0.0, 0.0);
     } else {
       eastVec = normalize(eastVec);
     }
-    
-    // North tangent vector (along meridian towards North pole)
     vec3 northVec = normalize(cross(normalVec, eastVec));
 
     // Surface velocity vector on globe
     vec3 surfaceVel = eastVec * vel.x + northVec * vel.y;
 
-    // 4. Position Advection: smoothly displace particle along surface flow
-    float travel = progress * uFlowDistance * max(0.2, speed);
+    // 5. Position Advection (Progressively scaled down with zoom so arrows never overshoot small scale)
+    float localDistance = uFlowDistance * mix(0.16, 1.0, altRatio);
+    float travel = progress * localDistance * max(0.25, speed);
     vec3 advectedPos = aInitialPosition + surfaceVel * travel;
 
-    // Re-project exactly back onto the globe surface hovering just above terrain (+0.085 units)
+    // Re-project onto globe surface hovering cleanly above terrain (+0.085 units)
     vec3 finalSpherePos = normalize(advectedPos) * (uGlobeRadius + 0.085);
 
-    // 5. Smooth Fade-In and Fade-Out (Zero popping)
-    // Fade in from 0.0 to 0.18, stay solid, fade out from 0.72 to 1.0
-    float fadeIn = smoothstep(0.0, 0.18, progress);
-    float fadeOut = 1.0 - smoothstep(0.72, 1.0, progress);
-    vAlpha = fadeIn * fadeOut * smoothstep(0.08, 0.35, speed);
+    // 6. Directional Angle in screen space for arrowhead alignment in fragment shader
+    vec4 projVel = projectionMatrix * modelViewMatrix * vec4(surfaceVel, 0.0);
+    vFlowAngle = atan(projVel.y, projVel.x);
+
+    // 7. Smooth Fade-In and Fade-Out (Zero popping)
+    float fadeIn = smoothstep(0.0, 0.16, progress);
+    float fadeOut = 1.0 - smoothstep(0.74, 1.0, progress);
+    vAlpha = fadeIn * fadeOut * smoothstep(0.06, 0.30, speed);
 
     vec4 mvPosition = modelViewMatrix * vec4(finalSpherePos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    // Perspective point size scaling
-    gl_PointSize = (aSize * uPixelRatio * (speed * 0.7 + 0.6) * 140.0) / -mvPosition.z;
-    gl_PointSize = clamp(gl_PointSize, 1.5, 9.0);
+    // 8. Progressive point size: gets smaller as you zoom in so it remains crisp and delicate at small scale
+    float sizeScale = mix(0.55, 1.0, altRatio);
+    float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.45 + 0.75);
+    gl_PointSize = (baseSize * 115.0) / max(0.5, -mvPosition.z);
+    gl_PointSize = clamp(gl_PointSize, 3.5, 26.0);
   }
 `;
 
@@ -186,23 +188,30 @@ const CURRENTS_FRAGMENT_SHADER = /* glsl */ `
 
   varying float vAlpha;
   varying float vSpeed;
+  varying float vFlowAngle;
 
   void main() {
-    // Circular particle with exponential soft glow falloff
-    vec2 coord = gl_PointCoord - vec2(0.5);
-    float dist = length(coord);
-    if (dist > 0.5) discard;
+    // 1. Rotate coordinate to align with current flow heading on screen
+    vec2 pt = gl_PointCoord - vec2(0.5);
+    float cosA = cos(-vFlowAngle);
+    float sinA = sin(-vFlowAngle);
+    vec2 rotPt = vec2(pt.x * cosA - pt.y * sinA, pt.x * sinA + pt.y * cosA);
 
-    // Soft Gaussian/Exponential glow
-    float glow = exp(-dist * 5.2);
+    // 2. Directional Aerodynamic Arrowhead Profile along flow (rotPt.x is tail-to-head)
+    // Width narrows toward tail (-0.45) and tip (+0.45)
+    float arrowWidth = (0.26 - abs(rotPt.x) * 0.16);
+    if (abs(rotPt.y) > arrowWidth || rotPt.x < -0.46 || rotPt.x > 0.46) discard;
 
-    // Color gradient by current speed: Electric Cyan (#00ffff) -> Vibrant Amber/Gold (#fbbf24) for high-speed jets
-    vec3 color = mix(uColorLow, uColorHigh, smoothstep(0.4, 0.85, vSpeed));
+    // 3. Arrowhead intensity: soft luminous tail, intense pointed head
+    float headGlow = smoothstep(-0.46, 0.38, rotPt.x);
+    float lateralFalloff = 1.0 - smoothstep(0.0, arrowWidth, abs(rotPt.y));
+    float arrowIntensity = headGlow * lateralFalloff;
 
-    // Core intensity boost
-    color += vec3(0.2, 0.3, 0.4) * exp(-dist * 9.0);
+    // 4. Color gradient by velocity: Electric Cyan (#00ffff) -> Luminous Gold/Amber (#fbbf24) for high jets
+    vec3 color = mix(uColorLow, uColorHigh, smoothstep(0.35, 0.85, vSpeed));
+    color += vec3(0.25, 0.35, 0.45) * exp(-length(pt) * 4.5);
 
-    float alpha = glow * vAlpha * uOpacity;
+    float alpha = arrowIntensity * vAlpha * uOpacity;
     gl_FragColor = vec4(color, alpha);
   }
 `;
@@ -213,23 +222,29 @@ export interface CurrentsLayerInstance {
   material: THREE.ShaderMaterial;
   geometry: THREE.BufferGeometry;
   dataTexture: THREE.DataTexture;
-  update: (time: number) => void;
+  update: (time: number, altitude?: number) => void;
   dispose: () => void;
 }
 
 /**
  * Creates the high-performance GPU-accelerated CurrentsLayer instance for vanilla Three.js.
+ * Features multi-tier particle scattering (global + dense Indian Ocean / EEZ concentration)
+ * and progressive zoom LOD scaling so arrows never disappear when scrolling in.
+ *
  * @param globeRadius Radius of the base sphere (e.g. 66)
- * @param particleCount Number of GPU particles (default: 32,000)
+ * @param particleCount Number of GPU particles (default: 56,000 for rich small-scale coverage)
  */
 export function createCurrentsLayer(
   globeRadius: number,
-  particleCount = 32000
+  particleCount = 56000
 ): CurrentsLayerInstance {
   // 1. Generate Divergence-Free Velocity DataTexture
   const dataTexture = generateVelocityDataTexture(512, 256);
 
-  // 2. Scatter ~30,000 particles uniformly on the sphere using Archimedes projection
+  // 2. Scatter particles with Multi-Tier Density:
+  // - 50% distributed globally across all oceans
+  // - 50% concentrated densely across Indian Ocean, Arabian Sea & Bay of Bengal [45°E-105°E, -5°S-28°N]
+  // This guarantees hundreds of active micro-arrows remain in view at every close zoom level!
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(particleCount * 3);
   const initialPositions = new Float32Array(particleCount * 3);
@@ -237,17 +252,34 @@ export function createCurrentsLayer(
   const speed = new Float32Array(particleCount);
   const size = new Float32Array(particleCount);
 
-  for (let i = 0; i < particleCount; i++) {
-    // Uniform spherical surface distribution
-    const u = Math.random();
-    const v = Math.random();
-    const theta = u * 2.0 * Math.PI; // Azimuth [0, 2*PI]
-    const phi = Math.acos(2.0 * v - 1.0); // Polar angle [0, PI]
+  const halfCount = Math.floor(particleCount / 2);
 
-    const sinPhi = Math.sin(phi);
-    const x = globeRadius * sinPhi * Math.cos(theta);
-    const y = globeRadius * Math.cos(phi);
-    const z = globeRadius * sinPhi * Math.sin(theta);
+  for (let i = 0; i < particleCount; i++) {
+    let x = 0, y = 0, z = 0;
+
+    if (i < halfCount) {
+      // Tier 1: Global uniform spherical distribution
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+
+      const sinPhi = Math.sin(phi);
+      x = globeRadius * sinPhi * Math.cos(theta);
+      y = globeRadius * Math.cos(phi);
+      z = globeRadius * sinPhi * Math.sin(theta);
+    } else {
+      // Tier 2: Concentrated Indian Ocean & EEZ regional sector [45°E to 105°E, -8°S to 26°N]
+      const lonDeg = 45.0 + Math.random() * 60.0;
+      const latDeg = -8.0 + Math.random() * 34.0;
+      const phi = (90.0 - latDeg) * (Math.PI / 180.0);
+      const theta = (lonDeg + 180.0) * (Math.PI / 180.0);
+
+      const sinPhi = Math.sin(phi);
+      x = -globeRadius * sinPhi * Math.cos(theta);
+      y = globeRadius * Math.cos(phi);
+      z = globeRadius * sinPhi * Math.sin(theta);
+    }
 
     const idx = i * 3;
     positions[idx] = x;
@@ -258,9 +290,9 @@ export function createCurrentsLayer(
     initialPositions[idx + 1] = y;
     initialPositions[idx + 2] = z;
 
-    life[i] = Math.random(); // Random initial life phase (0.0 to 1.0)
-    speed[i] = 0.75 + Math.random() * 0.50; // Random speed factor (0.75 to 1.25)
-    size[i] = 1.8 + Math.random() * 2.2; // Random particle size (1.8 to 4.0)
+    life[i] = Math.random();
+    speed[i] = 0.70 + Math.random() * 0.60;
+    size[i] = 2.2 + Math.random() * 2.6;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -277,29 +309,31 @@ export function createCurrentsLayer(
       uVelocityTexture: { value: dataTexture },
       uTime: { value: 0.0 },
       uGlobeRadius: { value: globeRadius },
-      uFlowSpeed: { value: 0.055 }, // Smooth flow speed
-      uFlowDistance: { value: 4.8 }, // Arc distance in units
+      uFlowSpeed: { value: 0.045 }, // Slow, active, hypnotic animation speed
+      uFlowDistance: { value: 3.6 }, // Arc travel span at global overview
+      uAltitude: { value: 70.0 }, // Camera altitude for dynamic zoom LOD scaling
       uPixelRatio: { value: typeof window !== "undefined" ? Math.min(window.devicePixelRatio, 2.0) : 1.0 },
       uColorLow: { value: new THREE.Color(0x00ffff) }, // Electric Cyan (#00ffff)
-      uColorHigh: { value: new THREE.Color(0xfbbf24) }, // Luminous Amber/Gold (#fbbf24) for high velocity
-      uOpacity: { value: 0.88 },
+      uColorHigh: { value: new THREE.Color(0xfbbf24) }, // Golden Amber (#fbbf24)
+      uOpacity: { value: 0.92 },
     },
     transparent: true,
-    blending: THREE.AdditiveBlending, // Radiant glowing particle accumulation
-    depthWrite: false, // Never occlude vector coastlines or graticule
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
     depthTest: true,
   });
 
   const mesh = new THREE.Points(geometry, material);
-  mesh.renderOrder = 17; // Sits on top of black base sphere (0) / rasters (1) and underneath coastlines (20)
+  mesh.renderOrder = 17; // On top of base sphere & rasters, beneath vector coastlines (20)
 
   return {
     mesh,
     material,
     geometry,
     dataTexture,
-    update: (time: number) => {
+    update: (time: number, altitude = 70.0) => {
       material.uniforms.uTime.value = time;
+      material.uniforms.uAltitude.value = Math.max(0.01, altitude);
     },
     dispose: () => {
       geometry.dispose();
@@ -309,7 +343,7 @@ export function createCurrentsLayer(
   };
 }
 
-// ── 4. React Component (for R3F / Modular React usage) ──────────────────────
+// ── 4. React Component (for R3F usage) ───────────────────────────────────────
 export interface CurrentsLayerProps {
   radius?: number;
   particleCount?: number;
@@ -318,10 +352,8 @@ export interface CurrentsLayerProps {
 
 export default function CurrentsLayer({
   radius = 66,
-  particleCount = 32000,
-  visible = true,
+  particleCount = 56000,
 }: CurrentsLayerProps) {
-  const pointsRef = useRef<THREE.Points>(null);
   const layerRef = useRef<CurrentsLayerInstance | null>(null);
 
   useEffect(() => {
