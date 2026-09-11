@@ -453,25 +453,25 @@ export default function ReportView({
             </div>
 
             {/* Live Terminal Stream Console */}
-            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs font-mono text-xs">
-              <div className="flex items-center justify-between text-[11px] text-[#475569] bg-slate-100/90 border-b border-slate-200 px-4 py-2.5">
+            <div className="rounded-xl border border-[#E1E5EA] overflow-hidden shadow-2xs font-mono text-xs bg-white">
+              <div className="flex items-center justify-between text-[11px] text-[#475569] bg-[#F8FAFC] border-b border-[#E1E5EA] px-4 py-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[#1E293B] font-bold tracking-wide">SWARM TELEMETRY BUS (REAL-TIME STREAM)</span>
+                  <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+                  <span className="text-[#1F4E8C] font-bold tracking-wide">SWARM TELEMETRY BUS (REAL-TIME STREAM)</span>
                 </div>
-                <span className="text-[#64748B] font-medium">Gemma 4 MoE + INCOIS Pipeline</span>
+                <span className="text-[#64748B] font-sans font-medium">Gemma 4 MoE + INCOIS Pipeline</span>
               </div>
-              <div className="bg-[#0B132B] p-4 text-slate-300 space-y-2">
-                <div className="flex items-start gap-2 text-cyan-300">
-                  <span className="text-emerald-400 font-bold flex-shrink-0">&gt;</span>
+              <div className="bg-[#FAFBFD] p-4 text-[#334155] space-y-2">
+                <div className="flex items-start gap-2 text-[#1F4E8C] font-medium">
+                  <span className="text-[#1F4E8C] font-bold flex-shrink-0">&gt;</span>
                   <span className="leading-relaxed animate-pulse">{currentMsg}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#64748B] pt-2 border-t border-[#E1E5EA]">
                   <span>Target: [{latDisplay}°N, {lonDisplay}°E]</span>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-zinc-300">·</span>
                   <span>Marine Basin: {basin}</span>
-                  <span className="text-slate-600">·</span>
-                  <span className="text-cyan-400">Status: Illuminating active dossier sections</span>
+                  <span className="text-zinc-300">·</span>
+                  <span className="text-emerald-700 font-semibold">Status: Illuminating active dossier sections</span>
                 </div>
               </div>
             </div>
