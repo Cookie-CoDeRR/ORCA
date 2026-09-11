@@ -39,6 +39,9 @@ interface ChatMessage {
   generatedReport?: Report;
   agentBadge?: string;
   toolUsed?: string;
+  thoughts?: string[];
+  thinkingDurationSeconds?: number;
+  isThinkingExpanded?: boolean;
 }
 
 interface LayerItem {
@@ -343,92 +346,213 @@ function getConversationalResponse(q: string, coords: { lat: number; lon: number
   return `**ORCA Mission Copilot Telemetry (${basinName}):**\n\nObserving 5km × 5km cell at **${latStr}°N, ${lonStr}°E**.\n\n• **SST:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m · **IMBL:** 74.2 km SAFE\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\nI can answer questions regarding ocean physics, species suitability, and safety standoffs, or formulate a full intelligence dossier when requested.`;
 }
 
-// ─── Scroll-To-Chat Bottom Intercept Component ──────────────────────────────
-function ScrollToChatIntercept({
-  onIntersect,
-  activeBaseLayer,
-  selectedCoord,
-  basinLabel,
-  onOpenChat,
-}: {
-  onIntersect: () => void;
-  activeBaseLayer: string;
-  selectedCoord: { lat: number; lon: number } | null;
-  basinLabel?: string;
-  onOpenChat: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const triggeredRef = useRef(false);
+// ─── Crisp Monochrome Chat Message Renderer ──────────────────────────────────
+function formatInlineMarkdown(text: string): string {
+  const clean = text
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA70}-\u{1FAFF}]/gu, "")
+    .trim();
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !triggeredRef.current) {
-          triggeredRef.current = true;
-          onIntersect();
-          setTimeout(() => {
-            triggeredRef.current = false;
-          }, 5000);
-        }
-      },
-      { threshold: 0.3 }
-    );
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-    return () => observer.disconnect();
-  }, [onIntersect]);
-
-  const latStr = (selectedCoord?.lat ?? 20.75).toFixed(3);
-  const lonStr = (selectedCoord?.lon ?? 70.19).toFixed(3);
-
-  return (
-    <div ref={ref} id="orca-report-section" className="w-full py-20 px-4 flex justify-center bg-slate-50 border-t border-slate-200">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="max-w-xl w-full p-8 rounded-2xl border-2 border-dashed border-slate-300 bg-white/90 shadow-sm flex flex-col items-center text-center space-y-4 backdrop-blur-md"
-      >
-        <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shadow-xs">
-          <Sparkles className="h-6 w-6 animate-pulse" />
-        </div>
-
-        <div>
-          <h3 className="text-base font-bold text-slate-900">Dynamic Ocean Intelligence Terminal</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
-            Need insights? Ask the ORCA agent in the side chat to generate a dynamic report based on your current map view.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-slate-600 bg-slate-50 px-3.5 py-1.5 rounded-full border border-slate-200">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-          <span className="font-semibold text-slate-800">Map Context:</span>
-          <span>[{activeBaseLayer}]</span>
-          <span>·</span>
-          <span>[{latStr}°N, {lonStr}°E]</span>
-          <span>·</span>
-          <span>{basinLabel || "Arabian Sea"}</span>
-        </div>
-
-        <button
-          onClick={onOpenChat}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer mt-1"
-        >
-          <Sparkles className="h-4 w-4" />
-          <span>Ask Agent in Side Chat &rarr;</span>
-        </button>
-      </motion.div>
-    </div>
-  );
+  return clean
+    .replace(/\*\*(.+?)\*\*/g, "<strong class='font-semibold text-zinc-900'>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em class='italic text-zinc-700'>$1</em>")
+    .replace(/`([^`]+)`/g, "<code class='font-mono px-1 py-0.2 rounded bg-zinc-100 border border-zinc-200 text-zinc-800 text-[10px]'>$1</code>")
+    .replace(/\[STATUS:\s*SAFE[^\]]*\]/gi, "<span class='inline-flex items-center px-1.5 py-0.2 rounded bg-zinc-900 text-white font-mono text-[9px] font-bold tracking-wide'>SAFE</span>")
+    .replace(/\[CAUTION[^\]]*\]/gi, "<span class='inline-flex items-center px-1.5 py-0.2 rounded bg-zinc-200 text-zinc-900 border border-zinc-300 font-mono text-[9px] font-bold tracking-wide'>CAUTION</span>")
+    .replace(/\[HAZARD[^\]]*\]/gi, "<span class='inline-flex items-center px-1.5 py-0.2 rounded bg-zinc-950 text-white font-mono text-[9px] font-bold tracking-wide'>HAZARD</span>")
+    .replace(/\[ALERT[^\]]*\]/gi, "<span class='inline-flex items-center px-1.5 py-0.2 rounded bg-zinc-200 text-zinc-800 font-mono text-[9px] font-medium'>ALERT</span>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href='$2' target='_blank' rel='noopener noreferrer' class='text-zinc-900 underline font-medium hover:text-blue-600'>$1 ↗</a>");
 }
 
-// ─── AI Chat Drawer (Sleek Crisp White Mission Copilot with Multi-Agent Router) ──
+function FormattedChatMessage({ content, isUser }: { content: string; isUser: boolean }) {
+  if (isUser) {
+    return <div className="leading-relaxed whitespace-pre-wrap text-white text-xs">{content}</div>;
+  }
+
+  // Strip emojis from content
+  const cleanContent = content
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA70}-\u{1FAFF}]/gu, "")
+    .trim();
+  const lines = cleanContent.split("\n");
+  const elements: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) {
+      elements.push(<div key={`sp-${i}`} className="h-1.5" />);
+      continue;
+    }
+
+    // 1. Horizontal Dividers
+    if (rawLine === "---" || rawLine === "___" || rawLine === "***") {
+      elements.push(<div key={`hr-${i}`} className="border-b border-zinc-100 my-2" />);
+      continue;
+    }
+
+    // 2. Markdown Headings (# or ## or ### or ####)
+    if (rawLine.startsWith("#")) {
+      const headingText = rawLine.replace(/^#+\s*/, "").trim();
+      const lower = headingText.toLowerCase();
+
+      let HeaderIcon = Compass;
+      if (lower.includes("fish") || lower.includes("tuna") || lower.includes("catch") || lower.includes("species") || lower.includes("mackerel")) {
+        HeaderIcon = Fish;
+      } else if (lower.includes("sea") || lower.includes("wave") || lower.includes("water") || lower.includes("weather") || lower.includes("swh")) {
+        HeaderIcon = Waves;
+      } else if (lower.includes("safety") || lower.includes("hazard") || lower.includes("status")) {
+        HeaderIcon = ShieldAlert;
+      } else if (lower.includes("border") || lower.includes("imbl") || lower.includes("geofenc") || lower.includes("clearance") || lower.includes("sovereign")) {
+        HeaderIcon = ShieldCheck;
+      } else if (lower.includes("route") || lower.includes("fuel") || lower.includes("navigation") || lower.includes("course") || lower.includes("bearing")) {
+        HeaderIcon = Navigation;
+      } else if (lower.includes("legal") || lower.includes("emergency") || lower.includes("directive") || lower.includes("ban") || lower.includes("notice") || lower.includes("order")) {
+        HeaderIcon = FileText;
+      } else if (lower.includes("vessel") || lower.includes("ais") || lower.includes("ship") || lower.includes("fleet") || lower.includes("traffic")) {
+        HeaderIcon = Ship;
+      } else if (lower.includes("oceanographic") || lower.includes("research") || lower.includes("synoptic") || lower.includes("science")) {
+        HeaderIcon = Microscope;
+      } else if (lower.includes("namaste") || lower.includes("orca") || lower.includes("matsya") || lower.includes("samudra") || lower.includes("sutradhar")) {
+        HeaderIcon = Sparkles;
+      }
+
+      elements.push(
+        <div key={`h-${i}`} className="flex items-center gap-2 pt-2.5 pb-1 border-b border-zinc-100 first:pt-0 mb-1.5">
+          <div className="p-1 rounded bg-zinc-100 border border-zinc-200 text-zinc-800 shrink-0">
+            <HeaderIcon className="h-3 w-3 text-zinc-800" />
+          </div>
+          <span className="font-bold text-zinc-900 text-xs tracking-tight">{headingText}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // 3. Blockquotes / Alerts (> ...)
+    if (rawLine.startsWith(">")) {
+      const quoteText = rawLine.replace(/^>\s*/, "").trim();
+      elements.push(
+        <div key={`q-${i}`} className="my-1.5 p-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 text-[10px] font-mono flex items-start gap-2">
+          <ShieldAlert className="h-3.5 w-3.5 text-zinc-700 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(quoteText) }} />
+        </div>
+      );
+      continue;
+    }
+
+    // 4. Section titles formatted with bold only: **TITLE**
+    if (/^\*\*[^*]+\*\*$/.test(rawLine)) {
+      const titleText = rawLine.replace(/^\*\*|\*\*$/g, "").trim();
+      const lower = titleText.toLowerCase();
+      let TitleIcon = Sparkles;
+      if (lower.includes("profile") || lower.includes("oceanographic")) TitleIcon = Compass;
+      else if (lower.includes("habitat") || lower.includes("species") || lower.includes("fish")) TitleIcon = Fish;
+      else if (lower.includes("ecological") || lower.includes("feeding")) TitleIcon = Activity;
+      else if (lower.includes("provenance") || lower.includes("data")) TitleIcon = Database;
+      else if (lower.includes("target")) TitleIcon = Navigation;
+
+      elements.push(
+        <div key={`st-${i}`} className="flex items-center gap-1.5 pt-2 pb-0.5 mt-1 text-[11px] font-bold text-zinc-900">
+          <TitleIcon className="h-3 w-3 text-zinc-700 shrink-0" />
+          <span>{titleText}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // 5. Bullet list items (- or * or •) and Numbered list items (1. , 2. )
+    const isBullet = /^[-*•]\s+/.test(rawLine);
+    const numMatch = rawLine.match(/^(\d+)\.\s+(.*)$/);
+
+    if (isBullet || numMatch) {
+      const itemText = isBullet ? rawLine.replace(/^[-*•]\s+/, "").trim() : numMatch![2].trim();
+      const itemNum = numMatch ? numMatch[1] : null;
+
+      // Extract bold or prefix label: **Label:** Value or Label: Value
+      let label = "";
+      let value = "";
+      const boldLabelMatch = itemText.match(/^\*\*(.+?)\*\*[:\s]*(.*)$/);
+      if (boldLabelMatch) {
+        label = boldLabelMatch[1].trim();
+        value = boldLabelMatch[2].trim();
+      } else {
+        const colonIdx = itemText.indexOf(":");
+        if (colonIdx > 0 && colonIdx < 35) {
+          label = itemText.slice(0, colonIdx).trim().replace(/^\*+|\*+$/g, "");
+          value = itemText.slice(colonIdx + 1).trim();
+        }
+      }
+
+      if (label) {
+        const lowerLabel = label.toLowerCase();
+        let ItemIcon = Grid;
+        if (lowerLabel.includes("fish") || lowerLabel.includes("species") || lowerLabel.includes("catch") || lowerLabel.includes("tuna") || lowerLabel.includes("mackerel") || lowerLabel.includes("pelagic")) {
+          ItemIcon = Fish;
+        } else if (lowerLabel.includes("sea") || lowerLabel.includes("wave") || lowerLabel.includes("temp") || lowerLabel.includes("wind") || lowerLabel.includes("sst") || lowerLabel.includes("swh") || lowerLabel.includes("condition")) {
+          ItemIcon = Waves;
+        } else if (lowerLabel.includes("border") || lowerLabel.includes("imbl") || lowerLabel.includes("standoff") || lowerLabel.includes("clearance") || lowerLabel.includes("sovereignty")) {
+          ItemIcon = ShieldCheck;
+        } else if (lowerLabel.includes("verdict") || lowerLabel.includes("status") || lowerLabel.includes("safe") || lowerLabel.includes("hazard") || lowerLabel.includes("alert") || lowerLabel.includes("risk")) {
+          ItemIcon = ShieldAlert;
+        } else if (lowerLabel.includes("route") || lowerLabel.includes("fuel") || lowerLabel.includes("bearing") || lowerLabel.includes("distance") || lowerLabel.includes("course") || lowerLabel.includes("travel") || lowerLabel.includes("transit")) {
+          ItemIcon = Navigation;
+        } else if (lowerLabel.includes("legal") || lowerLabel.includes("emergency") || lowerLabel.includes("ban") || lowerLabel.includes("channel") || lowerLabel.includes("order") || lowerLabel.includes("rule") || lowerLabel.includes("policy")) {
+          ItemIcon = FileText;
+        } else if (lowerLabel.includes("depth") || lowerLabel.includes("gear") || lowerLabel.includes("method")) {
+          ItemIcon = Anchor;
+        } else if (lowerLabel.includes("feeding") || lowerLabel.includes("diet") || lowerLabel.includes("window") || lowerLabel.includes("solunar")) {
+          ItemIcon = Activity;
+        } else if (lowerLabel.includes("commercial") || lowerLabel.includes("market") || lowerLabel.includes("price") || lowerLabel.includes("rate") || lowerLabel.includes("harbor")) {
+          ItemIcon = Database;
+        } else if (lowerLabel.includes("vessel") || lowerLabel.includes("ais") || lowerLabel.includes("ship")) {
+          ItemIcon = Ship;
+        } else if (lowerLabel.includes("chlorophyll") || lowerLabel.includes("biomass") || lowerLabel.includes("salinity") || lowerLabel.includes("oceanographic")) {
+          ItemIcon = Microscope;
+        }
+
+        elements.push(
+          <div key={`li-${i}`} className="flex items-start gap-2 py-0.5 text-[11px] leading-relaxed">
+            <div className="mt-0.5 p-0.5 rounded bg-zinc-100 border border-zinc-200 text-zinc-700 shrink-0">
+              <ItemIcon className="h-2.5 w-2.5 text-zinc-700" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold text-zinc-900">{label}: </span>
+              <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(value) }} />
+            </div>
+          </div>
+        );
+        continue;
+      }
+
+      // Plain bullet list or numbered item
+      elements.push(
+        <div key={`li-${i}`} className="flex items-start gap-2 py-0.5 text-[11px] leading-relaxed">
+          {itemNum ? (
+            <span className="font-mono text-[10px] font-semibold text-zinc-500 shrink-0 mt-0.5 w-3.5 text-right">{itemNum}.</span>
+          ) : (
+            <div className="h-1.5 w-1.5 rounded-full bg-zinc-400 shrink-0 mt-1.5" />
+          )}
+          <div className="flex-1 min-w-0" dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(itemText) }} />
+        </div>
+      );
+      continue;
+    }
+
+    // 6. Regular text paragraph
+    elements.push(
+      <p key={`p-${i}`} className="mb-1 text-[11px] leading-relaxed text-zinc-800" dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(rawLine) }} />
+    );
+  }
+
+  return <div className="space-y-0.5 text-zinc-800">{elements}</div>;
+}
+
+// ─── AI Chat Drawer (Sleek Crisp White Mission Copilot with Multi-Agent Router & Report Engine) ──
 function AIChatDrawer({
   persona,
   isOpen,
   onToggle,
+  onOpenReport,
+  onReportGenerated,
+  onGeneratingProgress,
+  onRegisterTrigger,
   selectedCoord,
   basinLabel,
   activeBaseLayer,
@@ -440,6 +564,10 @@ function AIChatDrawer({
   persona: Persona;
   isOpen: boolean;
   onToggle: () => void;
+  onOpenReport?: () => void;
+  onReportGenerated?: (report: Report) => void;
+  onGeneratingProgress?: (isGenerating: boolean, progress: ReportGenerationProgress | null) => void;
+  onRegisterTrigger?: (fn: (topic?: string) => void) => void;
   selectedCoord?: { lat: number; lon: number } | null;
   basinLabel?: string;
   activeBaseLayer: string;
@@ -454,44 +582,171 @@ function AIChatDrawer({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState<ReportGenerationProgress | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Method 1 & 2: Report Generation Pipeline Trigger (Multi-Agent Swarm + Dossier Compilation)
+  const triggerReportGeneration = useCallback(
+    async (customTopic?: string) => {
+      if (isGenerating || streaming) return;
+      const targetTopic =
+        (customTopic && customTopic.trim()) ||
+        input.trim() ||
+        "Comprehensive Ocean State & Advisory Report";
+      setInput("");
+
+      const coordToUse = selectedCoord || { lat: 20.75, lon: 70.19 };
+      const basinNameToUse = basinLabel || "Arabian Sea Basin";
+
+      // Scroll immediately to the report section so the user sees live creation in the bottom panel
+      if (onOpenReport) {
+        onOpenReport();
+      }
+
+      const userMsg: ChatMessage = {
+        id: uid(),
+        role: "user",
+        content: `Generate report: ${targetTopic}`,
+        timestamp: now(),
+      };
+      setMessages((m) => [...m, userMsg]);
+      setIsGenerating(true);
+
+      const progressMsgId = uid();
+      const initialProgress: ReportGenerationProgress = {
+        stage: 1,
+        totalStages: 6,
+        stageName: "Understanding request",
+        message: `Analyzing intent & extracting topic from: "${targetTopic}"...`,
+        progressPercent: 16,
+      };
+
+      setGeneratingProgress(initialProgress);
+      onGeneratingProgress?.(true, initialProgress);
+
+      setMessages((m) => [
+        ...m,
+        {
+          id: progressMsgId,
+          role: "system",
+          content: "",
+          timestamp: now(),
+          isReportProgress: true,
+          progressData: initialProgress,
+        },
+      ]);
+
+      try {
+        const newReport = await generateReportPipeline(
+          targetTopic,
+          {
+            lat: coordToUse.lat,
+            lon: coordToUse.lon,
+            basinLabel: basinNameToUse,
+            isEEZ: true,
+            imblDistanceKm: 74.2,
+          },
+          (progress) => {
+            setGeneratingProgress(progress);
+            onGeneratingProgress?.(true, progress);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === progressMsgId ? { ...msg, progressData: progress } : msg
+              )
+            );
+          }
+        );
+
+        // Complete
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === progressMsgId
+              ? {
+                  ...msg,
+                  content: `✅ **Report Complete: ${newReport.title}**\n\nGenerated ${newReport.sections.length} dynamic sections for ${newReport.location}. Scroll down to inspect full dossier below.`,
+                  generatedReport: newReport,
+                }
+              : msg
+          )
+        );
+
+        setIsGenerating(false);
+        setGeneratingProgress(null);
+        onGeneratingProgress?.(false, null);
+
+        // Automatically update active dossier in parent & scroll to it
+        if (onReportGenerated) {
+          onReportGenerated(newReport);
+        }
+      } catch (err) {
+        console.error("Report generation error:", err);
+        setIsGenerating(false);
+        setGeneratingProgress(null);
+        onGeneratingProgress?.(false, null);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            role: "ai",
+            content:
+              "⚠️ **Report Generation Error**\n\nReport generation could not be completed. Please check connection and try again.",
+            timestamp: now(),
+          },
+        ]);
+      }
+    },
+    [isGenerating, streaming, input, selectedCoord, basinLabel, onOpenReport, onGeneratingProgress, onReportGenerated]
+  );
+
+  useEffect(() => {
+    if (onRegisterTrigger) {
+      onRegisterTrigger(triggerReportGeneration);
+    }
+  }, [onRegisterTrigger, triggerReportGeneration]);
+
   const handleSend = useCallback(
     async (overrideText?: string) => {
       const q = (overrideText && overrideText.trim()) || input.trim();
-      if (!q || streaming) return;
+      if (!q || streaming || isGenerating) return;
+
+      const qLower = q.toLowerCase();
+      const isReport =
+        isReportRequest(q) ||
+        qLower.includes("report") ||
+        qLower.includes("dossier") ||
+        qLower.includes("generate");
+
+      // Redirect report requests to the multi-stage report generator
+      if (isReport) {
+        triggerReportGeneration(q);
+        return;
+      }
 
       setInput("");
       const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
       setMessages((m) => [...m, userMsg]);
       setStreaming(true);
 
-      const qLower = q.toLowerCase();
-      const isReport = qLower.includes("report") || qLower.includes("dossier") || qLower.includes("generate");
+      const aiMsgId = uid();
+      const startTime = Date.now();
 
-      const thoughts = isReport
-        ? [
-            "🧠 Router → Classifying query intent: [Sequential 4-Agent Pipeline]",
-            `📊 [1/4 Report Agent] Ingesting 5km × 5km cell telemetry at [${(selectedCoord?.lat ?? 20.75).toFixed(3)}°N, ${(selectedCoord?.lon ?? 70.19).toFixed(3)}°E]...`,
-            "📖 [2/4 Glossary Agent] Parsing marine terminology & 5nm EEZ standoff rules...",
-            "🔬 [3/4 Research Agent] Executing RAG search on Oceanographic KB & DOI papers...",
-            "📰 [4/4 News Agent] Fetching live IMD weather bulletins & public news feeds...",
-            "✍️ Synthesizing multi-agent operational dossier...",
-          ]
-        : [
-            "🧠 Router → Classifying intent & active map layer...",
-            `📡 Context Ingestion → Base: [${activeBaseLayer}], Coordinates: [${(selectedCoord?.lat ?? 20.75).toFixed(3)}°N, ${(selectedCoord?.lon ?? 70.19).toFixed(3)}°E]`,
-            "⚡ Sub-Agent Dispatch → Querying knowledge base & executing tool...",
-          ];
-
-      for (const t of thoughts) {
-        await new Promise((r) => setTimeout(r, 160));
-        setMessages((m) => [...m, { id: uid(), role: "thought", content: t, timestamp: now() }]);
-      }
+      // Initial AI message with live reasoning accordion
+      const initialAiMsg: ChatMessage = {
+        id: aiMsgId,
+        role: "ai",
+        content: "",
+        timestamp: now(),
+        streaming: true,
+        thoughts: [],
+        isThinkingExpanded: true,
+        agentBadge: `${pm.agent} (Swarm)`,
+      };
+      setMessages((m) => [...m, initialAiMsg]);
 
       try {
         const res = await fetch("/api/chat", {
@@ -499,6 +754,8 @@ function AIChatDrawer({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: [...messages, userMsg],
+            persona,
+            stream: true,
             mapContext: {
               activeBaseLayer,
               activeOverlays: Array.from(activeOverlays),
@@ -510,64 +767,126 @@ function AIChatDrawer({
           }),
         });
 
-        if (!res.ok) throw new Error("Chat API failed");
-        const data = await res.json();
+        if (!res.ok) throw new Error("Chat streaming request failed");
 
-        // ── Live Typewriter Stream Engine (Gemini/Claude Style) ──
-        const fullContent: string = data.content || "";
-        const aiMsgId = uid();
+        if (res.body) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
 
-        // 1. Insert initial streaming AI bubble
-        setMessages((m) => [
-          ...m,
-          {
-            id: aiMsgId,
-            role: "ai",
-            content: "",
-            timestamp: now(),
-            streaming: true,
-            agentBadge: data.agent,
-            toolUsed: data.toolUsed,
-          },
-        ]);
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-        // 2. Stream text live chunk-by-chunk
-        const chunkSize = 12;
-        for (let i = 0; i < fullContent.length; i += chunkSize) {
-          const chunk = fullContent.slice(0, i + chunkSize);
-          await new Promise((r) => setTimeout(r, 12));
-          setMessages((m) =>
-            m.map((item) => (item.id === aiMsgId ? { ...item, content: chunk } : item))
-          );
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() || "";
+
+            for (const part of parts) {
+              const trimmed = part.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const jsonStr = trimmed.replace(/^data:\s*/, "");
+              try {
+                const event = JSON.parse(jsonStr);
+
+                if (event.type === "thought" && event.text) {
+                  setMessages((m) =>
+                    m.map((item) => {
+                      if (item.id !== aiMsgId) return item;
+                      const existing = item.thoughts || [];
+                      if (existing.includes(event.text)) return item;
+                      return {
+                        ...item,
+                        thoughts: [...existing, event.text],
+                        isThinkingExpanded: true,
+                      };
+                    })
+                  );
+                } else if (event.type === "chunk" && event.text) {
+                  setMessages((m) =>
+                    m.map((item) => {
+                      if (item.id !== aiMsgId) return item;
+                      const isFirstChunk = !item.content;
+                      const duration =
+                        item.thinkingDurationSeconds ??
+                        Math.max(0.6, (Date.now() - startTime) / 1000);
+                      return {
+                        ...item,
+                        content: (item.content || "") + event.text,
+                        thinkingDurationSeconds: duration,
+                        // Collapse thinking accordion once response generation starts
+                        isThinkingExpanded: isFirstChunk ? false : item.isThinkingExpanded,
+                      };
+                    })
+                  );
+                } else if (event.type === "complete") {
+                  setMessages((m) =>
+                    m.map((item) => {
+                      if (item.id !== aiMsgId) return item;
+                      const duration =
+                        item.thinkingDurationSeconds ??
+                        Math.max(0.6, (Date.now() - startTime) / 1000);
+                      return {
+                        ...item,
+                        streaming: false,
+                        agentBadge: event.agent || item.agentBadge,
+                        toolUsed: event.toolUsed || item.toolUsed,
+                        thinkingDurationSeconds: duration,
+                        isThinkingExpanded: false,
+                      };
+                    })
+                  );
+                }
+              } catch {
+                // Ignore transient JSON parse errors on partial frames
+              }
+            }
+          }
         }
 
-        // 3. Finalize response state
+        // Finalize streaming status
         setMessages((m) =>
           m.map((item) =>
-            item.id === aiMsgId ? { ...item, content: fullContent, streaming: false } : item
+            item.id === aiMsgId ? { ...item, streaming: false } : item
           )
         );
-
         setStreaming(false);
       } catch (err) {
         console.error("Chat API fetch error:", err);
         setStreaming(false);
         const latStr = (selectedCoord?.lat ?? 20.75).toFixed(3);
         const lonStr = (selectedCoord?.lon ?? 70.19).toFixed(3);
-        setMessages((m) => [
-          ...m,
-          {
-            id: uid(),
-            role: "ai",
-            content: `### 📊 ORCA Local Briefing (${basinLabel || "Arabian Sea Basin"})\n\n**Location:** ${latStr}°N, ${lonStr}°E\n• **Active Base Layer:** ${activeBaseLayer}\n• **Sea Surface Temp:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\n*Agent system active and observing current map context.*`,
-            timestamp: now(),
-            agentBadge: "Report Agent (Fallback)",
-            toolUsed: "fetch_layer_data",
-          },
-        ]);
+        setMessages((m) =>
+          m.map((item) => {
+            if (item.id !== aiMsgId) return item;
+            return {
+              ...item,
+              streaming: false,
+              content:
+                item.content ||
+                `### 📊 ORCA Local Briefing (${basinLabel || "Arabian Sea Basin"})\n\n**Location:** ${latStr}°N, ${lonStr}°E\n• **Active Base Layer:** ${activeBaseLayer}\n• **Sea Surface Temp:** 28.4°C · **Chlorophyll-a:** 1.26 mg/m³ · **SWH:** 1.6m\n• **Sovereign Status:** Indian Exclusive Economic Zone (EEZ)\n\n*Agent system active and observing current map context.*`,
+              agentBadge: `${pm.agent} (Fallback)`,
+              toolUsed: "fetch_layer_data",
+              isThinkingExpanded: false,
+            };
+          })
+        );
       }
     },
-    [input, streaming, messages, activeBaseLayer, activeOverlays, selectedCoord, basinLabel, sstRange, waveMax]
+    [
+      input,
+      streaming,
+      isGenerating,
+      messages,
+      persona,
+      activeBaseLayer,
+      activeOverlays,
+      selectedCoord,
+      basinLabel,
+      sstRange,
+      waveMax,
+      triggerReportGeneration,
+    ]
   );
 
   return (
@@ -632,8 +951,8 @@ function AIChatDrawer({
           </div>
 
           <button
-            onClick={() => handleSend("Generate a comprehensive ocean intelligence report for current map view.")}
-            disabled={streaming}
+            onClick={() => triggerReportGeneration(input)}
+            disabled={isGenerating || streaming}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-medium transition disabled:opacity-40 shadow-none active:scale-95 cursor-pointer"
             title="Generate a dynamic report for current topic and coordinates"
           >
@@ -671,17 +990,38 @@ function AIChatDrawer({
                   4 Sub-Agent Router Commands
                 </div>
                 {[
-                  { text: "Generate a report for current map view", icon: FileText, label: "Report Agent" },
-                  { text: "What is PFZ and how is it detected?", icon: BookOpen, label: "Glossary Agent" },
-                  { text: "How does upwelling affect Yellowfin Tuna?", icon: Microscope, label: "Research Agent" },
-                  { text: "Are there any active cyclone alerts or fishing bans?", icon: Radio, label: "News Agent" },
+                  {
+                    text: "Generate a report for current map view",
+                    icon: FileText,
+                    label: "Report Agent",
+                    action: () => triggerReportGeneration("Generate an operational report for current map view."),
+                  },
+                  {
+                    text: "What is PFZ and how is it detected?",
+                    icon: BookOpen,
+                    label: "Glossary Agent",
+                    action: () => handleSend("What is PFZ and how is it detected?"),
+                  },
+                  {
+                    text: "How does upwelling affect Yellowfin Tuna?",
+                    icon: Microscope,
+                    label: "Research Agent",
+                    action: () => handleSend("How does upwelling affect Yellowfin Tuna?"),
+                  },
+                  {
+                    text: "Are there any active cyclone alerts or fishing bans?",
+                    icon: Radio,
+                    label: "News Agent",
+                    action: () => handleSend("Are there any active cyclone alerts or fishing bans?"),
+                  },
                 ].map((item) => {
                   const ItemIcon = item.icon;
                   return (
                     <button
                       key={item.text}
-                      onClick={() => handleSend(item.text)}
-                      className="w-full text-left px-2.5 py-2 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group cursor-pointer"
+                      onClick={item.action}
+                      disabled={isGenerating || streaming}
+                      className="w-full text-left px-2.5 py-2 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:bg-zinc-50 text-[11px] text-zinc-700 hover:text-zinc-900 transition flex items-center justify-between group cursor-pointer disabled:opacity-40"
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-1">
                         <ItemIcon className="h-3.5 w-3.5 text-zinc-400 group-hover:text-blue-600 shrink-0" />
@@ -698,10 +1038,67 @@ function AIChatDrawer({
           ) : (
             messages.map((msg) => {
               if (msg.role === "thought") {
+                const cleanContent = msg.content
+                  .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA70}-\u{1FAFF}]/gu, "")
+                  .trim();
+                const lower = cleanContent.toLowerCase();
+                let ThoughtIcon = Cpu;
+                if (lower.includes("router")) ThoughtIcon = Network;
+                else if (lower.includes("context") || lower.includes("ingestion")) ThoughtIcon = Layers;
+                else if (lower.includes("dispatch") || lower.includes("sub-agent") || lower.includes("swarm")) ThoughtIcon = Cpu;
+
                 return (
-                  <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 py-0.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
-                    {msg.content}
+                  <div key={msg.id} className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 py-1 px-2.5 rounded-lg bg-zinc-50 border border-zinc-200/80 shadow-2xs">
+                    <div className="p-1 rounded bg-white border border-zinc-200 text-zinc-700 shrink-0">
+                      <ThoughtIcon className="h-3 w-3 text-zinc-800 animate-pulse" />
+                    </div>
+                    <span className="truncate">{cleanContent}</span>
+                  </div>
+                );
+              }
+
+              // Dynamic Report Generation Progress Card
+              if (msg.isReportProgress && msg.progressData) {
+                const p = msg.progressData;
+                const isComplete = !!msg.generatedReport;
+                return (
+                  <div key={msg.id} className="p-4 rounded-xl border border-zinc-200 bg-white shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isComplete ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 text-[#1F4E8C] animate-spin" />
+                        )}
+                        <span className="text-xs font-bold text-zinc-900">
+                          {isComplete ? "Report Complete" : p.stageName}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Stage {p.stage}/{p.totalStages}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-600 leading-relaxed whitespace-pre-line">
+                      {msg.content || p.message}
+                    </p>
+
+                    <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                      <div
+                        className="h-full bg-[#1F4E8C] transition-all duration-300 rounded-full"
+                        style={{ width: `${isComplete ? 100 : p.progressPercent}%` }}
+                      />
+                    </div>
+
+                    {isComplete && (
+                      <button
+                        onClick={onOpenReport}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#1F4E8C] hover:bg-[#173F72] text-white text-xs font-semibold shadow-xs transition mt-1 cursor-pointer"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>Open Generated Dossier ▼</span>
+                      </button>
+                    )}
                   </div>
                 );
               }
@@ -740,17 +1137,79 @@ function AIChatDrawer({
                       )}
                     </div>
 
-                    {msg.content.split("\n").map((line, i) => {
-                      const formatted = line
-                        .replace(/\*\*(.+?)\*\*/g, `<strong class='${isUser ? "font-bold text-white" : "font-bold text-black"}'>$1</strong>`)
-                        .replace(/`([^`]+)`/g, `<code class='font-mono px-1 py-0.5 rounded bg-zinc-100 text-zinc-800 text-[10px]'>$1</code>`)
-                        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a href='$2' target='_blank' rel='noopener noreferrer' class='${isUser ? "text-blue-300 underline" : "text-blue-600 hover:text-blue-800 underline font-medium"}'>$1 ↗</a>`);
-                      return (
-                        <p key={i} className="mb-1 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatted }} />
-                      );
-                    })}
+                    {/* Antigravity-Style Collapsible Reasoning Container */}
+                    {!isUser && msg.thoughts && msg.thoughts.length > 0 && (
+                      <div className="mb-2.5 rounded-xl border border-zinc-200/90 bg-zinc-50/75 overflow-hidden shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMessages((prev) =>
+                              prev.map((item) =>
+                                item.id === msg.id
+                                  ? { ...item, isThinkingExpanded: !item.isThinkingExpanded }
+                                  : item
+                              )
+                            )
+                          }
+                          className="w-full px-2.5 py-1.5 flex items-center justify-between text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/60 transition cursor-pointer select-none"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {msg.streaming && !msg.content ? (
+                              <Sparkles className="h-3 w-3 text-zinc-700 animate-spin shrink-0" />
+                            ) : (
+                              <Sparkles className="h-3 w-3 text-zinc-500 shrink-0" />
+                            )}
+                            <span className="font-mono text-[10.5px] font-medium text-zinc-700 truncate">
+                              {msg.streaming && !msg.content
+                                ? "Thinking..."
+                                : `Thought for ${msg.thinkingDurationSeconds ? msg.thinkingDurationSeconds.toFixed(1) : "2.4"}s · ${msg.thoughts.length} reasoning steps`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-zinc-400 shrink-0 ml-2">
+                            <span className="text-[9px] font-mono">{msg.isThinkingExpanded ? "Hide" : "Show"}</span>
+                            <ChevronDown
+                              className={`h-3 w-3 transition-transform duration-200 ${
+                                msg.isThinkingExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          </div>
+                        </button>
 
-                    {msg.streaming && (
+                        <AnimatePresence>
+                          {msg.isThinkingExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.16 }}
+                              className="border-t border-zinc-200/60 bg-white/70 px-3 py-2 space-y-1.5 font-mono text-[10px] text-zinc-600"
+                            >
+                              {msg.thoughts.map((step, sIdx) => {
+                                const lower = step.toLowerCase();
+                                let StepIcon = Cpu;
+                                if (lower.includes("router")) StepIcon = Network;
+                                else if (lower.includes("context") || lower.includes("bound") || lower.includes("layer")) StepIcon = Layers;
+                                else if (lower.includes("research") || lower.includes("rag") || lower.includes("paper")) StepIcon = BookOpen;
+                                else if (lower.includes("telemetry") || lower.includes("ocean") || lower.includes("analytics")) StepIcon = Activity;
+
+                                return (
+                                  <div key={sIdx} className="flex items-start gap-1.5 leading-relaxed">
+                                    <div className="mt-0.5 p-0.5 rounded bg-zinc-100 text-zinc-600 shrink-0">
+                                      <StepIcon className="h-2.5 w-2.5" />
+                                    </div>
+                                    <span className="text-zinc-700 break-words">{step}</span>
+                                  </div>
+                                );
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+
+                    <FormattedChatMessage content={msg.content} isUser={isUser} />
+
+                    {msg.streaming && !!msg.content && (
                       <span className="inline-block text-zinc-900 animate-pulse ml-0.5 font-bold">▋</span>
                     )}
 
@@ -758,12 +1217,12 @@ function AIChatDrawer({
                       <div className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-between">
                         <button
                           onClick={() =>
-                            handleSend(
-                              `Generate a comprehensive operational report based on: ${msg.content.replace(/[#*`]/g, '').slice(0, 60)}...`
+                            triggerReportGeneration(
+                              `Generate an operational dossier based on: ${msg.content.replace(/[#*`]/g, '').slice(0, 60)}`
                             )
                           }
-                          disabled={streaming}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-mono font-medium transition active:scale-95 cursor-pointer shadow-xs"
+                          disabled={isGenerating || streaming}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-mono font-medium transition active:scale-95 cursor-pointer shadow-xs disabled:opacity-40"
                           title="Generate a full 4-agent report for this specific answer"
                         >
                           <FileText className="h-3 w-3 text-blue-400" />
@@ -794,7 +1253,7 @@ function AIChatDrawer({
             />
             <button
               onClick={() => handleSend()}
-              disabled={!input.trim() || streaming}
+              disabled={!input.trim() || streaming || isGenerating}
               className="p-2 rounded-xl bg-[#1F4E8C] text-white hover:bg-[#173F72] transition disabled:opacity-30 active:scale-95 shadow-sm cursor-pointer"
               title="Send Message"
             >
@@ -805,9 +1264,9 @@ function AIChatDrawer({
           <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-1">
             <span>5km × 5km Mesh Telemetry</span>
             <button
-              onClick={() => handleSend("Generate an operational report for current map telemetry.")}
-              disabled={streaming}
-              className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+              onClick={() => triggerReportGeneration(input)}
+              disabled={isGenerating || streaming}
+              className="text-[#1F4E8C] font-semibold hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-40"
             >
               <FileText className="h-3 w-3" />
               <span>Generate Report</span>
@@ -1082,7 +1541,10 @@ function AppContent() {
   const [selectedSpecies, setSelectedSpecies] = useState("yellowfin");
   const [navOpen, setNavOpen] = useState(false);
   const [scrolledPastGlobe, setScrolledPastGlobe] = useState(false);
-  const [activeReport, setActiveReport] = useState<Report>(DEFAULT_TUNA_REPORT);
+  const [activeReport, setActiveReport] = useState<Report | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportProgress, setReportProgress] = useState<ReportGenerationProgress | null>(null);
+  const triggerReportRef = useRef<((topic?: string) => void) | null>(null);
 
   useEffect(() => {
     setActiveReport(reportStore.getActiveReport());
@@ -1347,22 +1809,26 @@ function AppContent() {
         })()}
       </div>
 
-      {/* ══════════════════════════════ SCROLL-DOWN INTERCEPT SECTION ══════════════ */}
+      {/* ══════════════════════════════ SCROLL-DOWN REPORT DOSSIER ══════════════ */}
       <div className="relative z-20">
-        <ScrollToChatIntercept
-          onIntersect={() => {
-            if (!chatOpen) setChatOpen(true);
-            setPulseChat(true);
-            setTimeout(() => setPulseChat(false), 2400);
-          }}
-          activeBaseLayer={activeBaseLayer}
-          selectedCoord={selectedCoord}
-          basinLabel={
+        <ReportView
+          report={activeReport}
+          persona={persona}
+          selectedSpeciesId={selectedSpecies}
+          coordinates={selectedCoord || { lat: 20.75, lon: 70.19 }}
+          basinName={
             selectedCoord
               ? getSovereignBasin(selectedCoord.lat, selectedCoord.lon).label
               : BASINS.find((b) => b.id === basin)?.label || "Arabian Sea Basin"
           }
-          onOpenChat={() => setChatOpen(true)}
+          onBackToGlobe={scrollToGlobe}
+          showBackToGlobeButton={true}
+          isGenerating={isGeneratingReport}
+          generationProgress={reportProgress}
+          onTriggerGenerate={(topic) => {
+            scrollToReport();
+            triggerReportRef.current?.(topic);
+          }}
         />
       </div>
 
@@ -1533,6 +1999,21 @@ function AppContent() {
         persona={persona}
         isOpen={chatOpen}
         onToggle={() => setChatOpen((p) => !p)}
+        onOpenReport={scrollToReport}
+        onReportGenerated={(newReport) => {
+          setActiveReport(newReport);
+          reportStore.saveReport(newReport);
+          setTimeout(() => {
+            scrollToReport();
+          }, 400);
+        }}
+        onGeneratingProgress={(isGen, prog) => {
+          setIsGeneratingReport(isGen);
+          setReportProgress(prog);
+        }}
+        onRegisterTrigger={(fn) => {
+          triggerReportRef.current = fn;
+        }}
         selectedCoord={selectedCoord}
         basinLabel={
           selectedCoord

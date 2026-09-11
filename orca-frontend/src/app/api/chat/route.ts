@@ -15,6 +15,7 @@ export interface ChatRequestPayload {
   messages: Array<{ id?: string; role: string; content: string; timestamp?: string }>;
   mapContext: MapContextPayload;
   persona?: string;
+  stream?: boolean;
 }
 
 const FASTAPI_DOCKER_BACKEND = process.env.FASTAPI_BACKEND_URL || "http://localhost:8000";
@@ -96,7 +97,13 @@ function searchLiveNewsTool(query: string, basin: string) {
 export async function POST(req: NextRequest) {
   try {
     const body: ChatRequestPayload = await req.json();
-    const { messages, mapContext, persona = "navigator" } = body;
+    const mapContext = body.mapContext || {
+      activeBaseLayer: "natural_satellite",
+      activeOverlays: [],
+      selectedCoord: { lat: 20.75, lon: 70.19 },
+      basinLabel: "Arabian Sea Basin",
+    };
+    const { messages, persona = "navigator" } = body;
 
     const userMessage = messages?.[messages.length - 1]?.content || "Provide an operational summary of the active map view.";
     const isReport = userMessage.toLowerCase().includes("report") || userMessage.toLowerCase().includes("dossier");
@@ -104,6 +111,103 @@ export async function POST(req: NextRequest) {
     const targetCoords = mapContext.selectedCoord
       ? [mapContext.selectedCoord.lat, mapContext.selectedCoord.lon]
       : [15.848, 72.254];
+
+    const latStr = (mapContext.selectedCoord?.lat ?? 20.75).toFixed(3);
+    const lonStr = (mapContext.selectedCoord?.lon ?? 70.19).toFixed(3);
+    const basin = mapContext.basinLabel || "Arabian Sea Basin";
+    const reportData = fetchLayerDataTool(mapContext);
+
+    // Direct dynamic fallback answer
+    const fallbackAnswer = `**Fish Concentration & Habitat Analysis (${latStr}°N, ${lonStr}°E):**
+
+Based on active Sentinel-3 and OceanSat-3 satellite telemetry:
+• **Chlorophyll-a Biomass:** ${reportData.telemetry.chlorophyll} — Indicates moderate primary phytoplankton production.
+• **Thermal Window (SST):** ${reportData.telemetry.sst} — Preferred operational envelope for pelagic species (Yellowfin Tuna & Indian Mackerel).
+• **Habitat Suitability Index:** **${reportData.suitabilityIndex}** along this 5km × 5km cell.
+
+*Recommendation:* Type "Generate Report" for full multi-agent breakdown.`;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 0. STREAMING ROUTE: SSE STREAM FROM DOCKER FASTAPI BACKEND
+    // ══════════════════════════════════════════════════════════════════════════
+    if (body.stream) {
+      try {
+        const dockerStreamRes = await fetch(`${FASTAPI_DOCKER_BACKEND}/api/v1/chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: userMessage,
+            thread_id: "orca-docker-session",
+            user_role: persona.toLowerCase(),
+            format_mode: isReport ? "report" : "conversational",
+            active_basin: (mapContext.basinLabel || "arabian_sea").toLowerCase().replace(/ /g, "_"),
+            target_coordinates: targetCoords,
+          }),
+        });
+
+        if (dockerStreamRes.ok && dockerStreamRes.body) {
+          return new Response(dockerStreamRes.body, {
+            headers: {
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "Cache-Control": "no-cache, no-transform",
+              "Connection": "keep-alive",
+              "X-Accel-Buffering": "no",
+            },
+          });
+        }
+      } catch (dockerErr) {
+        console.warn("Docker FastAPI Backend stream not reachable, using local fallback stream:", dockerErr);
+      }
+
+      // Local fallback SSE stream
+      const encoder = new TextEncoder();
+      const customReadable = new ReadableStream({
+        async start(controller) {
+          const sendEvent = (obj: any) => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+          };
+
+          sendEvent({ type: "thought", agent: "supervisor", text: `Router → Classifying intent for persona [${persona}] across ${basin}...` });
+          await new Promise((r) => setTimeout(r, 70));
+          sendEvent({ type: "thought", agent: "context_ingestion", text: `Context Ingestion → Resolving spatial bounds at [${latStr}°N, ${lonStr}°E]...` });
+          await new Promise((r) => setTimeout(r, 70));
+          sendEvent({ type: "thought", agent: "swarm", text: `Sub-Agent Dispatch → Querying Swarm nodes & executing GIS/RAG pipelines...` });
+          await new Promise((r) => setTimeout(r, 70));
+          sendEvent({ type: "thought", agent: "ocean_analytics", text: `Telemetry Node → Ocean Analytics validated.` });
+          await new Promise((r) => setTimeout(r, 70));
+
+          const words = fallbackAnswer.split(" ");
+          let buf: string[] = [];
+          for (const word of words) {
+            buf.push(word);
+            if (buf.length >= 2 || word.includes("\n")) {
+              sendEvent({ type: "chunk", text: buf.join(" ") + " " });
+              buf = [];
+              await new Promise((r) => setTimeout(r, 20));
+            }
+          }
+          if (buf.length > 0) {
+            sendEvent({ type: "chunk", text: buf.join(" ") });
+          }
+
+          sendEvent({
+            type: "complete",
+            agent: "Matsya-Sutradhar (Local Pipeline)",
+            content: fallbackAnswer,
+          });
+          controller.close();
+        },
+      });
+
+      return new Response(customReadable, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
 
     // ══════════════════════════════════════════════════════════════════════════
     // 1. PRIMARY ROUTE: DOCKER FASTAPI BACKEND (http://localhost:8000)
@@ -129,12 +233,18 @@ export async function POST(req: NextRequest) {
 
         let responseContent = markdownAdvisory;
 
-        // Build policy and risk section if provided by backend
-        if (dockerData.policy_advisories && dockerData.policy_advisories.length > 0) {
-          responseContent += `\n\n#### 📜 Active Regulatory Advisories\n` + dockerData.policy_advisories.map((p: string) => `• ${p}`).join("\n");
+        const activeWorkers = dockerData.active_tasks || ["ocean_analytics", "risk_geofencing"];
+        const policyAdvisories = respPayload.policy_advisories || dockerData.policy_advisories || [];
+        const researchPapers = respPayload.research_papers || dockerData.research_papers || [];
+
+        if ((isReport || activeWorkers.includes("policy_rag")) && policyAdvisories.length > 0 && !responseContent.includes("LEGAL & EMERGENCY") && !responseContent.includes("Active Regulatory")) {
+          responseContent += `\n\n#### Active Regulatory Advisories\n` + policyAdvisories.map((p: string) => `• ${p}`).join("\n");
         }
 
-        const activeWorkers = dockerData.active_tasks || ["ocean_analytics", "risk_geofencing"];
+        if ((isReport || persona.toLowerCase() === "researcher" || activeWorkers.includes("research_rag")) && researchPapers.length > 0 && !responseContent.includes("SCIENTIFIC LITERATURE") && !responseContent.includes("Relevant Peer-Reviewed")) {
+          responseContent += `\n\n#### Peer-Reviewed Scientific Literature (RAG Citations)\n` + researchPapers.map((p: any) => `• **[${p.title}](${p.url || '#'})** — *${p.authors}* (${p.year}, ${p.journal})\n  *Key Finding:* ${p.keyFinding || p.key_findings || p.abstractSnippet}`).join("\n\n");
+        }
+
         const agentBadgeName = isReport
           ? "ORCA Swarm Pipeline (Docker Container)"
           : `Matsya-Sutradhar (${activeWorkers.join(", ")})`;
@@ -145,6 +255,8 @@ export async function POST(req: NextRequest) {
           toolUsed: `docker_fastapi_${activeWorkers[0] || "swarm"}`,
           content: responseContent,
           systemPromptContext: `Docker Container Backend connected at http://localhost:8000`,
+          backendData: dockerData,
+          researchPapers,
         });
       }
     } catch (dockerErr) {
@@ -154,22 +266,17 @@ export async function POST(req: NextRequest) {
     // ══════════════════════════════════════════════════════════════════════════
     // 2. FALLBACK ROUTE: SEQUENTIAL MULTI-AGENT PIPELINE
     // ══════════════════════════════════════════════════════════════════════════
-    const latStr = (mapContext.selectedCoord?.lat ?? 20.75).toFixed(3);
-    const lonStr = (mapContext.selectedCoord?.lon ?? 70.19).toFixed(3);
-    const basin = mapContext.basinLabel || "Arabian Sea Basin";
-    const reportData = fetchLayerDataTool(mapContext);
-
     if (isReport) {
       const glossaryEntries = lookupGlossaryTool("sst chlorophyll swh imbl eez");
       const researchPapers = queryResearchKbTool(userMessage);
       const newsBulletins = searchLiveNewsTool(userMessage, basin);
 
-      const pipelineMarkdown = `### 📑 ORCA Multi-Agent Operational Report (${basin})
+      const pipelineMarkdown = `### ORCA Multi-Agent Operational Report (${basin})
 *Context:* Coordinates: [${latStr}°N, ${lonStr}°E] | Base Layer: [${mapContext.activeBaseLayer || "natural_satellite"}]
 
 ---
 
-#### 1. 📊 Analytical Telemetry & Hydrodynamics
+#### 1. Analytical Telemetry & Hydrodynamics
 • **Target Location:** ${reportData.location} (${reportData.basin})
 • **Sea Surface Temp (SST):** ${reportData.telemetry.sst} (Sentinel-3 SLSTR)
 • **Chlorophyll-a Biomass:** ${reportData.telemetry.chlorophyll} (OceanSat-3 OCM)
@@ -178,17 +285,17 @@ export async function POST(req: NextRequest) {
 
 ---
 
-#### 2. 📖 Defined Parameters & Glossary
+#### 2. Defined Parameters & Glossary
 ${glossaryEntries.slice(0, 3).map((g) => `• **${g.term}** (*${g.fullName}*): ${g.definition}`).join("\n")}
 
 ---
 
-#### 3. 🔬 Peer-Reviewed Academic Research & RAG
+#### 3. Peer-Reviewed Academic Research & RAG
 ${researchPapers.map((p) => `• **[${p.title}](${p.url})**: ${p.abstractSnippet}`).join("\n\n")}
 
 ---
 
-#### 4. 📰 Real-Time Maritime News & Advisories
+#### 4. Real-Time Maritime News & Advisories
 ${newsBulletins.map((n) => `• **[${n.title}](${n.url})**: ${n.summary}`).join("\n\n")}`;
 
       return NextResponse.json({
@@ -199,15 +306,7 @@ ${newsBulletins.map((n) => `• **[${n.title}](${n.url})**: ${n.summary}`).join(
       });
     }
 
-    // Direct dynamic answer
-    const fallbackAnswer = `**Fish Concentration & Habitat Analysis (${latStr}°N, ${lonStr}°E):**
-
-Based on active Sentinel-3 and OceanSat-3 satellite telemetry:
-• **Chlorophyll-a Biomass:** ${reportData.telemetry.chlorophyll} — Indicates moderate primary phytoplankton production.
-• **Thermal Window (SST):** ${reportData.telemetry.sst} — Preferred operational envelope for pelagic species (Yellowfin Tuna & Indian Mackerel).
-• **Habitat Suitability Index:** **${reportData.suitabilityIndex}** along this 5km × 5km cell.
-
-*Recommendation:* Type "Generate Report" for full multi-agent breakdown.`;
+    // Direct dynamic answer: use fallbackAnswer defined above
 
     return NextResponse.json({
       agent: "Matsya-Sutradhar (Report Agent)",

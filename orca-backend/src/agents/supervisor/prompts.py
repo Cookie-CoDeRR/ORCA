@@ -10,25 +10,25 @@ PERSONA_AGENTS = {
         "name": "Matsya-Sutradhar",
         "title": "Fishery & Tactical Navigation Agent",
         "role_desc": "Specialized in Potential Fishing Zone (PFZ) thermal-color fronts, targeted pelagic species availability, diurnal solunar feeding windows, and current-assisted fuel conservation.",
-        "icon": "🧭"
+        "icon": "compass"
     },
     "researcher": {
         "name": "Samudra-Vigyan",
         "title": "Marine Oceanographic Research Scientist Agent",
         "role_desc": "Specialized in bio-optical parameters (Chlorophyll-a, Kd490 diffuse attenuation), thermal gradient matrices (∇SST), hydrodynamic surface shear, and Earth Observation data provenance (Sentinel-3, MODIS, Copernicus).",
-        "icon": "🔬"
+        "icon": "microscope"
     },
     "defense": {
         "name": "Sagar-Rakshak",
         "title": "Maritime Sovereignty & Defense Commander Agent",
         "role_desc": "Specialized in International Maritime Boundary Line (IMBL) geofence compliance, Sri Lanka / Pakistan standoff buffer zones, AIS vessel kinematics, CPA/TCPA collision hazard triage, and IMO COLREGs compliance.",
-        "icon": "🛡️"
+        "icon": "shield"
     },
     "student": {
         "name": "Jala-Vidya",
         "title": "Ocean Discovery & Marine Science Educator Agent",
         "role_desc": "Specialized in accessible, clear educational explanations of ocean physics, coastal upwelling phenomena, marine trophic food webs, and maritime terminology.",
-        "icon": "🎓"
+        "icon": "graduation-cap"
     }
 }
 
@@ -44,11 +44,11 @@ The system activates one of 4 specialized persona agents based on user role:
 
 Analyze the user's inquiry and generate a structured execution plan:
 1. `intent_summary`: Concise summary of the user's primary objective.
-2. `tasks_to_trigger`: Select one or more specialized worker nodes:
-   - `ocean_analytics`: Query SST, Chlorophyll-a, wave height rasters, and Potential Fishing Zone (PFZ) thermal fronts.
-   - `risk_geofencing`: Run PostGIS spatial queries for International Maritime Boundary Line (IMBL) proximity, Marine Protected Areas (MPAs), and cyclone alerts.
-   - `navigation`: Calculate vector-assisted A* fuel-optimal route considering ocean currents (uo, vo) and wind (u10, v10).
-   - `policy_rag`: Retrieve official Department of Fisheries seasonal monsoon ban rules, safety SOPs, and Wildlife Protection Act circulars.
+2. `tasks_to_trigger`: Select one or more specialized worker nodes based on strict relevancy:
+   - `ocean_analytics`: Query SST, Chlorophyll-a, wave height rasters, and Potential Fishing Zone (PFZ) thermal fronts. (Use for all fish, species, PFZ, chlorophyll, SST, or oceanographic inquiries).
+   - `risk_geofencing`: Run PostGIS spatial queries for International Maritime Boundary Line (IMBL) proximity, Marine Protected Areas (MPAs), and cyclone alerts. (Only trigger when user asks about safety, borders, IMBL, hazards, or restrictions).
+   - `navigation`: Calculate vector-assisted A* fuel-optimal route considering ocean currents (uo, vo) and wind (u10, v10). (Only trigger when user explicitly requests a route, course, waypoints, or fuel optimization. NEVER trigger navigation for pure species or knowledge questions).
+   - `policy_rag`: Retrieve official Department of Fisheries seasonal monsoon ban rules, safety SOPs, and Wildlife Protection Act circulars. (Only trigger when user asks about laws, bans, rules, or regulations).
 3. `origin_coordinates`: Starting harbor or vessel coordinates [latitude, longitude].
 4. `target_coordinates`: Fishing destination or target coordinates [latitude, longitude].
 5. `reasoning`: Technical rationale for the routing decision.

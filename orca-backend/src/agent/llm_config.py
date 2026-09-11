@@ -17,10 +17,66 @@ logger = logging.getLogger("ORCA.LLMConfig")
 # ==============================================================================
 # OLLAMA CONFIGURATION DEFAULTS
 # ==============================================================================
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+def resolve_ollama_base_url() -> str:
+    explicit = os.getenv("OLLAMA_BASE_URL")
+    if explicit:
+        return explicit
+    if os.path.exists("/.dockerenv") or os.getenv("DOCKER_CONTAINER", "") == "true":
+        return "http://host.docker.internal:11434"
+    return "http://localhost:11434"
 
-# Primary Reasoning & Structured Output LLM (Qwen 2.5 7B Instruct)
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q5_k_m")
+OLLAMA_BASE_URL = resolve_ollama_base_url()
+
+def get_installed_ollama_models() -> list[str]:
+    """Queries the local Ollama server for currently installed and ready model tags."""
+    try:
+        import urllib.request
+        import json
+        req = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/tags", headers={"User-Agent": "ORCA"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return [m.get("name", "") for m in data.get("models", [])]
+    except Exception as e:
+        logger.debug(f"[Model Resolver] Tag inspection error: {e}")
+        return []
+
+
+def resolve_active_model() -> str:
+    """
+    Intelligently resolves the active LLM model.
+    Prioritizes Gemma 4 E4B (Google DeepMind edge-optimized multimodal MoE architecture).
+    If Gemma 4 E4B is downloading or not yet ready, falls back to the best ready model
+    (e.g., Qwen 2.5 7B or Gemma 2) and switches to Gemma 4 E4B automatically as soon as ready.
+    """
+    target = os.getenv("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
+    installed = get_installed_ollama_models()
+
+    if not installed:
+        return target
+
+    # 1. Check if requested target is already installed and ready
+    for m in installed:
+        if target in m or m.startswith(target):
+            return m
+
+    # 2. Check for any ready Gemma 4 variants
+    for pref in ["gemma4:e4b-it-q4_K_M", "gemma4:e4b", "gemma4:26b", "gemma4"]:
+        for m in installed:
+            if pref in m or m.startswith(pref):
+                return m
+
+    # 3. Fall back to ready installed models while Gemma 4 download completes
+    for fallback in ["qwen2.5:7b-instruct-q5_k_m", "qwen2.5:latest", "gemma2:latest", "gemma2:2b"]:
+        for m in installed:
+            if fallback in m or m.startswith(fallback):
+                logger.info(f"⏳ [Model Resolver] Target '{target}' is downloading; active local fallback: '{m}'")
+                return m
+
+    return installed[0] if installed else target
+
+
+# Primary Reasoning & Structured Output LLM (Gemma 4 E4B by default)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b-it-q4_K_M")
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.0"))
 OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
 
@@ -41,14 +97,8 @@ def init_chat_llm(
 ) -> ChatOllama:
     """
     Initializes a ChatOllama instance configured for deterministic structured routing.
-    
-    Args:
-        model: Target local LLM (defaults to 'qwen2.5:7b-instruct-q5_k_m').
-        temperature: Set strictly to 0.0 for deterministic spatial & mathematical routing.
-        format: Optional format mode ('json' or None for schema-guided output).
-        timeout: Maximum HTTP timeout in seconds for local inference.
     """
-    target_model = model or OLLAMA_MODEL
+    target_model = model or resolve_active_model()
     target_temp = temperature if temperature is not None else OLLAMA_TEMPERATURE
 
     logger.info(f"Initializing ChatOllama [model='{target_model}', temperature={target_temp}, base_url='{OLLAMA_BASE_URL}']")
@@ -65,9 +115,6 @@ def init_chat_llm(
 def init_embeddings_model(model: str | None = None) -> OllamaEmbeddings:
     """
     Initializes an OllamaEmbeddings instance targeting BGE-M3 for sovereign vector encoding.
-    
-    Args:
-        model: Target local embedding model (defaults to 'bge-m3').
     """
     target_embed_model = model or OLLAMA_EMBED_MODEL
     logger.info(f"Initializing OllamaEmbeddings [model='{target_embed_model}', base_url='{OLLAMA_BASE_URL}']")
@@ -77,19 +124,24 @@ def init_embeddings_model(model: str | None = None) -> OllamaEmbeddings:
     )
 
 
-# Export standard pre-configured instances for direct import across agent nodes
-chat_llm: ChatOllama = init_chat_llm()
-embed_model: OllamaEmbeddings = init_embeddings_model()
-
-
-def get_chat_llm() -> ChatOllama:
-    """Returns the primary configured ChatOllama instance."""
-    return chat_llm
+def get_chat_llm(
+    model: str | None = None,
+    temperature: float | None = None,
+    format: str | None = None,
+    timeout: float = 60.0
+) -> ChatOllama:
+    """Returns a freshly configured ChatOllama instance."""
+    return init_chat_llm(model=model, temperature=temperature, format=format, timeout=timeout)
 
 
 def get_embeddings_model() -> OllamaEmbeddings:
     """Returns the primary configured OllamaEmbeddings instance."""
-    return embed_model
+    return init_embeddings_model()
+
+
+# Global singletons exported for backward compatibility
+chat_llm = init_chat_llm()
+embed_model = init_embeddings_model()
 
 
 def generate_deterministic_embedding(text: str, dim: int = EMBEDDING_DIMENSION) -> list[float]:
@@ -108,9 +160,17 @@ def generate_deterministic_embedding(text: str, dim: int = EMBEDDING_DIMENSION) 
 async def check_ollama_health() -> bool:
     """Checks if the local Ollama server is reachable and serving models."""
     import httpx
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            res = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
-            return res.status_code == 200
-    except Exception:
-        return False
+    urls = [OLLAMA_BASE_URL]
+    if "host.docker.internal" not in OLLAMA_BASE_URL:
+        urls.append("http://host.docker.internal:11434")
+    if "localhost" not in OLLAMA_BASE_URL:
+        urls.append("http://localhost:11434")
+    for u in urls:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                res = await client.get(f"{u}/api/tags")
+                if res.status_code == 200:
+                    return True
+        except Exception:
+            continue
+    return False

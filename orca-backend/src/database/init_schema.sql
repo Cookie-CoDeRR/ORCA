@@ -30,6 +30,33 @@ ON marine_advisories USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_marine_advisories_category 
 ON marine_advisories (category);
 
+-- 2b. Peer-Reviewed Oceanographic & Fisheries Research Papers for RAG Storage (pgvector 768-dim)
+CREATE TABLE IF NOT EXISTS research_papers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    paper_id VARCHAR(100) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    authors TEXT NOT NULL,
+    journal VARCHAR(200) NOT NULL,
+    year INTEGER NOT NULL,
+    doi VARCHAR(150),
+    topic VARCHAR(100) NOT NULL,            -- 'upwelling_tuna', 'ocean_currents', 'phytoplankton_blooms', etc.
+    keywords TEXT[] DEFAULT '{}',
+    abstract TEXT NOT NULL,
+    key_findings TEXT NOT NULL,
+    url TEXT,
+    metadata JSONB DEFAULT '{}',
+    embedding VECTOR(768),                 -- 768-dimensional dense vector embedding for RAG
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Cosine Distance HNSW Index for Sub-Millisecond Vector Similarity Search
+CREATE INDEX IF NOT EXISTS idx_research_papers_embedding 
+ON research_papers USING hnsw (embedding vector_cosine_ops);
+
+CREATE INDEX IF NOT EXISTS idx_research_papers_topic 
+ON research_papers (topic);
+
+
 -- 3. Coastal Landing Centers & Harbors Gazetteer (PostGIS Geometry)
 CREATE TABLE IF NOT EXISTS coastal_nodes (
     id SERIAL PRIMARY KEY,

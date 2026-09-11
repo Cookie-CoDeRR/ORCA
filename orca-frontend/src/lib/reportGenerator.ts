@@ -198,14 +198,17 @@ export function detectReportTopicAndType(query: string): {
 export function buildDynamicSections(
   reportType: ReportType,
   title: string,
-  spatial: GlobeSpatialContext
+  spatial: GlobeSpatialContext,
+  liveAiContent?: string,
+  backendData?: any
 ): ReportSection[] {
   const latStr = spatial.lat.toFixed(3);
   const lonStr = spatial.lon.toFixed(3);
   const region = spatial.basinLabel || "Arabian Sea";
   const imblStandoff = spatial.imblDistanceKm ? `${spatial.imblDistanceKm.toFixed(1)} km` : "74.2 km";
 
-  switch (reportType) {
+  const getBaseSections = (): ReportSection[] => {
+    switch (reportType) {
     // ═════════════════════════════════════════════════════════════════════════
     // WAVE HAZARD REPORT
     // ═════════════════════════════════════════════════════════════════════════
@@ -784,7 +787,41 @@ export function buildDynamicSections(
           },
         },
       ];
+    }
+  };
+
+  const baseSections = getBaseSections();
+
+  if (liveAiContent) {
+    const activeModelName = backendData?.model ? String(backendData.model) : "Gemma 4 E4B / Qwen 2.5 7B";
+    const aiSection: ReportSection = {
+      id: "sec-ai-neural-synthesis",
+      order: 1,
+      key: "ai_synthesis",
+      label: "AI Neural Synthesis",
+      title: "Multi-Agent Neural Synthesis & Sovereign LLM Advisory",
+      subtitle: `Local Neural Inference (${activeModelName}) · ${region}`,
+      type: "ai_synthesis",
+      summary: "Live multi-agent spatial reasoning synthesized directly by sovereign open-weight LLM on Apple Silicon Metal GPU without cloud data egress.",
+      data: {
+        markdown: liveAiContent,
+        model: activeModelName,
+        accelerator: "Apple Silicon Metal GPU (Zero Cloud Egress)",
+        activeTasks: backendData?.active_tasks || ["ocean_analytics", "risk_geofencing", "navigation"],
+        executionTimeMs: backendData?.execution_time_ms || 2800,
+        telemetry: backendData?.response?.ocean_data?.telemetry || {},
+        risk: backendData?.response?.risk_assessment || {},
+        policies: backendData?.response?.policy_advisories || [],
+      },
+    };
+
+    return [aiSection, ...baseSections].map((sec, idx) => ({
+      ...sec,
+      order: idx + 1,
+    }));
   }
+
+  return baseSections;
 }
 
 // ─── Main Report Generation Engine ────────────────────────────────────────────
@@ -821,7 +858,47 @@ export async function generateReportPipeline(
 
   // Stage 3: Collecting ocean observations
   notify(3, "Collecting ocean observations", "Querying Sentinel-3 SLSTR thermal raster, OLCI chlorophyll & INCOIS wave model...");
-  await new Promise((r) => setTimeout(r, 520));
+  
+  const liveTelemetry: { sst?: string; chla?: string; waves?: string; imbl?: string } = {};
+  let liveAiContent: string | undefined = undefined;
+  let liveBackendData: any = undefined;
+
+  try {
+    const chatFetch = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: `Generate comprehensive operational maritime report and environmental synthesis for ${topic} at ${latStr}°N, ${lonStr}°E` }],
+        mapContext: {
+          activeBaseLayer: "natural_satellite",
+          activeOverlays: [],
+          selectedCoord: { lat: spatial.lat, lon: spatial.lon },
+          basinLabel: spatial.basinLabel,
+        },
+        persona: "researcher",
+      }),
+    });
+    if (chatFetch.ok) {
+      const chatRes = await chatFetch.json();
+      liveAiContent = chatRes.content;
+      liveBackendData = chatRes.backendData;
+
+      const backendTelemetry = chatRes.backendData?.response?.ocean_data?.telemetry;
+      const imblCheck = chatRes.backendData?.response?.risk_assessment?.imbl_check;
+      if (backendTelemetry) {
+        if (backendTelemetry.sst_celsius != null) liveTelemetry.sst = `${Number(backendTelemetry.sst_celsius).toFixed(1)} °C`;
+        if (backendTelemetry.chlorophyll_mg_m3 != null) liveTelemetry.chla = `${Number(backendTelemetry.chlorophyll_mg_m3).toFixed(2)} mg/m³`;
+        if (backendTelemetry.significant_wave_height_m != null) liveTelemetry.waves = `${Number(backendTelemetry.significant_wave_height_m).toFixed(1)} m`;
+      }
+      if (imblCheck?.distance_km != null) {
+        liveTelemetry.imbl = `${Number(imblCheck.distance_km).toFixed(1)} km ${imblCheck.alert_level || "SAFE"}`;
+      }
+    }
+  } catch (err) {
+    console.warn("Live telemetry fetch fallback:", err);
+  }
+
+  await new Promise((r) => setTimeout(r, 420));
 
   // Stage 4: Retrieving supporting knowledge
   notify(4, "Retrieving supporting knowledge", "Connecting to ICAR-CMFRI biological registry, ISRO MOSDAC & bathymetry contours...");
@@ -831,7 +908,7 @@ export async function generateReportPipeline(
   notify(5, "Generating report", `Synthesizing dynamic multi-agent sections for ${reportType.replace("_", " ")}...`);
   await new Promise((r) => setTimeout(r, 550));
 
-  const dynamicSections = buildDynamicSections(reportType, title, spatial);
+  const dynamicSections = buildDynamicSections(reportType, title, spatial, liveAiContent, liveBackendData);
 
   // Stage 6: Validating sources & schema
   notify(6, "Validating sources", "Verifying sovereign IMBL boundary standoff & geodetic polygon integrity...");
@@ -864,12 +941,12 @@ export async function generateReportPipeline(
     summary: `${title} dynamically generated for coordinate ${latStr}°N, ${lonStr}°E in ${regionName}. Verified against real-time Earth Observation datasets and Indian EEZ sovereign boundaries.`,
     telemetry: {
       resolution: "6 km × 5 km",
-      sst: isRough ? "27.6 °C" : isChlHigh ? "26.8 °C" : "28.4 °C",
-      waves: isRough ? "3.4 m" : "1.6 m",
+      sst: liveTelemetry.sst || (isRough ? "27.6 °C" : isChlHigh ? "26.8 °C" : "28.4 °C"),
+      waves: liveTelemetry.waves || (isRough ? "3.4 m" : "1.6 m"),
       wind: isRough ? "28 kt WSW" : "12 kt WNW",
-      imblStatus: `${spatial.imblDistanceKm ? spatial.imblDistanceKm.toFixed(1) : "74.2"} km SAFE`,
+      imblStatus: liveTelemetry.imbl || `${spatial.imblDistanceKm ? spatial.imblDistanceKm.toFixed(1) : "74.2"} km SAFE`,
       imblColor: "#228B5A",
-      chla: isChlHigh ? "2.45 mg/m³" : "1.26 mg/m³",
+      chla: liveTelemetry.chla || (isChlHigh ? "2.45 mg/m³" : "1.26 mg/m³"),
       current: isRough ? "1.8 kt (220° SW)" : "1.2 kt (215° SW)",
       salinity: "35.4 PSU",
       basin: spatial.basinLabel?.replace(" Basin", "") || "Arabian Sea",

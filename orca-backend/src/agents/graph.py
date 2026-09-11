@@ -18,6 +18,7 @@ from .ocean_analytics.agent import ocean_analytics_agent_node
 from .risk_geofencing.agent import risk_geofencing_agent_node
 from .navigation.agent import navigation_agent_node
 from .policy_rag.agent import policy_rag_agent_node
+from .research_rag.agent import research_rag_agent_node
 from .synthesizer.agent import synthesizer_agent_node
 
 logger = logging.getLogger("ORCA.MasterGraph")
@@ -35,6 +36,7 @@ def build_orca_graph(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_node("risk_geofencing", risk_geofencing_agent_node)
     builder.add_node("navigation", navigation_agent_node)
     builder.add_node("policy_rag", policy_rag_agent_node)
+    builder.add_node("research_rag", research_rag_agent_node)
     builder.add_node("synthesizer", synthesizer_agent_node)
 
     # 2. Add edges: Ingress -> Supervisor
@@ -45,15 +47,18 @@ def build_orca_graph(checkpointer: BaseCheckpointSaver | None = None):
     builder.add_edge("supervisor", "risk_geofencing")
     builder.add_edge("supervisor", "navigation")
     builder.add_edge("supervisor", "policy_rag")
+    builder.add_edge("supervisor", "research_rag")
 
     # 4. Add edges: All Workers -> Synthesizer
     builder.add_edge("ocean_analytics", "synthesizer")
     builder.add_edge("risk_geofencing", "synthesizer")
     builder.add_edge("navigation", "synthesizer")
     builder.add_edge("policy_rag", "synthesizer")
+    builder.add_edge("research_rag", "synthesizer")
 
     # 5. Add edge: Synthesizer -> Egress
     builder.add_edge("synthesizer", END)
+
 
     if checkpointer:
         logger.info("Compiling Master ORCA Graph with persistent PostgreSQL checkpointer...")
@@ -98,14 +103,20 @@ async def run_orca_multi_agent(
 
     logger.info(f"✅ [Master Graph] Turn completed in {duration_ms} ms.")
 
+    from ..agent.llm_config import resolve_active_model
+    active_model = resolve_active_model()
+
     return {
         "thread_id": thread_id,
         "query": user_query,
         "user_role": user_role,
         "format_mode": format_mode,
+        "model": active_model,
         "response": final_state.get("final_response"),
         "active_tasks": final_state.get("active_tasks"),
         "origin_coordinates": final_state.get("origin_coordinates"),
         "target_coordinates": final_state.get("target_coordinates"),
+        "research_papers": final_state.get("research_papers"),
         "execution_time_ms": duration_ms
     }
+

@@ -38,7 +38,7 @@ class SubTaskPlan(BaseModel):
         description="Brief summary of what the user is asking."
     )
     tasks_to_trigger: list[
-        Literal["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"]
+        Literal["ocean_analytics", "risk_geofencing", "navigation", "policy_rag", "research_rag"]
     ] = Field(
         default_factory=lambda: ["ocean_analytics", "risk_geofencing", "policy_rag"],
         description="List of worker agents required to fulfill this maritime query."

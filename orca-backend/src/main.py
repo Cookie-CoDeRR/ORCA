@@ -22,6 +22,9 @@ from .storage.minio_client import get_minio_client
 from .agents.graph import run_orca_multi_agent
 from .agents.ocean_analytics.tools import get_sst_and_chlorophyll, find_nearby_pfz_clusters
 from .agents.risk_geofencing.tools import check_imbl_proximity, check_protected_area_intersection, check_active_cyclone_warnings
+from .agents.policy_rag.tools import retrieve_maritime_policy_circulars
+from .agents.research_rag.tools import retrieve_research_papers
+
 from .navigation.router import compute_optimal_marine_route
 from .navigation.colregs import evaluate_colregs_for_traffic, ColregsEvaluation, RiskLevel
 from .navigation.dynamic_router import dynamic_router
@@ -214,58 +217,146 @@ async def chat_with_multi_agent_swarm(req: ChatRequest):
 async def stream_chat_with_agent_swarm(req: ChatRequest):
     """
     Streams multi-agent reasoning steps, tool telemetry, and final deck.gl GeoJSON
-    via Server-Sent Events (SSE) for real-time frontend streaming.
+    via Server-Sent Events (SSE) with genuine live token streaming from Ollama astream().
     """
     async def event_generator():
         import asyncio
+        from .agents.state import AgentState
+        from .agents.supervisor.agent import supervisor_agent_node
+        from .agents.ocean_analytics.agent import ocean_analytics_agent_node
+        from .agents.risk_geofencing.agent import risk_geofencing_agent_node
+        from .agents.navigation.agent import navigation_agent_node
+        from .agents.policy_rag.agent import policy_rag_agent_node
+        from .agents.research_rag.agent import research_rag_agent_node
+        from .agents.synthesizer.agent import prepare_synthesizer_prompts
+        from .agent.llm_config import get_chat_llm, resolve_active_model
+        from langchain_core.messages import SystemMessage, HumanMessage
+
         try:
-            # 1. Thought step: Supervisor
-            yield f"data: {json.dumps({'type': 'thought', 'agent': 'supervisor', 'text': f'Routing for persona: {req.user_role.upper()} | Basin: {req.active_basin}'})}\n\n"
-            await asyncio.sleep(0.2)
+            basin_clean = req.active_basin.replace("_", " ").title()
+            persona_title = req.user_role.title()
 
-            # 2. Run multi-agent graph
-            checkpointer = get_default_checkpointer()
-            result = await run_orca_multi_agent(
-                user_query=req.message,
-                thread_id=req.thread_id,
-                user_role=req.user_role,
-                format_mode=req.format_mode,
-                active_basin=req.active_basin,
-                target_coordinates=req.target_coordinates,
-                origin_coordinates=req.origin_coordinates,
-                checkpointer=checkpointer
-            )
+            # 1. Routing Thought
+            yield f"data: {json.dumps({'type': 'thought', 'agent': 'supervisor', 'text': f'Router → Classifying intent for persona [{persona_title}] across {basin_clean}...' })}\n\n"
+            await asyncio.sleep(0.02)
 
-            # 3. Stream active tasks telemetry
-            active_tasks = result.get("active_tasks", [])
-            for task in active_tasks:
-                yield f"data: {json.dumps({'type': 'thought', 'agent': task, 'text': f'Executing worker node: {task}'})}\n\n"
-                await asyncio.sleep(0.15)
+            # 2. Supervisor Fast Dispatch
+            state: AgentState = {
+                "user_query": req.message,
+                "user_role": req.user_role,
+                "format_mode": req.format_mode,
+                "active_basin": req.active_basin,
+                "target_coordinates": req.target_coordinates,
+                "origin_coordinates": req.origin_coordinates,
+                "active_tasks": []
+            }
+            sup_res = await supervisor_agent_node(state)
+            state.update(sup_res)
+            active_tasks = state.get("active_tasks", [])
+            target = state.get("target_coordinates") or [20.5, 70.1]
+            coords_str = f"[{target[0]}°N, {target[1]}°E]"
 
-            # 4. Stream final synthesized response and deck.gl GeoJSON
-            response_payload = result.get("response", {})
-            markdown_text = response_payload.get("markdown_advisory", "")
-            geojson_data = response_payload.get("geojson_payload", {"type": "FeatureCollection", "features": []})
+            # 3. Context Ingestion Thought
+            yield f"data: {json.dumps({'type': 'thought', 'agent': 'context_ingestion', 'text': f'Context Ingestion → Resolving spatial telemetry at {coords_str}...' })}\n\n"
+            await asyncio.sleep(0.02)
 
-            # Stream markdown chunks
-            lines = markdown_text.split("\n")
-            for line in lines:
-                chunk_data = json.dumps({"type": "chunk", "text": line + "\n"})
-                yield f"data: {chunk_data}\n\n"
-                await asyncio.sleep(0.03)
+            # 4. Dispatch active workers concurrently (fast C/Python/PostGIS/pgvector)
+            worker_tasks = []
+            if "ocean_analytics" in active_tasks:
+                worker_tasks.append(("ocean_analytics", ocean_analytics_agent_node(state)))
+            if "risk_geofencing" in active_tasks:
+                worker_tasks.append(("risk_geofencing", risk_geofencing_agent_node(state)))
+            if "navigation" in active_tasks:
+                worker_tasks.append(("navigation", navigation_agent_node(state)))
+            if "policy_rag" in active_tasks:
+                worker_tasks.append(("policy_rag", policy_rag_agent_node(state)))
+            if "research_rag" in active_tasks:
+                worker_tasks.append(("research_rag", research_rag_agent_node(state)))
 
-            # Final complete payload event
-            yield f"data: {json.dumps({'type': 'complete', 'result': result, 'geojson': geojson_data})}\n\n"
+            if worker_tasks:
+                results = await asyncio.gather(*[t[1] for t in worker_tasks])
+                for (task_name, _), res in zip(worker_tasks, results):
+                    state.update(res)
+                    display_name = task_name.replace("_", " ").title()
+                    yield f"data: {json.dumps({'type': 'thought', 'agent': task_name, 'text': f'Telemetry Node → {display_name} validated.' })}\n\n"
+                    await asyncio.sleep(0.02)
+
+            papers = state.get("research_papers") or []
+            if papers:
+                yield f"data: {json.dumps({'type': 'thought', 'agent': 'research_rag', 'text': f'Research Literature RAG → Found {len(papers)} peer-reviewed papers matching sector dynamics.' })}\n\n"
+                await asyncio.sleep(0.02)
+
+            # 5. Prepare synthesizer prompts
+            prompt_data = prepare_synthesizer_prompts(state)
+
+            if prompt_data["is_greeting"]:
+                greeting = prompt_data["greeting_text"]
+                for word in greeting.split(" "):
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': word + ' '})}\n\n"
+                    await asyncio.sleep(0.015)
+                yield f"data: {json.dumps({'type': 'complete', 'agent': prompt_data['agent_name'], 'geojson': {'type': 'FeatureCollection', 'features': []}})}\n\n"
+                return
+
+            # 6. GENUINE LIVE TOKEN STREAMING VIA OLLAMA astream()
+            llm = get_chat_llm(temperature=0.2, timeout=60.0)
+            accumulated = []
+            async for chunk in llm.astream([
+                SystemMessage(content=prompt_data["sys_prompt"]),
+                HumanMessage(content=prompt_data["user_instruction"])
+            ]):
+                token = chunk.content
+                if token:
+                    accumulated.append(token)
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': token})}\n\n"
+
+            # 7. Final Complete Event
+            full_markdown = "".join(accumulated)
+            active_model_name = resolve_active_model()
+            agent_label = f"{prompt_data['agent_name']} ({active_model_name})"
+            geojson_payload = state.get("ocean_data", {}).get("pfz_geojson_features", [])
+
+            yield f"data: {json.dumps({'type': 'complete', 'agent': agent_label, 'text': full_markdown, 'research_papers': papers, 'geojson': geojson_payload})}\n\n"
 
         except Exception as e:
-            logger.error(f"Stream error: {e}")
+            logger.error(f"Stream error: {e}", exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
     )
+
+
+
+@app.post("/api/v1/rag/research", tags=["RAG Knowledge Bases"])
+async def search_research_literature(req: RAGSearchRequest):
+    """
+    Performs dense vector similarity search over peer-reviewed oceanographic papers (pgvector research_papers table).
+    """
+    try:
+        results = await retrieve_research_papers(query_text=req.query, top_k=req.top_k)
+        return {"query": req.query, "count": len(results), "papers": results}
+    except Exception as e:
+        logger.error(f"Research RAG error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/rag/policy", tags=["RAG Knowledge Bases"])
+async def search_maritime_policies(req: RAGSearchRequest):
+    """
+    Performs dense vector similarity search over official maritime regulatory circulars (pgvector marine_advisories table).
+    """
+    try:
+        results = await retrieve_maritime_policy_circulars(query_text=req.query, top_k=req.top_k)
+        return {"query": req.query, "count": len(results), "advisories": results}
+    except Exception as e:
+        logger.error(f"Policy RAG error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/navigation/optimal-route", tags=["Navigation"])

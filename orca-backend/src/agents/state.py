@@ -26,6 +26,7 @@ class AgentState(TypedDict, total=False):
       - risk_assessment: PostGIS boundary distance to IMBL, MPA intersections, and cyclone alerts.
       - route_plan: A* vector-optimized GeoJSON LineString, nautical miles, and fuel savings.
       - policy_advisories: Retrieved maritime policy circulars, monsoon fishing ban rules, and SOPs.
+      - research_papers: Retrieved peer-reviewed oceanographic and fisheries scientific literature.
       - final_response: Consolidated natural language markdown advice + deck.gl GeoJSON payload.
     """
     messages: Annotated[Sequence[BaseMessage], add_messages]
@@ -40,4 +41,6 @@ class AgentState(TypedDict, total=False):
     risk_assessment: Optional[dict[str, Any]]
     route_plan: Optional[dict[str, Any]]
     policy_advisories: Optional[list[str]]
+    research_papers: Optional[list[dict[str, Any]]]
     final_response: Optional[dict[str, Any]]
+

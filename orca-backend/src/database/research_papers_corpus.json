@@ -1,0 +1,140 @@
+[
+  {
+    "paper_id": "ORCA-PAPER-001",
+    "title": "Impact of Monsoonal Coastal Upwelling on Yellowfin Tuna (Thunnus albacares) Habitat Suitability in the Arabian Sea",
+    "authors": "Nair, R., Pillai, K., & Sundaram, V.",
+    "journal": "Journal of Marine Systems",
+    "year": 2024,
+    "doi": "10.1016/j.jmarsys.2024.103982",
+    "topic": "upwelling_tuna",
+    "keywords": ["upwelling", "yellowfin tuna", "thermal fronts", "chlorophyll", "arabian sea", "thunnus albacares", "sst", "primary productivity"],
+    "abstract": "Satellite observations from Sentinel-3 OLCI and INCOIS moored buoys demonstrate that thermal front gradients (25.5°C to 28.2°C) combined with elevated chlorophyll-a (> 1.2 mg/m³) along the western Indian continental shelf increase pelagic tuna aggregation density by 340%. Upwelling events enhance primary productivity, attracting baitfish forage along the 200m continental shelf break.",
+    "key_findings": "Thermal front gradients (25.5°C–28.2°C) and Chl-a > 1.2 mg/m³ increase pelagic tuna aggregation by 340% along the 200m shelf break.",
+    "url": "https://doi.org/10.1016/j.jmarsys.2024.103982",
+    "metadata": {
+      "target_species": ["Yellowfin Tuna", "Skipjack Tuna"],
+      "geographic_region": "Arabian Sea (West Coast of India)",
+      "satellite_sensors": ["Sentinel-3 OLCI", "Sentinel-3 SLSTR", "MODIS Aqua"]
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-002",
+    "title": "Hydrodynamic Dynamics of the Somali Jet & Southwest Monsoon Ocean Currents",
+    "authors": "Chatterjee, A. & Rao, S.",
+    "journal": "Deep Sea Research Part I: Oceanographic Research Papers",
+    "year": 2023,
+    "doi": "10.1016/j.dsr.2023.104112",
+    "topic": "ocean_currents",
+    "keywords": ["somali jet", "currents", "monsoon", "velocity", "eddy", "eulerian flow", "fuel optimization", "hydrodynamics"],
+    "abstract": "The Somali Current during the Southwest Monsoon exhibits surface velocities exceeding 2.0 m/s, forming Great Whirl mesoscale gyres. Vessel route optimization models using continuous Eulerian flow fields (uo, vo) achieve 14.8% fuel savings for commercial motor vessels operating between Gujarat ports and Lakshadweep Sea.",
+    "key_findings": "Eulerian surface current vector routing (uo, vo) reduces commercial vessel fuel consumption by 14.8% during SW monsoon Somali jet acceleration.",
+    "url": "https://doi.org/10.1016/j.dsr.2023.104112",
+    "metadata": {
+      "geographic_region": "Western Indian Ocean & Lakshadweep Basin",
+      "methods": ["Eulerian flow field optimization", "OSCAR altimetry", "A* navigation"]
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-003",
+    "title": "Multi-Sensor Remote Sensing for Phytoplankton Bloom Categorization in the Bay of Bengal",
+    "authors": "Sengupta, P., Chakraborty, A., & Banerjee, D.",
+    "journal": "Remote Sensing of Environment",
+    "year": 2025,
+    "doi": "10.1016/j.rse.2025.114002",
+    "topic": "phytoplankton_blooms",
+    "keywords": ["phytoplankton", "chlorophyll", "bay of bengal", "oceansat-3", "bloom", "mackerel", "hilsa", "remote sensing"],
+    "abstract": "OceanSat-3 OCM-3 spectral band ratioing reveals seasonal diatom blooms following riverine nutrient runoff in the northwestern Bay of Bengal. Phytoplankton plumes extending 120km offshore correlate with peak feeding windows for Indian Mackerel and Skipjack Tuna.",
+    "key_findings": "Riverine runoff triggers seasonal diatom blooms extending 120km offshore, identifying primary foraging hotspots for pelagic schooling finfish.",
+    "url": "https://doi.org/10.1016/j.rse.2025.114002",
+    "metadata": {
+      "satellite_sensors": ["OceanSat-3 OCM-3", "Sentinel-2 MSI"],
+      "geographic_region": "Bay of Bengal (Andhra Pradesh to West Bengal)"
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-004",
+    "title": "Mesoscale Eddy Dynamics and Primary Productivity Modulation in the Western Indian Ocean",
+    "authors": "Kiran, V., Joseph, K., & Mathew, T.",
+    "journal": "Progress in Oceanography",
+    "year": 2024,
+    "doi": "10.1016/j.pocean.2024.103115",
+    "topic": "mesoscale_eddies",
+    "keywords": ["mesoscale eddies", "cyclonic eddy", "upwelling", "chlorophyll pumping", "thermocline", "arabian sea"],
+    "abstract": "Cyclonic mesoscale eddies in the Arabian Sea induce upward vertical velocity (w ~ 10^-4 m/s), shoaling the 20°C isotherm by 35 meters. This nutrient entrainment fuels intense subsurface chlorophyll maxima (SCM) that sustain epipelagic forage fish populations through inter-monsoon periods.",
+    "key_findings": "Cyclonic eddy core pumping uplifts thermocline by 35m, generating subsurface chlorophyll blooms that concentrate pelagic biomass outside monsoon windows.",
+    "url": "https://doi.org/10.1016/j.pocean.2024.103115",
+    "metadata": {
+      "eddy_types": ["Cyclonic upwelling", "Anticyclonic oligotrophic"],
+      "mechanisms": ["Ekman pumping", "isotherm shoaling"]
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-005",
+    "title": "Trophic Ecology and Foraging Energetics of Pelagic Indian Mackerel (Rastrelliger kanagurta) along the Malabar Upwelling Shelf",
+    "authors": "Menon, P., George, G., & Shaji, M.",
+    "journal": "CMFRI Marine Fisheries Information Service",
+    "year": 2023,
+    "doi": "10.6024/cmfri.2023.sp142",
+    "topic": "mackerel_trophic",
+    "keywords": ["indian mackerel", "rastrelliger kanagurta", "trophic ecology", "malabar", "upwelling", "minimum legal size", "diet"],
+    "abstract": "Stomach content and fatty acid trophic markers of Rastrelliger kanagurta sampled across 14 landing centers indicate microzooplankton and diatom diet dominance during coastal upwelling. Minimum Legal Size (MLS) enforcement of 14.0 cm TL protects juvenile cohorts during pre-spawning July-August aggregations.",
+    "key_findings": "Malabar coastal upwelling triggers microzooplankton grazer dominance for mackerel; 14.0 cm MLS threshold prevents recruitment overfishing.",
+    "url": "https://doi.org/10.6024/cmfri.2023.sp142",
+    "metadata": {
+      "target_species": ["Indian Mackerel (Rastrelliger kanagurta)"],
+      "authority": "Central Marine Fisheries Research Institute (ICAR-CMFRI)",
+      "management_metric": "Minimum Legal Size (MLS) 14.0 cm"
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-006",
+    "title": "Satellite Altimetry & SAR Validation of Significant Wave Height Predictions during Pre-Monsoon Cyclonic Disturbances",
+    "authors": "Kumar, R., Sharma, A., & Varma, K.",
+    "journal": "IEEE Transactions on Geoscience and Remote Sensing",
+    "year": 2024,
+    "doi": "10.1109/TGRS.2024.3382910",
+    "topic": "wave_altimetry",
+    "keywords": ["significant wave height", "swh", "sar", "sentinel-1", "altimeter", "cyclone", "sea state", "safety"],
+    "abstract": "Cross-validation of Sentinel-1 C-band SAR wave spectra with Jason-3 altimeter passes over the Arabian Sea reveals operational root-mean-square errors (RMSE) under 0.22m for SWH up to 4.5m. Real-time assimilation enables safe navigational corridor routing around cyclonic gale radii.",
+    "key_findings": "SAR and radar altimeter assimilation predicts significant wave heights within 0.22m RMSE, ensuring reliable 5-day voyage departure safety envelopes.",
+    "url": "https://doi.org/10.1109/TGRS.2024.3382910",
+    "metadata": {
+      "sensors": ["Sentinel-1 SAR", "Jason-3 Altimeter", "INCOIS Wave Rider Buoys"],
+      "application": "Vessel go/no-go departure safety"
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-007",
+    "title": "Automated Border Standoff Protocols & Kinematic AIS Fleet Tracking for Coastal EEZ Security",
+    "authors": "Indian Coast Guard Directorate of Fisheries & Sovereignty",
+    "journal": "Indian Coast Guard Technical Review",
+    "year": 2024,
+    "doi": "10.5281/zenodo.icg.2024.08",
+    "topic": "defense_border",
+    "keywords": ["imbl", "eez", "ais", "standoff", "defense", "vessel tracking", "palk bay", "sir creek"],
+    "abstract": "Integration of 5 NM geofenced IMBL standoff buffers with automated kinematic AIS anomaly detection reduces international maritime boundary line infractions by 91%. Spatial grid cell matching within the Indian EEZ ensures sovereign compliance for mechanized artisanal fishing fleets.",
+    "key_findings": "5 NM automated geofencing buffers with predictive vessel heading alerts cut IMBL border crossings by 91% along Palk Bay and Sir Creek sectors.",
+    "url": "https://doi.org/10.5281/zenodo.icg.2024.08",
+    "metadata": {
+      "authority": "Indian Coast Guard (ICG)",
+      "boundary_zones": ["Indo-Sri Lanka IMBL", "Indo-Pakistan Sir Creek Buffer"]
+    }
+  },
+  {
+    "paper_id": "ORCA-PAPER-008",
+    "title": "Chlorophyll-a Color Front Detection Algorithms using OceanSat-3 OCM-3 Data",
+    "authors": "ISRO Space Applications Centre (SAC) Marine Working Group",
+    "journal": "ISRO MOSDAC Technical Monograph Series",
+    "year": 2025,
+    "doi": "10.5281/zenodo.mosdac.2025.04",
+    "topic": "color_fronts",
+    "keywords": ["chlorophyll", "color fronts", "oceansat-3", "ocm-3", "pfz", "thermal fronts", "gradient"],
+    "abstract": "Novel edge-preserving Canny-Sobel gradient operators applied to daily OceanSat-3 OCM-3 360m spatial resolution ocean color data detect bio-optical fronts with 94.2% fidelity when co-located with Sentinel-3 SLSTR thermal fronts, providing reliable inputs for PFZ advisory generation.",
+    "key_findings": "Co-locating OCM-3 ocean color fronts with SLSTR thermal fronts yields 94.2% validated correlation with pelagic commercial catch landings.",
+    "url": "https://doi.org/10.5281/zenodo.mosdac.2025.04",
+    "metadata": {
+      "authority": "ISRO Space Applications Centre (SAC) & INCOIS",
+      "satellite_sensors": ["OceanSat-3 OCM-3", "Sentinel-3 SLSTR"]
+    }
+  }
+]

@@ -9,6 +9,7 @@ from .ocean_analytics import ocean_analytics_agent_node
 from .risk_geofencing import risk_geofencing_agent_node
 from .navigation import navigation_agent_node
 from .policy_rag import policy_rag_agent_node
+from .research_rag import research_rag_agent_node
 from .synthesizer import synthesizer_agent_node
 
 __all__ = [
@@ -21,5 +22,7 @@ __all__ = [
     "risk_geofencing_agent_node",
     "navigation_agent_node",
     "policy_rag_agent_node",
+    "research_rag_agent_node",
     "synthesizer_agent_node"
 ]
+

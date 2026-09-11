@@ -213,10 +213,10 @@ export const DEFAULT_TUNA_REPORT: Report = {
 const STORAGE_KEY = "orca_report_history_v2";
 const ACTIVE_REPORT_KEY = "orca_active_report_id_v2";
 
-type StoreListener = (reports: Report[], activeReport: Report) => void;
+type StoreListener = (reports: Report[], activeReport: Report | null) => void;
 const listeners: Set<StoreListener> = new Set();
 
-function emitChange(reports: Report[], activeReport: Report) {
+function emitChange(reports: Report[], activeReport: Report | null) {
   listeners.forEach((listener) => {
     try {
       listener(reports, activeReport);
@@ -228,49 +228,52 @@ function emitChange(reports: Report[], activeReport: Report) {
 
 export const reportStore = {
   getReportHistory(): Report[] {
-    if (typeof window === "undefined") return [DEFAULT_TUNA_REPORT];
+    if (typeof window === "undefined") return [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([DEFAULT_TUNA_REPORT]));
-        return [DEFAULT_TUNA_REPORT];
-      }
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([DEFAULT_TUNA_REPORT]));
-        return [DEFAULT_TUNA_REPORT];
-      }
+      if (!Array.isArray(parsed)) return [];
       return parsed;
     } catch {
-      return [DEFAULT_TUNA_REPORT];
+      return [];
     }
   },
 
-  getActiveReport(): Report {
-    const history = this.getReportHistory();
-    if (typeof window === "undefined") return history[0] || DEFAULT_TUNA_REPORT;
+  getActiveReport(): Report | null {
+    if (typeof window === "undefined") return null;
     try {
       const activeId = localStorage.getItem(ACTIVE_REPORT_KEY);
-      if (activeId) {
+      const history = this.getReportHistory();
+      if (activeId && history.length > 0) {
         const found = history.find((r) => r.id === activeId);
         if (found) return found;
       }
+      return history.length > 0 ? history[0] : null;
     } catch {
-      // fallback
+      return null;
     }
-    return history[0] || DEFAULT_TUNA_REPORT;
   },
 
-  setActiveReportId(id: string): Report {
+  setActiveReportId(id: string): Report | null {
     const history = this.getReportHistory();
-    const target = history.find((r) => r.id === id) || history[0] || DEFAULT_TUNA_REPORT;
+    const target = history.find((r) => r.id === id) || null;
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(ACTIVE_REPORT_KEY, target.id);
+        if (target) {
+          localStorage.setItem(ACTIVE_REPORT_KEY, target.id);
+        } else {
+          localStorage.removeItem(ACTIVE_REPORT_KEY);
+        }
       } catch {}
     }
     emitChange(history, target);
     return target;
+  },
+
+  loadBenchmarkReport(): Report {
+    this.saveReport(DEFAULT_TUNA_REPORT);
+    return DEFAULT_TUNA_REPORT;
   },
 
   saveReport(report: Report): void {
@@ -298,10 +301,14 @@ export const reportStore = {
     if (typeof window === "undefined") return;
     try {
       const history = this.getReportHistory().filter((r) => r.id !== id);
-      const safeHistory = history.length > 0 ? history : [DEFAULT_TUNA_REPORT];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(safeHistory));
-      const active = this.getActiveReport();
-      emitChange(safeHistory, active);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      const active = history.length > 0 ? history[0] : null;
+      if (active) {
+        localStorage.setItem(ACTIVE_REPORT_KEY, active.id);
+      } else {
+        localStorage.removeItem(ACTIVE_REPORT_KEY);
+      }
+      emitChange(history, active);
     } catch {}
   },
 
@@ -310,3 +317,4 @@ export const reportStore = {
     return () => listeners.delete(listener);
   },
 };
+

@@ -23,6 +23,7 @@ export type SectionType =
   | "analysis"
   | "research"
   | "sources"
+  | "ai_synthesis"
   | "generic";
 
 export interface ReportTelemetry {

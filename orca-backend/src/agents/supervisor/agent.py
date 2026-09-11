@@ -138,102 +138,107 @@ async def supervisor_agent_node(state: AgentState) -> dict[str, Any]:
     logger.info(f"🧭 [Supervisor Node] Evaluating query: '{user_query[:80]}...' | Role: '{user_role}' | Mode: '{format_mode}'")
 
     plan: SubTaskPlan | None = None
+    text_lower = user_query.lower().strip()
+    
+    # 1. Fast Deterministic Routing (Zero-latency spatial & domain classification)
+    is_greeting = any(
+        text_lower == w or text_lower.startswith(w + " ") or text_lower.endswith(" " + w)
+        for w in ["hi", "hello", "hey", "namaste", "vanakkam", "halo", "help", "who are you", "what can you do", "morning", "good morning", "good evening", "how are you"]
+    )
 
-    # 1. Attempt LLM Structured Output with Qwen 2.5
-    is_live = await check_ollama_health()
-    if is_live:
-        try:
-            llm = get_chat_llm(model="qwen2.5:7b-instruct-q5_k_m", temperature=0.0)
-            structured_llm = llm.with_structured_output(SubTaskPlan)
-            system_instruction = f"{SUPERVISOR_SYSTEM_PROMPT}\n\n{ROLE_PROMPT_PREFIXES.get(user_role, '')}"
-            res = await structured_llm.ainvoke([
-                SystemMessage(content=system_instruction),
-                HumanMessage(content=user_query)
-            ])
-            if isinstance(res, SubTaskPlan):
-                plan = res
-                logger.info(f"✅ [Supervisor Node] Structured plan generated: {plan.tasks_to_trigger}")
-        except Exception as e:
-            logger.warning(f"Ollama plan generation fallback: {e}")
+    # Priority 1: Check if coordinates or region were explicitly mentioned in text
+    origin_coords = None
+    for name, coords in GAZETTEER.items():
+        if name in text_lower:
+            origin_coords = coords
+            break
 
-    # 2. Deterministic Fallback if LLM daemon is offline
-    if plan is None:
-        text_lower = user_query.lower().strip()
-        
-        # Check for conversational greetings / help
-        is_greeting = any(
-            text_lower == w or text_lower.startswith(w + " ") or text_lower.endswith(" " + w)
-            for w in ["hi", "hello", "hey", "namaste", "vanakkam", "halo", "help", "who are you", "what can you do", "morning", "good morning", "good evening", "how are you"]
+    # Priority 2: Use existing state coordinates if user pinned map or asked follow-up
+    if not origin_coords:
+        origin_coords = state.get("target_coordinates") or state.get("origin_coordinates")
+
+    # Priority 3: Default to active basin center
+    if not origin_coords:
+        origin_coords = BASIN_DEFAULT_COORDS.get(active_basin, [20.902, 70.368])
+
+    # Check for explicit numeric coordinates in query (e.g. 20.65, 70.11)
+    coord_match = re.search(r"(\d+\.\d+)\s*[Nn]?\s*,\s*(\d+\.\d+)\s*[Ee]?", user_query)
+    if coord_match:
+        target_coords = [float(coord_match.group(1)), float(coord_match.group(2))]
+    else:
+        target_coords = [round(origin_coords[0] - 0.22, 3), round(origin_coords[1] - 0.22, 3)]
+
+    # Specific task routing
+    tasks = []
+    if any(w in text_lower for w in ["fish", "pfz", "tuna", "mackerel", "sardine", "catch", "chlorophyll", "species", "feeding", "where to fish"]):
+        tasks.append("ocean_analytics")
+    if any(w in text_lower for w in ["weather", "sea", "wave", "swh", "temp", "sst", "wind", "cyclone", "storm", "safe to venture"]):
+        if "ocean_analytics" not in tasks:
+            tasks.append("ocean_analytics")
+    if any(w in text_lower for w in ["border", "imbl", "safe", "danger", "risk", "warning", "sri lanka", "pakistan", "mpa", "sanctuary", "restricted"]):
+        tasks.append("risk_geofencing")
+    if any(w in text_lower for w in ["route", "path", "fuel", "navigate", "distance", "heading", "optimal", "transit", "waypoint"]):
+        tasks.append("navigation")
+    if any(w in text_lower for w in ["ban", "rule", "law", "trawl", "monsoon", "policy", "permit", "license", "vhf", "1554", "fine", "penalty"]):
+        tasks.append("policy_rag")
+    if user_role == "researcher" or any(w in text_lower for w in ["paper", "research", "study", "journal", "academic", "literature", "upwelling", "bloom", "eddy", "cmfri", "incois", "somali jet", "diatom", "science"]):
+        tasks.append("research_rag")
+
+    if is_greeting and not tasks:
+        plan = SubTaskPlan(
+            intent_summary="Conversational greeting & capabilities inquiry",
+            tasks_to_trigger=[],
+            origin_coordinates=origin_coords,
+            target_coordinates=target_coords,
+            reasoning="Conversational interaction without domain calculation requirements."
+        )
+    elif tasks:
+        plan = SubTaskPlan(
+            intent_summary=f"Domain query for {user_query[:60]}",
+            tasks_to_trigger=tasks,
+            origin_coordinates=origin_coords,
+            target_coordinates=target_coords,
+            reasoning="Targeted domain routing."
+        )
+    elif "report" in text_lower or format_mode == "report":
+        if user_role == "researcher":
+            tasks = ["ocean_analytics", "risk_geofencing", "policy_rag", "research_rag"]
+        else:
+            tasks = ["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"]
+        plan = SubTaskPlan(
+            intent_summary=f"Comprehensive operational report for {user_query[:60]}",
+            tasks_to_trigger=tasks,
+            origin_coordinates=origin_coords,
+            target_coordinates=target_coords,
+            reasoning="Full multi-agent operational assessment."
         )
 
-        # Priority 1: Check if coordinates or region were explicitly mentioned in text
-        origin_coords = None
-        for name, coords in GAZETTEER.items():
-            if name in text_lower:
-                origin_coords = coords
-                break
+    # 2. If completely unclassified, attempt LLM Structured Output with timeout
+    if plan is None:
+        is_live = await check_ollama_health()
+        if is_live:
+            try:
+                llm = get_chat_llm(temperature=0.0, timeout=10.0)
+                structured_llm = llm.with_structured_output(SubTaskPlan)
+                system_instruction = f"{SUPERVISOR_SYSTEM_PROMPT}\n\n{ROLE_PROMPT_PREFIXES.get(user_role, '')}"
+                res = await structured_llm.ainvoke([
+                    SystemMessage(content=system_instruction),
+                    HumanMessage(content=user_query)
+                ])
+                if isinstance(res, SubTaskPlan):
+                    plan = res
+                    logger.info(f"✅ [Supervisor Node] Structured plan generated: {plan.tasks_to_trigger}")
+            except Exception as e:
+                logger.warning(f"Ollama plan generation fallback: {e}")
 
-        # Priority 2: Use existing state coordinates if user pinned map or asked follow-up
-        if not origin_coords:
-            origin_coords = state.get("target_coordinates") or state.get("origin_coordinates")
-
-        # Priority 3: Default to active basin center
-        if not origin_coords:
-            origin_coords = BASIN_DEFAULT_COORDS.get(active_basin, [20.902, 70.368])
-
-        # Check for explicit numeric coordinates in query (e.g. 20.65, 70.11)
-        coord_match = re.search(r"(\d+\.\d+)\s*[Nn]?\s*,\s*(\d+\.\d+)\s*[Ee]?", user_query)
-        if coord_match:
-            target_coords = [float(coord_match.group(1)), float(coord_match.group(2))]
-        else:
-            target_coords = [round(origin_coords[0] - 0.22, 3), round(origin_coords[1] - 0.22, 3)]
-
-        # Specific task routing
-        tasks = []
-        if any(w in text_lower for w in ["fish", "pfz", "tuna", "mackerel", "sardine", "catch", "chlorophyll", "species", "feeding", "where to fish"]):
-            tasks.append("ocean_analytics")
-        if any(w in text_lower for w in ["weather", "sea", "wave", "swh", "temp", "sst", "wind", "cyclone", "storm", "safe to venture"]):
-            if "ocean_analytics" not in tasks:
-                tasks.append("ocean_analytics")
-        if any(w in text_lower for w in ["border", "imbl", "safe", "danger", "risk", "warning", "sri lanka", "pakistan", "mpa", "sanctuary", "restricted"]):
-            tasks.append("risk_geofencing")
-        if any(w in text_lower for w in ["route", "path", "fuel", "navigate", "distance", "heading", "optimal", "transit", "waypoint"]):
-            tasks.append("navigation")
-        if any(w in text_lower for w in ["ban", "rule", "law", "trawl", "monsoon", "policy", "permit", "license", "vhf", "1554", "fine", "penalty"]):
-            tasks.append("policy_rag")
-
-        # Conversational greeting without specific task
-        if is_greeting and not tasks:
-            plan = SubTaskPlan(
-                intent_summary="Conversational greeting & capabilities inquiry",
-                tasks_to_trigger=[],
-                origin_coordinates=origin_coords,
-                target_coordinates=target_coords,
-                reasoning="Conversational interaction without domain calculation requirements."
-            )
-        elif not tasks:
-            # If user asks for report, run full assessment
-            if "report" in text_lower or format_mode == "report":
-                tasks = ["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"]
-            else:
-                # Default targeted ocean check
-                tasks = ["ocean_analytics"]
-
-            plan = SubTaskPlan(
-                intent_summary=f"General maritime evaluation for {user_query[:60]}",
-                tasks_to_trigger=tasks,
-                origin_coordinates=origin_coords,
-                target_coordinates=target_coords,
-                reasoning="Contextual maritime evaluation."
-            )
-        else:
-            plan = SubTaskPlan(
-                intent_summary=f"Domain query for {user_query[:60]}",
-                tasks_to_trigger=tasks,
-                origin_coordinates=origin_coords,
-                target_coordinates=target_coords,
-                reasoning="Targeted domain routing."
-            )
+    if plan is None:
+        plan = SubTaskPlan(
+            intent_summary=f"General maritime evaluation for {user_query[:60]}",
+            tasks_to_trigger=["ocean_analytics", "research_rag"] if user_role == "researcher" else ["ocean_analytics"],
+            origin_coordinates=origin_coords,
+            target_coordinates=target_coords,
+            reasoning="Contextual maritime evaluation fallback."
+        )
 
     return {
         "user_query": user_query,
