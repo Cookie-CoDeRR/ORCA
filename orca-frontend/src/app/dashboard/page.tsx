@@ -170,10 +170,10 @@ export const VECTOR_OVERLAYS_DEF: VectorOverlayDef[] = [
     color: "#2563eb",
   },
   {
-    id: "currentsFlow",
-    label: "Current Flow Vectors",
-    subtitle: "Directional Streamline Flow Arrows",
-    icon: Wind,
+    id: "ocean_currents",
+    label: "Online Ocean Currents Map",
+    subtitle: "Dedicated Hydrodynamic Current & Circulation Service",
+    icon: Waves,
     color: "#06b6d4",
   },
   {
@@ -1450,7 +1450,7 @@ function LayerDock({
                       (v.id === "imbl" && (activeOverlays.has("imbl") || activeOverlays.has("imbl_sovereign"))) ||
                       (v.id === "ais" && (activeOverlays.has("ais") || activeOverlays.has("ais_fleet"))) ||
                       (v.id === "route" && (activeOverlays.has("route") || activeOverlays.has("optimal_route"))) ||
-                      (v.id === "currentsFlow" && (activeOverlays.has("currentsFlow") || activeOverlays.has("current_flow"))) ||
+                      (v.id === "ocean_currents" && (activeOverlays.has("ocean_currents") || activeOverlays.has("oceanCurrents") || activeOverlays.has("current_flow") || activeOverlays.has("currentsFlow"))) ||
                       (v.id === "mesh" && (activeOverlays.has("mesh") || activeOverlays.has("tactical_mesh"))) ||
                       (v.id === "graticule" && activeOverlays.has("graticule")) ||
                       activeOverlays.has(v.id as string);
@@ -1561,7 +1561,6 @@ function AppContent() {
       "imbl_sovereign",
       "ais_fleet",
       "optimal_route",
-      "current_flow",
       "tactical_mesh",
     ])
   );
@@ -1576,7 +1575,7 @@ function AppContent() {
         id === "imbl" ? "imbl_sovereign" :
         id === "ais" ? "ais_fleet" :
         id === "route" ? "optimal_route" :
-        id === "currentsFlow" ? "current_flow" :
+        id === "ocean_currents" || id === "currentsFlow" || id === "current_flow" ? "ocean_currents" :
         id === "mesh" ? "tactical_mesh" :
         id;
 

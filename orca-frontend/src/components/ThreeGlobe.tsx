@@ -11,7 +11,9 @@ export interface VectorOverlayToggles {
   imbl: boolean;
   ais: boolean;
   route: boolean;
-  currentsFlow: boolean;
+  oceanCurrents: boolean;
+  ocean_currents?: boolean;
+  currentsFlow?: boolean;
   mesh: boolean;
   graticule: boolean;
 }
@@ -74,7 +76,9 @@ export function normalizeOverlays(
       imbl: set.has("imbl") || set.has("imbl_sovereign"),
       ais: set.has("ais") || set.has("ais_fleet"),
       route: set.has("route") || set.has("optimal_route"),
-      currentsFlow: set.has("currentsFlow") || set.has("current_flow") || set.has("currents_flow"),
+      oceanCurrents: set.has("ocean_currents") || set.has("oceanCurrents") || set.has("current_flow") || set.has("currents_flow"),
+      ocean_currents: set.has("ocean_currents") || set.has("oceanCurrents") || set.has("current_flow") || set.has("currents_flow"),
+      currentsFlow: false,
       mesh: set.has("mesh") || set.has("tactical_mesh") || set.has("5x5_mesh"),
       graticule: set.has("graticule") || set.has("global_graticule"),
     };
@@ -84,7 +88,9 @@ export function normalizeOverlays(
     imbl: vectorLayers?.imbl ?? true,
     ais: vectorLayers?.ais ?? true,
     route: vectorLayers?.route ?? true,
-    currentsFlow: vectorLayers?.currentsFlow ?? true,
+    oceanCurrents: vectorLayers?.oceanCurrents ?? vectorLayers?.ocean_currents ?? false,
+    ocean_currents: vectorLayers?.oceanCurrents ?? vectorLayers?.ocean_currents ?? false,
+    currentsFlow: false,
     mesh: vectorLayers?.mesh ?? true,
     graticule: vectorLayers?.graticule ?? false,
   };
@@ -324,7 +330,7 @@ export default function ThreeGlobe({
 
   const isLockedRef = useRef(false);
   const targetCoordsRef = useRef(targetCoords);
-  const updateTargetRef = useRef<(lat: number, lon: number) => void>(() => {});
+  const updateTargetRef = useRef<(lat: number, lon: number, customAltitude?: number) => void>(() => {});
 
   useEffect(() => {
     targetCoordsRef.current = targetCoords;
@@ -870,46 +876,6 @@ export default function ThreeGlobe({
       routeGroup.add(wp);
     });
 
-    // ── 8e. Ocean Currents Flow Vectors (Directional Streamline Arrows) ───
-    const currentsFlowGroup = new THREE.Group();
-    globeGroup.add(currentsFlowGroup);
-
-    const flowPoints: THREE.Vector3[] = [];
-    for (let lat = 4; lat <= 20; lat += 2.5) {
-      for (let lon = 55; lon <= 88; lon += 3.5) {
-        if (lat > 12 && lat < 26 && lon > 74 && lon < 85) continue; // Skip mainland India
-
-        const p1 = latLonToVec3(lat, lon, radius + 0.19);
-        let angle = 0.2;
-        if (lon < 65) angle = 0.7; // Somali Jet heading NE
-        if (lon > 80 && lat < 12) angle = 0.1; // South Indian Ocean eastbound drift
-        if (lon > 82 && lat > 12) angle = 1.3; // Bay of Bengal anticyclonic turn
-
-        const arrowLen = 0.85;
-        const dLat = Math.sin(angle) * arrowLen;
-        const dLon = Math.cos(angle) * arrowLen;
-        const p2 = latLonToVec3(lat + dLat, lon + dLon, radius + 0.19);
-
-        const leftLat = lat + dLat - Math.sin(angle - 0.45) * 0.3;
-        const leftLon = lon + dLon - Math.cos(angle - 0.45) * 0.3;
-        const rightLat = lat + dLat - Math.sin(angle + 0.45) * 0.3;
-        const rightLon = lon + dLon - Math.cos(angle + 0.45) * 0.3;
-
-        flowPoints.push(p1, p2);
-        flowPoints.push(p2, latLonToVec3(leftLat, leftLon, radius + 0.19));
-        flowPoints.push(p2, latLonToVec3(rightLat, rightLon, radius + 0.19));
-      }
-    }
-
-    const flowGeo = new THREE.BufferGeometry().setFromPoints(flowPoints);
-    const flowMat = new THREE.LineBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.80,
-      depthWrite: false,
-    });
-    currentsFlowGroup.add(new THREE.LineSegments(flowGeo, flowMat));
-
     // ── 8f. Computed Vector Coastlines & Country Boundaries via GeoJSON ──
     const geojsonGroup = new THREE.Group();
     geojsonGroup.renderOrder = 20; // Renders ABOVE base black sphere (Layer 0) and marine rasters (Layer 1)
@@ -966,7 +932,18 @@ export default function ThreeGlobe({
 
     const updateTiledSatellite = (force = false) => {
       const raster = activeRasterRef.current;
-      if (raster && raster !== "none") {
+      const vl = vectorLayersRef.current;
+      const isOceanCurrentsMap =
+        raster === "currents" ||
+        Boolean(vl?.oceanCurrents);
+
+      // Dedicated online ocean current service vs. high-resolution satellite imagery
+      const servicePrefix = isOceanCurrentsMap ? "ocean" : "sat";
+      const tileServiceBase = isOceanCurrentsMap
+        ? "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile"
+        : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
+
+      if (raster && raster !== "none" && raster !== "currents") {
         tiledSatelliteGroup.visible = false;
         return;
       }
@@ -977,7 +954,7 @@ export default function ThreeGlobe({
       const altitude = Math.max(0.015, camera.position.z - radius);
       const z = getTileZoomLevel(altitude);
 
-      if (z === 0) {
+      if (z === 0 && !isOceanCurrentsMap) {
         tiledSatelliteGroup.visible = false;
         return;
       }
@@ -1003,7 +980,7 @@ export default function ThreeGlobe({
 
         for (let dx = -span; dx <= span; dx++) {
           const x = (centerTile.x + dx + n) % n;
-          const key = `${z}_${x}_${y}`;
+          const key = `${servicePrefix}_${z}_${x}_${y}`;
           requiredKeys.add(key);
 
           const existing = tileCache.get(key);
@@ -1015,7 +992,7 @@ export default function ThreeGlobe({
           } else {
             const { latMin, latMax, lonMin, lonMax } = tileToBounds(x, y, z);
             const geo = createTileGeometry(latMin, latMax, lonMin, lonMax, radius + 0.002, 6);
-            const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+            const url = `${tileServiceBase}/${z}/${y}/${x}`;
 
             const mat = new THREE.MeshBasicMaterial({
               side: THREE.FrontSide,
@@ -1066,9 +1043,9 @@ export default function ThreeGlobe({
         }
       }
 
-      // Hide tiles from mismatched zoom tiers
+      // Hide tiles from mismatched zoom tiers or other service
       for (const [k, item] of tileCache.entries()) {
-        if (!requiredKeys.has(k) && item.z !== z) {
+        if (!k.startsWith(servicePrefix) || (!requiredKeys.has(k) && item.z !== z)) {
           item.mesh.visible = false;
         }
       }
@@ -1098,26 +1075,38 @@ export default function ThreeGlobe({
       const targetTexture = isDataMode ? textureMapCache[raster] : null;
 
       if (isDataMode) {
-        // DATA MODE: Pitch Black Base Earth Bedrock + High-Contrast Ocean Data Raster
-        if (earthMat.map !== null) {
-          earthMat.map = null;
-          earthMat.specularMap = null;
-          earthMat.color.setHex(0x050505); // Pitch black landmasses
-          earthMat.needsUpdate = true;
-        }
-
-        // Turn off satellite tiles completely so they never protrude or Z-fight
-        tiledSatelliteGroup.visible = false;
-
-        // Show data raster directly over black bedrock
-        if (rasterMat.map !== targetTexture) {
+        if (raster === "currents") {
+          // Dedicated Ocean Current Data Mode:
+          // Display the authentic Eulerian hydrodynamic currents velocity field
+          // and keep online ocean tiles active for high-resolution current bathymetry
           rasterMat.map = targetTexture;
+          rasterMat.opacity = 0.88;
           rasterMat.needsUpdate = true;
+          rasterMesh.visible = true;
+          tiledSatelliteGroup.visible = true;
+          updateTiledSatellite(true);
+        } else {
+          // Pure color field data rasters (SST, Chlorophyll, Bathymetry)
+          if (earthMat.map !== null) {
+            earthMat.map = null;
+            earthMat.specularMap = null;
+            earthMat.color.setHex(0x050505); // Pitch black landmasses
+            earthMat.needsUpdate = true;
+          }
+
+          // Turn off satellite tiles completely so they never protrude or Z-fight
+          tiledSatelliteGroup.visible = false;
+
+          // Show data raster directly over black bedrock
+          if (rasterMat.map !== targetTexture) {
+            rasterMat.map = targetTexture;
+            rasterMat.needsUpdate = true;
+          }
+          rasterMat.opacity = 0.95;
+          rasterMesh.visible = true;
         }
-        rasterMat.opacity = 0.95;
-        rasterMesh.visible = true;
       } else {
-        // SATELLITE MODE: Standard High-Resolution Photorealistic Earth
+        // SATELLITE / OCEAN CURRENT MODE
         if (earthMat.map !== earthDayMap) {
           earthMat.map = earthDayMap;
           earthMat.specularMap = earthSpecularMap;
@@ -1126,7 +1115,6 @@ export default function ThreeGlobe({
         }
 
         rasterMesh.visible = false;
-        // Tile group visibility managed by altitude in updateTiledSatellite
         updateTiledSatellite(true);
       }
 
@@ -1137,8 +1125,10 @@ export default function ThreeGlobe({
         imblGroup.visible = vl.imbl !== false;
         aisGroup.visible = vl.ais !== false;
         routeGroup.visible = vl.route !== false;
-        currentsFlowGroup.visible = vl.currentsFlow !== false;
         gridMeshGroup.visible = vl.mesh !== false || vl.graticule !== false;
+        if (vl.oceanCurrents) {
+          updateTiledSatellite(true);
+        }
       }
     };
 
@@ -1154,8 +1144,8 @@ export default function ThreeGlobe({
     let targetRotY = DEFAULT_ROT_Y;
     let targetRotX = DEFAULT_ROT_X;
 
-    // External target coordinate setter: smooth centering and deep tactical zoom
-    updateTargetRef.current = (lat: number, lon: number) => {
+    // External target coordinate setter: smooth centering and comfortable regional zoom
+    updateTargetRef.current = (lat: number, lon: number, customAltitude?: number) => {
       targetRotX = (lat * Math.PI) / 180;
       const desiredRotY = -((lon + 90.0) * Math.PI) / 180;
       let diff = (desiredRotY - globeGroup.rotation.y) % (Math.PI * 2);
@@ -1163,8 +1153,10 @@ export default function ThreeGlobe({
       if (diff < -Math.PI) diff += Math.PI * 2;
       targetRotY = globeGroup.rotation.y + diff;
       
-      // Deep tactical close-in altitude (hovering ~950m relative to sphere)
-      targetCamDist = radius + 0.95;
+      // Moderate regional altitude (~42 units above sphere, ~3.3x zoom from overview)
+      // Provides clear, wide regional context of the marine sector instead of plunging down to 0.95!
+      const altitude = customAltitude !== undefined ? customAltitude : 42.0;
+      targetCamDist = radius + altitude;
 
       createTargetBox(lat, lon);
       updateRemoteGrid(lat, lon);
@@ -1301,8 +1293,12 @@ export default function ThreeGlobe({
         isLockedRef.current = true;
         autoRotateRef.current = false;
 
-        // Centering, deep zoom into cell, and progressive grids
-        updateTargetRef.current(lat, lon);
+        // Moderate regional zoom instead of plunging to 0.95:
+        // If currently at overview or high altitude (>55), zoom to 42.0 altitude.
+        // If already closer, gently zoom in by 30% with a floor of 22.0.
+        const currentAltitude = Math.max(0.1, targetCamDist - radius);
+        const targetAltitude = currentAltitude > 55 ? 42.0 : Math.max(22.0, currentAltitude * 0.70);
+        updateTargetRef.current(lat, lon, targetAltitude);
 
         if (onLocationSelectRef.current) {
           onLocationSelectRef.current({
@@ -1315,11 +1311,54 @@ export default function ThreeGlobe({
       }
     };
 
+    let lastTouchTime = 0;
+    let lastTouchPos = { x: 0, y: 0 };
+
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
+        const now = Date.now();
+        const touchX = e.touches[0].clientX;
+        const touchY = e.touches[0].clientY;
+        const timeDiff = now - lastTouchTime;
+        const distDiff = Math.hypot(touchX - lastTouchPos.x, touchY - lastTouchPos.y);
+
+        if (timeDiff < 350 && distDiff < 35) {
+          // Double-tap detected on touch screen!
+          const rect = renderer.domElement.getBoundingClientRect();
+          mouseVec.x = ((touchX - rect.left) / rect.width) * 2 - 1;
+          mouseVec.y = -((touchY - rect.top) / rect.height) * 2 + 1;
+
+          raycaster.setFromCamera(mouseVec, camera);
+          const intersects = raycaster.intersectObject(earthMesh, false);
+
+          if (intersects.length > 0) {
+            const hitWorld = intersects[0].point;
+            const hitLocal = earthMesh.worldToLocal(hitWorld.clone());
+            const { lat, lon } = vec3ToLatLon(hitLocal);
+
+            isLockedRef.current = true;
+            autoRotateRef.current = false;
+
+            const currentAltitude = Math.max(0.1, targetCamDist - radius);
+            const targetAltitude = currentAltitude > 55 ? 42.0 : Math.max(22.0, currentAltitude * 0.70);
+            updateTargetRef.current(lat, lon, targetAltitude);
+
+            if (onLocationSelectRef.current) {
+              onLocationSelectRef.current({
+                lat: Number(lat.toFixed(3)),
+                lon: Number(lon.toFixed(3)),
+              });
+            }
+          }
+          lastTouchTime = 0;
+          return;
+        }
+
+        lastTouchTime = now;
+        lastTouchPos = { x: touchX, y: touchY };
         isDragging = true;
-        prevMouseX = e.touches[0].clientX;
-        prevMouseY = e.touches[0].clientY;
+        prevMouseX = touchX;
+        prevMouseY = touchY;
       } else if (e.touches.length === 2) {
         isDragging = false;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1430,9 +1469,6 @@ export default function ThreeGlobe({
         pr.mesh.scale.set(s, s, s);
         pr.mat.opacity = Math.max(0.20, 0.80 - 0.50 * (s - 1.0));
       });
-
-      // Animate subtle flow on currents streamline arrows
-      flowMat.opacity = 0.60 + 0.25 * Math.sin(t * 2.2);
 
       // Direct DOM update for Compass needle and tooltip
       const headingDeg = Math.round((-globeGroup.rotation.y * 180 / Math.PI) % 360);

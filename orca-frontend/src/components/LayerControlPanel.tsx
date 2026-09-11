@@ -19,6 +19,7 @@ import {
   X,
   Lock,
   Sliders,
+  Waves,
 } from "lucide-react";
 
 // ─── Types & Definitions ──────────────────────────────────────────────────────
@@ -115,11 +116,11 @@ export const DIRECT_OVERLAYS: OverlayDef[] = [
     color: "bg-blue-600",
   },
   {
-    id: "current_flow",
-    label: "Current Flow Vectors",
-    subtitle: "Directional Streamline Flow Arrows",
-    icon: Wind,
-    color: "bg-cyan-400",
+    id: "ocean_currents",
+    label: "Online Ocean Currents Map",
+    subtitle: "Dedicated Hydrodynamic Current & Circulation Service",
+    icon: Waves,
+    color: "bg-cyan-500",
   },
   {
     id: "tactical_mesh",
@@ -168,7 +169,6 @@ export default function LayerControlPanel({
     "imbl_sovereign",
     "ais_fleet",
     "optimal_route",
-    "current_flow",
     "tactical_mesh",
   ]),
   onToggleOverlay,
