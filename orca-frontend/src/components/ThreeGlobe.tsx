@@ -1048,7 +1048,7 @@ export default function ThreeGlobe({
     globeGroup.add(graticuleMesh);
 
     // ── 8h. GPU-Accelerated Hydrodynamic Ocean Current Flow Field (GPGPU Shaders) ──
-    const currentsLayer = createCurrentsLayer(radius, 12000);
+    const currentsLayer = createCurrentsLayer(radius, 36000);
     globeGroup.add(currentsLayer.mesh);
 
     let lastTileUpdate = 0;

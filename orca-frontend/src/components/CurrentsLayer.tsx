@@ -167,15 +167,17 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
   varying float vAlpha;
   varying float vSpeed;
   varying float vFlowAngle;
+  varying float vAltFactor;
 
   const float PI = 3.14159265358979323846;
 
   void main() {
     // 1. Dynamic Progressive Zoom LOD Scaling:
-    // When zoomed out (uAltitude >= 110): altFactor = 1.0 -> visibleRatio = 0.10 (only 10% particles active -> very sparse, low density).
-    // As user zooms in (uAltitude drops towards 0): altFactor -> 0.0 -> visibleRatio = 1.0 (100% active -> high tactical density).
-    float altFactor = clamp((uAltitude - 12.0) / 98.0, 0.0, 1.0);
-    float visibleRatio = mix(1.0, 0.10, altFactor);
+    // When zoomed out (uAltitude >= 105): altFactor = 1.0 -> visibleRatio = 0.035 (ultra-sparse, low density from space).
+    // As user zooms in (uAltitude drops towards 0): altFactor -> 0.0 -> visibleRatio = 1.0 (all particles active in local view).
+    float altFactor = clamp((uAltitude - 10.0) / 95.0, 0.0, 1.0);
+    float visibleRatio = mix(1.0, 0.035, altFactor);
+    vAltFactor = altFactor;
 
     if (aLodThreshold > visibleRatio) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -217,7 +219,7 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     vec3 surfaceVel = eastVec * vel.x + northVec * vel.y;
 
     // 5. Position Advection: shorter travel distance when zoomed out so streamlines stay clean and separated
-    float travelDistance = uFlowDistance * mix(0.28, 0.95, altFactor);
+    float travelDistance = uFlowDistance * mix(0.24, 0.90, altFactor);
     float progress = fract(aLife + uTime * uFlowSpeed * aSpeed);
     float travel = progress * travelDistance * max(0.28, speed);
     vec3 advectedPos = aInitialPosition + surfaceVel * travel;
@@ -239,15 +241,15 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
 
     // 8. Dynamic Inverted Size Scaling:
     // - Zoomed out: arrows are BIGGER than normal size (prominent, bold, readable from orbit)
-    // - Zoomed in: arrows REDUCE in size (delicate, small, crisp, fitting local tactical mesh)
-    float sizeScale = mix(0.50, 2.50, altFactor);
+    // - Zoomed in: arrows reduce in size (delicate, small, crisp, clearly visible without clutter)
+    float sizeScale = mix(0.70, 2.10, altFactor);
     float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.30 + 0.70);
-    gl_PointSize = (baseSize * 75.0) / max(0.65, -projPos.z);
+    gl_PointSize = (baseSize * 72.0) / max(0.65, -projPos.z);
 
-    // Zoomed out clamp: [22.0, 36.0] px (bigger than normal size, clearly visible arrows from orbit)
-    // Zoomed in clamp:  [4.0, 8.5] px   (fine & reduced size in local zoom)
-    float minSize = mix(4.0, 22.0, altFactor);
-    float maxSize = mix(8.5, 36.0, altFactor);
+    // Zoomed out clamp: [18.0, 28.0] px (bigger than normal size, clearly visible arrows from orbit)
+    // Zoomed in clamp:  [8.0, 13.5] px  (sharp, clear, and visible in tactical zoom, not invisible 4px!)
+    float minSize = mix(8.0, 18.0, altFactor);
+    float maxSize = mix(13.5, 28.0, altFactor);
     gl_PointSize = clamp(gl_PointSize, minSize, maxSize);
   }
 `;
@@ -262,6 +264,7 @@ const CURRENTS_FRAGMENT_SHADER = /* glsl */ `
   varying float vAlpha;
   varying float vSpeed;
   varying float vFlowAngle;
+  varying float vAltFactor;
 
   void main() {
     // 1. Coordinate frame matching screen-space NDC: +X is Right, +Y is UP
@@ -272,13 +275,14 @@ const CURRENTS_FRAGMENT_SHADER = /* glsl */ `
     float sinA = sin(vFlowAngle);
     vec2 rotPt = vec2(pt.x * cosA + pt.y * sinA, -pt.x * sinA + pt.y * cosA);
 
-    // 3. Aerodynamic Directional Arrowhead & Streamline Profile
+    // 3. Aerodynamic Directional Arrowhead & Streamline Profile (Sleek, Slender Width)
     // rotPt.x in [-0.48, +0.48]: -0.48 is tail, +0.48 is tip
     float s = clamp((rotPt.x + 0.48) / 0.96, 0.0, 1.0);
 
-    // Boundary width: sleek tapered tail (s: 0.0 - 0.65), arrowhead flare (s: 0.65 - 0.72), pointed tip (s: 1.0)
-    float bodyWidth = mix(0.06, 0.14, smoothstep(0.0, 0.65, s));
-    float headWidth = mix(0.36, 0.02, smoothstep(0.68, 1.0, s));
+    // Slender, hydrodynamic arrow profile (dramatically reduced width, narrower head & body)
+    float widthScale = mix(0.70, 1.0, vAltFactor);
+    float bodyWidth = mix(0.016, 0.038, smoothstep(0.0, 0.65, s)) * widthScale;
+    float headWidth = mix(0.135, 0.008, smoothstep(0.68, 1.0, s)) * widthScale;
     float maxWidth = s > 0.68 ? headWidth : bodyWidth;
 
     float distY = abs(rotPt.y);
@@ -287,13 +291,13 @@ const CURRENTS_FRAGMENT_SHADER = /* glsl */ `
     }
 
     // Anti-aliased outer edge
-    float edgeAlpha = smoothstep(maxWidth, maxWidth * 0.35, distY);
+    float edgeAlpha = smoothstep(maxWidth, maxWidth * 0.25, distY);
 
-    // Glowing aerodynamic central spine
-    float spineGlow = exp(-distY * distY * 65.0);
+    // Glowing aerodynamic central spine (sharper, luminous core)
+    float spineGlow = exp(-distY * distY * 200.0);
 
     // Luminous arrowhead tip highlight
-    float tipGlow = smoothstep(0.55, 0.98, s);
+    float tipGlow = smoothstep(0.60, 0.98, s);
 
     float intensity = clamp(edgeAlpha * 0.75 + spineGlow * 0.85 + tipGlow * 0.50, 0.0, 1.0);
 
@@ -320,14 +324,16 @@ export interface CurrentsLayerInstance {
 
 /**
  * Creates the high-performance GPU-accelerated CurrentsLayer instance.
- * Features 100% UNIFORM global ocean particle distribution (zero artificial rectangular seams)
- * and dynamic zoom LOD scaling:
- * - Zoomed out: very few particles (18% active), larger bold arrows.
- * - Zoomed in: progressive increase in particle numbers, small delicate arrows.
+ * Features:
+ * - Slender, hydrodynamic arrow width profile (narrow head & body)
+ * - Dynamic zoom LOD scaling:
+ *   * Zoomed out: very few particles (only ~3.5% active), larger bold arrows, perfectly uniform.
+ *   * Zoomed in: progressive increase in particle numbers (all 36k active), slender delicate arrows.
+ * - Zero rectangular boundaries: uses smooth continuous Gaussian dispersion for regional coastal focus.
  */
 export function createCurrentsLayer(
   globeRadius: number,
-  particleCount = 12000
+  particleCount = 36000
 ): CurrentsLayerInstance {
   // 1. Generate Hydrodynamic Velocity DataTexture with smooth blending
   const dataTexture = generateVelocityDataTexture(512, 256);
@@ -351,17 +357,45 @@ export function createCurrentsLayer(
     ];
   };
 
-  // 100% Uniform Global Ocean Sampling - NO rectangular boundaries!
+  const countGlobal = Math.floor(particleCount * 0.38); // 13,680 uniform global particles
+  const countRegional = particleCount - countGlobal;     // 22,320 smooth Gaussian regional particles
+
   for (let i = 0; i < particleCount; i++) {
     let lat = 0;
     let lon = 0;
     let attempts = 0;
 
-    do {
-      lon = Math.random() * 360.0 - 180.0;
-      lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
-      attempts++;
-    } while (!isOceanCoordinate(lat, lon) && attempts < 40);
+    if (i < countGlobal) {
+      // 1. Global Uniform Ocean Sampling (Zero bias, whole planet)
+      do {
+        lon = Math.random() * 360.0 - 180.0;
+        lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
+        attempts++;
+      } while (!isOceanCoordinate(lat, lon) && attempts < 40);
+
+      // Global LOD thresholds span [0.0, 0.40] so baseline arrows remain visible at all zoom levels
+      lodThreshold[i] = (i / countGlobal) * 0.40;
+    } else {
+      // 2. Smooth Gaussian Marine Focus (Arabian Sea, Bay of Bengal, Indian Ocean)
+      // Continuous 2D Gaussian dispersion with ZERO rectangular boundaries or seams!
+      const regionalIdx = i - countGlobal;
+      do {
+        let u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        const z0 = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        const z1 = Math.sqrt(-2.0 * Math.log(u)) * Math.sin(2.0 * Math.PI * v);
+
+        lat = 13.5 + z0 * 12.0;
+        lon = 73.5 + z1 * 18.0;
+        attempts++;
+      } while (!isOceanCoordinate(lat, lon) && attempts < 45);
+
+      // Regional LOD thresholds span [0.045, 1.0]
+      // Completely culled when zoomed out in orbit (visibleRatio <= 0.035),
+      // then progressively activate as the user zooms into the marine region!
+      lodThreshold[i] = 0.045 + (regionalIdx / countRegional) * 0.955;
+    }
 
     const [x, y, z] = geodeticPoint(lat, lon, globeRadius);
 
@@ -377,8 +411,6 @@ export function createCurrentsLayer(
     life[i] = Math.random();
     speed[i] = 0.75 + Math.random() * 0.50;
     size[i] = 2.0 + Math.random() * 2.0;
-    // Evenly distributed LOD threshold from 0.0 to 1.0 across particles
-    lodThreshold[i] = (i + 0.5) / particleCount;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
