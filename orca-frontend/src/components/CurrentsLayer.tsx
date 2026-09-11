@@ -8,12 +8,11 @@ import { isOceanCoordinate } from "../lib/oceanMask";
 /**
  * Generates a 512x256 Float/Byte DataTexture simulating global hydrodynamic ocean currents.
  * Land pixels are strictly zeroed out (speed = 0, u = 0, v = 0) so no currents exist on land.
- * Encodes horizontal eastward u-velocity into R, vertical northward v-velocity into G,
- * and speed magnitude into B using authentic oceanographic circulation models:
- * - West India Coastal Current (WICC): Southward flow along Gujarat, Maharashtra, Goa, Karnataka, Kerala shelf.
- * - Somali Jet & Central Arabian Sea: Northeastward flow toward Saurashtra.
+ * Uses continuous Gaussian-blended circulation vectors with zero rectangular discontinuities:
+ * - West India Coastal Current (WICC): Southward along the Indian west coast shelf.
+ * - Somali Jet: Broad northeastward drift across the Arabian Sea.
  * - Somali Western Boundary Current: Strong northward boundary jet along East Africa.
- * - Indian Ocean Monsoon Drift / Equatorial Jet: Fast eastward drift south of Sri Lanka.
+ * - Equatorial Jet: Rapid eastward flow south of Sri Lanka into Bay of Bengal.
  * - East India Coastal Current (EICC): Northward flow along Bay of Bengal western boundary.
  */
 export function generateVelocityDataTexture(width = 512, height = 256): THREE.DataTexture {
@@ -64,51 +63,57 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
 
       // Antarctic Circumpolar Current (ACC) eastward flow at Southern Ocean [-65° to -45°]
       if (latDeg >= -65.0 && latDeg <= -45.0) {
-        u += 1.4;
+        const accWeight = Math.sin(((latDeg - -65.0) / 20.0) * Math.PI);
+        u += 1.35 * accWeight;
       }
 
-      // ── Authentic Regional Ocean Circulation: Arabian Sea & Bay of Bengal ──
-      // 1. West India Coastal Current (WICC):
-      // During Southwest Monsoon, coastal current flows SOUTHWARD along the Indian shelf [67.5°E - 76.5°E, 7.5°N - 23.5°N]
+      // ── Smooth Organic Regional Blending (Zero Hard Rectangular Seams) ──
+      // 1. Somali Jet & Central Arabian Sea Basin (Northeastward drift)
+      if (lonDeg >= 48.0 && lonDeg <= 70.0 && latDeg >= 3.0 && latDeg <= 20.0) {
+        const wLon = Math.sin(((lonDeg - 48.0) / 22.0) * Math.PI);
+        const wLat = Math.sin(((latDeg - 3.0) / 17.0) * Math.PI);
+        const w = wLon * wLat * 0.82;
+        u = u * (1.0 - w) + 0.85 * w;
+        v = v * (1.0 - w) + 0.50 * w;
+      }
+
+      // 2. West India Coastal Current (WICC) - Southward along Indian shelf
       if (lonDeg >= 67.5 && lonDeg <= 76.5 && latDeg >= 7.5 && latDeg <= 23.5) {
-        // Southward along-shore current with slight eastward onshore contour following
-        const shelfFactor = Math.sin(((lonDeg - 67.5) / 9.0) * Math.PI);
-        u = 0.08 * shelfFactor;
-        v = -1.15 * shelfFactor - 0.25;
-      }
-      // 2. Somali Jet & Central Arabian Sea Basin:
-      // Northeastward drift across open Arabian Sea towards Gujarat [48°E - 67.5°E, 4°N - 19°N]
-      else if (lonDeg >= 48.0 && lonDeg < 67.5 && latDeg >= 4.0 && latDeg <= 19.0) {
-        u = 0.95;
-        v = 0.55;
-      }
-      // 3. Somali Western Boundary Current & Great Whirl:
-      // High-velocity northward jet along Horn of Africa [42°E - 52°E, 0°N - 12°N]
-      else if (lonDeg >= 42.0 && lonDeg <= 52.0 && latDeg >= 0.0 && latDeg <= 12.0) {
-        u = 0.45;
-        v = 1.35;
-      }
-      // 4. Equatorial Southwest Monsoon Current (South of Sri Lanka & Maldives):
-      // Rapid eastward flow into Bay of Bengal [66°E - 96°E, 1°N - 7.5°N]
-      else if (lonDeg >= 66.0 && lonDeg <= 96.0 && latDeg >= 1.0 && latDeg <= 7.5) {
-        u = 1.10;
-        v = 0.08;
-      }
-      // 5. East India Coastal Current (EICC):
-      // Northward western boundary flow along Bay of Bengal [80°E - 87.5°E, 9.5°N - 22.5°N]
-      else if (lonDeg >= 80.0 && lonDeg <= 87.5 && latDeg >= 9.5 && latDeg <= 22.5) {
-        u = 0.22;
-        v = 0.95;
-      }
-      // 6. Central Bay of Bengal Anticyclonic Circulation:
-      else if (lonDeg >= 85.0 && lonDeg <= 95.0 && latDeg >= 8.0 && latDeg <= 19.0) {
-        const dLon = (lonDeg - 90.0) * 0.15;
-        const dLat = (latDeg - 13.5) * 0.15;
-        u += -dLat * 1.2;
-        v += dLon * 1.2;
+        const wLon = Math.sin(((lonDeg - 67.5) / 9.0) * Math.PI);
+        const wLat = Math.sin(((latDeg - 7.5) / 16.0) * Math.PI);
+        const w = wLon * wLat * 0.90;
+        u = u * (1.0 - w) + 0.05 * w;
+        v = v * (1.0 - w) - 1.10 * w;
       }
 
-      // Attenuate flow at extreme high latitudes (near poles)
+      // 3. Somali Western Boundary Current & Great Whirl (Northward along East Africa)
+      if (lonDeg >= 42.0 && lonDeg <= 53.0 && latDeg >= 0.0 && latDeg <= 13.0) {
+        const wLon = Math.sin(((lonDeg - 42.0) / 11.0) * Math.PI);
+        const wLat = Math.sin(((latDeg - 0.0) / 13.0) * Math.PI);
+        const w = wLon * wLat * 0.85;
+        u = u * (1.0 - w) + 0.35 * w;
+        v = v * (1.0 - w) + 1.25 * w;
+      }
+
+      // 4. Equatorial Southwest Monsoon Current (Eastward south of Sri Lanka)
+      if (lonDeg >= 66.0 && lonDeg <= 96.0 && latDeg >= 1.0 && latDeg <= 7.5) {
+        const wLon = Math.sin(((lonDeg - 66.0) / 30.0) * Math.PI);
+        const wLat = Math.sin(((latDeg - 1.0) / 6.5) * Math.PI);
+        const w = wLon * wLat * 0.85;
+        u = u * (1.0 - w) + 1.05 * w;
+        v = v * (1.0 - w) + 0.05 * w;
+      }
+
+      // 5. East India Coastal Current (EICC) (Northward along Bay of Bengal)
+      if (lonDeg >= 80.0 && lonDeg <= 88.0 && latDeg >= 9.5 && latDeg <= 22.5) {
+        const wLon = Math.sin(((lonDeg - 80.0) / 8.0) * Math.PI);
+        const wLat = Math.sin(((latDeg - 9.5) / 13.0) * Math.PI);
+        const w = wLon * wLat * 0.85;
+        u = u * (1.0 - w) + 0.18 * w;
+        v = v * (1.0 - w) + 0.90 * w;
+      }
+
+      // Attenuate flow at extreme high latitudes
       const polarDamp = Math.cos(latRad);
       u *= polarDamp;
       v *= polarDamp;
@@ -157,6 +162,7 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
   attribute float aLife;
   attribute float aSpeed;
   attribute float aSize;
+  attribute float aLodThreshold;
 
   varying float vAlpha;
   varying float vSpeed;
@@ -165,17 +171,22 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
   const float PI = 3.14159265358979323846;
 
   void main() {
-    // 1. Progressive zoom scaling:
-    // When zooming in (uAltitude drops from 80 to 0.02), travel span scales down
-    // so arrows remain delicate, clear, and perfectly proportioned inside local mesh cells.
-    float altRatio = clamp(uAltitude / 65.0, 0.02, 1.0);
-    float zoomSpeed = mix(1.35, 1.0, altRatio);
-    float progress = fract(aLife + uTime * uFlowSpeed * zoomSpeed * aSpeed);
+    // 1. Dynamic Progressive Zoom LOD Scaling:
+    // When zoomed out (uAltitude >= 110): altFactor = 1.0 -> visibleRatio = 0.10 (only 10% particles active -> very sparse, low density).
+    // As user zooms in (uAltitude drops towards 0): altFactor -> 0.0 -> visibleRatio = 1.0 (100% active -> high tactical density).
+    float altFactor = clamp((uAltitude - 12.0) / 98.0, 0.0, 1.0);
+    float visibleRatio = mix(1.0, 0.10, altFactor);
+
+    if (aLodThreshold > visibleRatio) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 0.0;
+      vAlpha = 0.0;
+      return;
+    }
 
     vec3 normalVec = normalize(aInitialPosition);
 
     // 2. Exact Geodetic Equirectangular UV mapping matching latLonToVec3:
-    // normalVec.y = sin(latRad), atan(-pos.z, pos.x) = lonRad
     float latRad = asin(clamp(normalVec.y, -1.0, 1.0));
     float lonRad = atan(-aInitialPosition.z, aInitialPosition.x);
     vec2 uv = vec2(lonRad / (2.0 * PI) + 0.5, latRad / PI + 0.5);
@@ -186,7 +197,7 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     float speed = velSample.b;
     vSpeed = speed;
 
-    // Strict Land & Zero-Flow Culling: completely discard vertices on land or with zero velocity
+    // Strict Land & Zero-Flow Culling: completely discard vertices on land
     if (speed < 0.04) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
       gl_PointSize = 0.0;
@@ -195,45 +206,49 @@ const CURRENTS_VERTEX_SHADER = /* glsl */ `
     }
 
     // 4. Exact Spherical Surface Tangent Coordinate Frame
-    // East vector is along increasing lon: d(pos)/d(lon) = (pos.z, 0, -pos.x)
     vec3 eastVec = vec3(normalVec.z, 0.0, -normalVec.x);
     if (length(eastVec) < 0.0001) {
       eastVec = vec3(0.0, 0.0, -1.0);
     } else {
       eastVec = normalize(eastVec);
     }
-    // North vector is along increasing lat towards +Y
     vec3 northVec = normalize(cross(normalVec, eastVec));
 
-    // Surface velocity on 3D sphere
     vec3 surfaceVel = eastVec * vel.x + northVec * vel.y;
 
-    // 5. Position Advection: smoothly advected along the flow streamlines
-    float localDistance = uFlowDistance * mix(0.18, 1.0, altRatio);
-    float travel = progress * localDistance * max(0.28, speed);
+    // 5. Position Advection: shorter travel distance when zoomed out so streamlines stay clean and separated
+    float travelDistance = uFlowDistance * mix(0.28, 0.95, altFactor);
+    float progress = fract(aLife + uTime * uFlowSpeed * aSpeed);
+    float travel = progress * travelDistance * max(0.28, speed);
     vec3 advectedPos = aInitialPosition + surfaceVel * travel;
 
-    // Re-project onto globe surface hovering smoothly above terrain (+0.09 units)
     vec3 finalSpherePos = normalize(advectedPos) * (uGlobeRadius + 0.09);
 
-    // 6. Post-Perspective NDC Screen Direction for flawless arrowhead alignment
+    // 6. Post-Perspective NDC Screen Direction for arrowhead alignment
     vec4 projPos = projectionMatrix * modelViewMatrix * vec4(finalSpherePos, 1.0);
     vec4 projAhead = projectionMatrix * modelViewMatrix * vec4(finalSpherePos + surfaceVel * 0.25, 1.0);
     vec2 screenDir = (projAhead.xy / max(0.001, projAhead.w)) - (projPos.xy / max(0.001, projPos.w));
     vFlowAngle = atan(screenDir.y, screenDir.x);
 
-    // 7. Smooth Fade-In and Fade-Out (Continuous loop without popping)
+    // 7. Smooth Fade-In and Fade-Out
     float fadeIn = smoothstep(0.0, 0.18, progress);
     float fadeOut = 1.0 - smoothstep(0.72, 1.0, progress);
     vAlpha = fadeIn * fadeOut * smoothstep(0.05, 0.28, speed);
 
     gl_Position = projPos;
 
-    // 8. Delicate & crisp point size (calm, elegant, never a solid sheet of arrows)
-    float sizeScale = mix(0.70, 1.0, altRatio);
-    float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.35 + 0.70);
-    gl_PointSize = (baseSize * 70.0) / max(0.60, -projPos.z);
-    gl_PointSize = clamp(gl_PointSize, 3.5, 14.0);
+    // 8. Dynamic Inverted Size Scaling:
+    // - Zoomed out: arrows are BIGGER than normal size (prominent, bold, readable from orbit)
+    // - Zoomed in: arrows REDUCE in size (delicate, small, crisp, fitting local tactical mesh)
+    float sizeScale = mix(0.50, 2.50, altFactor);
+    float baseSize = aSize * sizeScale * uPixelRatio * (speed * 0.30 + 0.70);
+    gl_PointSize = (baseSize * 75.0) / max(0.65, -projPos.z);
+
+    // Zoomed out clamp: [22.0, 36.0] px (bigger than normal size, clearly visible arrows from orbit)
+    // Zoomed in clamp:  [4.0, 8.5] px   (fine & reduced size in local zoom)
+    float minSize = mix(4.0, 22.0, altFactor);
+    float maxSize = mix(8.5, 36.0, altFactor);
+    gl_PointSize = clamp(gl_PointSize, minSize, maxSize);
   }
 `;
 
@@ -305,14 +320,16 @@ export interface CurrentsLayerInstance {
 
 /**
  * Creates the high-performance GPU-accelerated CurrentsLayer instance.
- * Features strict ocean-only particle distribution and balanced tactical density (~14,000 particles)
- * so currents are clear, calm, and NEVER appear on land!
+ * Features 100% UNIFORM global ocean particle distribution (zero artificial rectangular seams)
+ * and dynamic zoom LOD scaling:
+ * - Zoomed out: very few particles (18% active), larger bold arrows.
+ * - Zoomed in: progressive increase in particle numbers, small delicate arrows.
  */
 export function createCurrentsLayer(
   globeRadius: number,
-  particleCount = 14000
+  particleCount = 12000
 ): CurrentsLayerInstance {
-  // 1. Generate Hydrodynamic Velocity DataTexture with land masking
+  // 1. Generate Hydrodynamic Velocity DataTexture with smooth blending
   const dataTexture = generateVelocityDataTexture(512, 256);
 
   const geometry = new THREE.BufferGeometry();
@@ -321,6 +338,7 @@ export function createCurrentsLayer(
   const life = new Float32Array(particleCount);
   const speed = new Float32Array(particleCount);
   const size = new Float32Array(particleCount);
+  const lodThreshold = new Float32Array(particleCount);
 
   // Helper matching ThreeGlobe latLonToVec3 geodetic coordinate convention
   const geodeticPoint = (latDeg: number, lonDeg: number, r: number): [number, number, number] => {
@@ -333,32 +351,17 @@ export function createCurrentsLayer(
     ];
   };
 
-  const countTier1 = Math.floor(particleCount * 0.35); // Global oceans
-  const countTier2 = Math.floor(particleCount * 0.35); // Indian Ocean Basin
-  const countTier3 = particleCount - countTier1 - countTier2; // Dense Indian Shelf & EEZ
-
+  // 100% Uniform Global Ocean Sampling - NO rectangular boundaries!
   for (let i = 0; i < particleCount; i++) {
     let lat = 0;
     let lon = 0;
     let attempts = 0;
 
-    // Strictly ensure EVERY particle is spawned on water/ocean
     do {
-      if (i < countTier1) {
-        // Tier 1: Uniform global spherical sampling
-        lon = Math.random() * 360.0 - 180.0;
-        lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
-      } else if (i < countTier1 + countTier2) {
-        // Tier 2: Indian Ocean / Arabian Sea / Bay of Bengal basin [45°E - 105°E, -12°S - 27°N]
-        lon = 45.0 + Math.random() * 60.0;
-        lat = -12.0 + Math.random() * 39.0;
-      } else {
-        // Tier 3: High-density Indian EEZ, shelf, and coastal waters [66°E - 88°E, 6°N - 24°N]
-        lon = 66.0 + Math.random() * 22.0;
-        lat = 6.0 + Math.random() * 18.0;
-      }
+      lon = Math.random() * 360.0 - 180.0;
+      lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
       attempts++;
-    } while (!isOceanCoordinate(lat, lon) && attempts < 30);
+    } while (!isOceanCoordinate(lat, lon) && attempts < 40);
 
     const [x, y, z] = geodeticPoint(lat, lon, globeRadius);
 
@@ -374,6 +377,8 @@ export function createCurrentsLayer(
     life[i] = Math.random();
     speed[i] = 0.75 + Math.random() * 0.50;
     size[i] = 2.0 + Math.random() * 2.0;
+    // Evenly distributed LOD threshold from 0.0 to 1.0 across particles
+    lodThreshold[i] = (i + 0.5) / particleCount;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -381,6 +386,7 @@ export function createCurrentsLayer(
   geometry.setAttribute("aLife", new THREE.BufferAttribute(life, 1));
   geometry.setAttribute("aSpeed", new THREE.BufferAttribute(speed, 1));
   geometry.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
+  geometry.setAttribute("aLodThreshold", new THREE.BufferAttribute(lodThreshold, 1));
 
   // 3. Custom GPGPU ShaderMaterial
   const material = new THREE.ShaderMaterial({
@@ -390,8 +396,8 @@ export function createCurrentsLayer(
       uVelocityTexture: { value: dataTexture },
       uTime: { value: 0.0 },
       uGlobeRadius: { value: globeRadius },
-      uFlowSpeed: { value: 0.028 }, // Calm, mesmerizing hydrodynamic flow
-      uFlowDistance: { value: 1.8 }, // Crisp, refined streamline travel span
+      uFlowSpeed: { value: 0.024 }, // Calm, graceful hydrodynamic flow
+      uFlowDistance: { value: 1.6 }, // Sleek streamline length
       uAltitude: { value: 70.0 }, // Dynamic zoom LOD scaling
       uPixelRatio: { value: typeof window !== "undefined" ? Math.min(window.devicePixelRatio, 2.0) : 1.0 },
       uColorLow: { value: new THREE.Color(0x00d4ff) }, // Electric Cyan (#00d4ff)
