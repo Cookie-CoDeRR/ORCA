@@ -19,7 +19,7 @@ import {
 import ThreeGlobe, { EnvironmentalRasterType, VectorOverlayToggles } from "@/components/ThreeGlobe";
 import ReportView from "@/components/ReportView";
 import { sendMultiAgentMessage, fetchLiveOceanCurrent, LiveOceanCurrentResponse } from "@/lib/api";
-import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
+import { isReportRequest, generateReportPipeline, hasReportContext } from "@/lib/reportGenerator";
 import { reportStore, DEFAULT_TUNA_REPORT } from "@/lib/reportStore";
 import { Report, ReportGenerationProgress } from "@/lib/reportTypes";
 import { isOceanCoordinate, isIndianControlledOcean } from "@/lib/oceanMask";
@@ -43,6 +43,7 @@ interface ChatMessage {
   thoughts?: string[];
   thinkingDurationSeconds?: number;
   isThinkingExpanded?: boolean;
+  quickActions?: Array<{ label: string; prompt: string }>;
 }
 
 interface LayerItem {
@@ -758,7 +759,45 @@ function AIChatDrawer({
         qLower.includes("dossier") ||
         qLower.includes("generate");
 
-      // Redirect report requests to the multi-stage report generator
+      // ── GUARD RAIL: Operational Context Required Before Dossier Generation ───
+      // If user asks for report without context or before any question has been asked:
+      const priorUserMessages = messages.filter((m) => m.role === "user");
+      const hasContext = hasReportContext(q, priorUserMessages.length);
+
+      if (isReport && !hasContext) {
+        setInput("");
+        const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
+        const coordDisplay = selectedCoord ? `${selectedCoord.lat.toFixed(3)}°N, ${selectedCoord.lon.toFixed(3)}°E` : "active location";
+        const guardRailMsg: ChatMessage = {
+          id: uid(),
+          role: "ai",
+          agentBadge: "Matsya-Sutradhar (Context Guard Rail)",
+          content: `🛡️ **Operational Context Required Before Dossier Generation**\n\nTo ensure accurate scientific, biological, and navigation synthesis for coordinate **[${coordDisplay}]** in **${basinLabel || "Arabian Sea Basin"}**, operational context must be provided before multi-agent evaluation.\n\nWithout specific context, the multi-agent swarm cannot calibrate target biomass envelopes, navigation corridors, or statutory safety thresholds.\n\n**Select an operational mission profile or ask your specific question below:**`,
+          timestamp: now(),
+          quickActions: [
+            {
+              label: "🐟 Pelagic Fisheries & PFZ Advisory",
+              prompt: `Assess Yellowfin Tuna & Indian Mackerel habitat suitability and thermal fronts at ${coordDisplay}`,
+            },
+            {
+              label: "🌊 High Wave & Swell Hazard Assessment",
+              prompt: `Assess significant wave height, swell dynamics, and vessel safety limits at ${coordDisplay}`,
+            },
+            {
+              label: "🛡️ Sovereign IMBL Standoff & Security",
+              prompt: `Verify Indian EEZ sovereign standoff distance and maritime compliance at ${coordDisplay}`,
+            },
+            {
+              label: "🧭 Optimal Fuel Navigation Route",
+              prompt: `Compute surface current vector assist and fuel-optimal navigation route at ${coordDisplay}`,
+            },
+          ],
+        };
+        setMessages((m) => [...m, userMsg, guardRailMsg]);
+        return;
+      }
+
+      // Redirect report requests with verified context to the multi-stage report generator
       if (isReport) {
         triggerReportGeneration(q);
         return;
@@ -1016,7 +1055,13 @@ function AIChatDrawer({
           </div>
 
           <button
-            onClick={() => triggerReportGeneration(input)}
+            onClick={() => {
+              if (!input.trim() && messages.filter((m) => m.role === "user").length === 0) {
+                handleSend("generate report");
+              } else {
+                triggerReportGeneration(input);
+              }
+            }}
             disabled={isGenerating || streaming}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-[10px] font-medium transition disabled:opacity-40 shadow-none active:scale-95 cursor-pointer"
             title="Generate a dynamic report for current topic and coordinates"
@@ -1133,6 +1178,7 @@ function AIChatDrawer({
               if (msg.isReportProgress && msg.progressData) {
                 const p = msg.progressData;
                 const isComplete = !!msg.generatedReport;
+                const estRemaining = p.estimatedSecondsRemaining ?? Math.max(1, (p.totalStages - p.stage + 1) * 2);
                 return (
                   <div key={msg.id} className="p-4 rounded-xl border border-zinc-200 bg-white shadow-xs space-y-3">
                     <div className="flex items-center justify-between">
@@ -1146,20 +1192,27 @@ function AIChatDrawer({
                           {isComplete ? "Report Complete" : p.stageName}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        Stage {p.stage}/{p.totalStages}
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
+                        <Clock className="h-3 w-3 text-[#1F4E8C]" />
+                        <span>{isComplete ? "Done" : `Est. ~${estRemaining}s`}</span>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-zinc-600 leading-relaxed whitespace-pre-line">
                       {msg.content || p.message}
                     </p>
 
-                    <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                      <div
-                        className="h-full bg-[#1F4E8C] transition-all duration-300 rounded-full"
-                        style={{ width: `${isComplete ? 100 : p.progressPercent}%` }}
-                      />
+                    <div className="space-y-1">
+                      <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                        <div
+                          className="h-full bg-[#1F4E8C] transition-all duration-300 rounded-full"
+                          style={{ width: `${isComplete ? 100 : p.progressPercent}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400">
+                        <span>Stage {p.stage}/{p.totalStages}</span>
+                        <span>{isComplete ? "100%" : `${estRemaining}s remaining`}</span>
+                      </div>
                     </div>
 
                     {isComplete && (
@@ -1300,6 +1353,27 @@ function AIChatDrawer({
                           <FileText className="h-3 w-3 text-blue-400" />
                           <span>Generate Report for this Answer</span>
                         </button>
+                      </div>
+                    )}
+
+                    {/* Interactive Mission Profile Quick Actions */}
+                    {msg.quickActions && msg.quickActions.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
+                          Select Mission Profile to Proceed:
+                        </span>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {msg.quickActions.map((qa, qIdx) => (
+                            <button
+                              key={qIdx}
+                              onClick={() => handleSend(qa.prompt)}
+                              className="text-left px-3 py-2 rounded-lg bg-zinc-50 hover:bg-[#F0F4FA] border border-zinc-200 hover:border-[#1F4E8C]/40 text-xs text-zinc-800 hover:text-[#1F4E8C] font-medium transition flex items-center justify-between group cursor-pointer shadow-2xs"
+                            >
+                              <span>{qa.label}</span>
+                              <ChevronRight className="h-3 w-3 text-zinc-400 group-hover:text-[#1F4E8C] transition-transform group-hover:translate-x-0.5" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

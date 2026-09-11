@@ -140,4 +140,6 @@ export interface ReportGenerationProgress {
   stageName: string;
   message: string;
   progressPercent: number;
+  estimatedSecondsRemaining?: number;
+  totalEstimatedSeconds?: number;
 }

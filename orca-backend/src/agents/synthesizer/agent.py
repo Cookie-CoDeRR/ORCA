@@ -199,6 +199,7 @@ def prepare_synthesizer_prompts(state: AgentState) -> dict[str, Any]:
         "policies": policies,
         "papers": papers,
         "is_report_requested": is_report_requested,
+        "format_mode": format_mode,
         "is_species_query": is_species_query,
         "sst": sst,
         "chl": chl,
@@ -217,6 +218,8 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
     into a persona-adapted conversational answer or structured report.
     """
     prompt_info = prepare_synthesizer_prompts(state)
+    format_mode = prompt_info.get("format_mode", state.get("format_mode", "conversational"))
+    user_role = prompt_info.get("user_role", state.get("user_role", "navigator"))
     if prompt_info["is_greeting"]:
         greeting_text = prompt_info["greeting_text"]
         return {
@@ -227,14 +230,15 @@ async def synthesizer_agent_node(state: AgentState) -> dict[str, Any]:
                 "ocean_data": {},
                 "risk_assessment": {},
                 "route_plan": {},
-                "policy_advisories": []
+                "policy_advisories": [],
+                "format_mode": format_mode,
+                "user_role": user_role
             }
         }
 
     sys_prompt = prompt_info["sys_prompt"]
     user_instruction = prompt_info["user_instruction"]
     agent_name = prompt_info["agent_name"]
-    user_role = prompt_info["user_role"]
     target = prompt_info["target"]
     origin = prompt_info["origin"]
     ocean = prompt_info["ocean"]

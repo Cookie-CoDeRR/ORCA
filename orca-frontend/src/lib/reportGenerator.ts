@@ -824,6 +824,47 @@ export function buildDynamicSections(
   return baseSections;
 }
 
+// ─── Operational Guard Rail Context Check ─────────────────────────────────────
+export function hasReportContext(query: string, priorUserMessageCount: number = 0): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return false;
+
+  // Explicit bare triggers with zero context
+  const isBareCommand = [
+    "generate report", "generate a report", "create report", "create a report",
+    "make report", "make a report", "prepare report", "prepare a report",
+    "report", "dossier", "give report", "give me report", "generate dossier",
+    "create dossier", "give me a report", "compile report", "compile dossier",
+    "generate", "create", "make"
+  ].includes(q);
+
+  if (isBareCommand) {
+    return false;
+  }
+
+  // Keywords that supply concrete operational mission or oceanographic context
+  const contextKeywords = [
+    "tuna", "mackerel", "sardine", "seer", "fish", "fishery", "pfz", "species", "catch",
+    "wave", "swell", "wind", "cyclone", "storm", "monsoon", "hazard", "sea state",
+    "imbl", "border", "standoff", "security", "guard", "patrol", "eez", "compliance", "coast guard",
+    "fuel", "route", "waypoint", "navigation", "drift", "current", "vector",
+    "temperature", "sst", "chlorophyll", "chla", "upwelling", "salinity", "depth", "bathymetry",
+    "ecosystem", "biology", "research", "trawling", "advisory", "ocean state"
+  ];
+
+  const hasKeyword = contextKeywords.some((kw) => q.includes(kw));
+  if (hasKeyword) {
+    return true;
+  }
+
+  // If user has engaged in previous conversation and query has at least 15 characters
+  if (priorUserMessageCount > 0 && q.length >= 15) {
+    return true;
+  }
+
+  return false;
+}
+
 // ─── Main Report Generation Engine ────────────────────────────────────────────
 export async function generateReportPipeline(
   query: string,
@@ -831,6 +872,16 @@ export async function generateReportPipeline(
   onProgress?: (p: ReportGenerationProgress) => void
 ): Promise<Report> {
   const totalStages = 6;
+  const totalEstimatedSeconds = 12;
+  const stageRemainingSecMap: Record<number, number> = {
+    1: 12,
+    2: 10,
+    3: 8,
+    4: 5,
+    5: 3,
+    6: 1,
+  };
+
   const notify = (stage: number, stageName: string, message: string) => {
     if (onProgress) {
       onProgress({
@@ -839,6 +890,8 @@ export async function generateReportPipeline(
         stageName,
         message,
         progressPercent: Math.round((stage / totalStages) * 100),
+        estimatedSecondsRemaining: stageRemainingSecMap[stage] ?? Math.max(1, (totalStages - stage + 1) * 2),
+        totalEstimatedSeconds,
       });
     }
   };
