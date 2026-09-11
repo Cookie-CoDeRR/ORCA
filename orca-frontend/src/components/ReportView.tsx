@@ -363,12 +363,12 @@ export default function ReportView({
     const totalStages = generationProgress?.totalStages || 6;
     const progressPercent = generationProgress?.progressPercent || Math.round((stage / totalStages) * 100);
     const stageName = generationProgress?.stageName || "Synthesizing Operational Knowledge";
-    const currentMsg = generationProgress?.message || "Retrieving supporting oceanographic data...";
+    const currentMsg = generationProgress?.message || "Autonomous agent swarm coordinating multi-spectral sensors...";
     const latDisplay = coords.lat.toFixed(3);
     const lonDisplay = coords.lon.toFixed(3);
 
     return (
-      <div id="orca-report-section" className="relative min-h-screen bg-[#F6F8FA] text-[#202124] pb-24 font-sans">
+      <div id="orca-report-section" className="relative min-h-screen bg-[#F8FAFC] text-[#202124] pb-24 font-sans">
         {/* Sticky Top Bar */}
         <div className="sticky top-14 z-30 bg-white/95 border-b border-[#E1E5EA] shadow-xs backdrop-blur-md">
           <div className="w-full px-4 sm:px-6 lg:px-8 h-12 flex items-center justify-between gap-3">
@@ -383,38 +383,41 @@ export default function ReportView({
                 </button>
               )}
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-xs font-medium text-[#667085]">
-                  Report Generation in Progress
+                <span className="h-2 w-2 rounded-full bg-[#1F4E8C] animate-pulse" />
+                <span className="text-xs font-bold font-mono text-[#1F4E8C] tracking-wide uppercase">
+                  LIVE SWARM SYNTHESIS ACTIVE
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-mono text-[#667085]">
-              <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+            <div className="flex items-center gap-2 text-xs font-mono text-[#475569]">
+              <span className="px-2.5 py-1 rounded-md bg-white border border-[#CBD5E1] shadow-2xs">
                 {latDisplay}°N, {lonDisplay}°E
               </span>
-              <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+              <span className="hidden sm:inline-block px-2.5 py-1 rounded-md bg-white border border-[#CBD5E1] shadow-2xs">
                 {basin}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Hero Progress Card */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+        {/* Hero Live Construction Box */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
           <div className="rounded-2xl bg-white border border-[#E1E5EA] shadow-sm p-6 sm:p-8 mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
-                <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#667085] mb-2">
-                  <Activity className="h-4 w-4 animate-pulse text-[#1F4E8C]" />
-                  <span>Report Generation Progress · Stage {stage} of {totalStages}</span>
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold text-[#1F4E8C] uppercase tracking-wider mb-2">
+                  <Cpu className="h-4 w-4 text-[#1F4E8C] animate-spin" />
+                  <span>Multi-Agent Swarm Orchestrator · Stage {stage} of {totalStages}</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#202124]">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1E293B]">
                   {stageName}
                 </h2>
-                <p className="text-sm text-[#667085] mt-1">
-                  Preparing Report for <span className="font-mono text-[#475569]">[{latDisplay}°N, {lonDisplay}°E]</span>
+                <p className="text-sm text-[#64748B] mt-1">
+                  Compiling sovereign oceanographic dossier for target geodetic cell{" "}
+                  <span className="font-mono text-[#1F4E8C] font-semibold bg-[#F0F4FA] px-2 py-0.5 rounded border border-[#CBD5E1]">
+                    [{latDisplay}°N, {lonDisplay}°E]
+                  </span>
                 </p>
               </div>
 
@@ -422,131 +425,213 @@ export default function ReportView({
                 <span className="text-3xl sm:text-4xl font-mono font-bold text-[#1F4E8C]">
                   {progressPercent}%
                 </span>
+                <span className="text-[11px] font-mono text-[#64748B]">Compilation Progress</span>
               </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-zinc-100 rounded-full h-2.5 overflow-hidden border border-zinc-200 mb-6">
+            {/* Animated Progress Bar */}
+            <div className="w-full bg-slate-100 rounded-full h-3 p-0.5 overflow-hidden border border-slate-200 mb-6">
               <div
-                className="bg-[#1F4E8C] h-full rounded-full transition-all duration-500 ease-out"
+                className="bg-gradient-to-r from-[#1F4E8C] via-[#2563EB] to-[#0EA5E9] h-full rounded-full transition-all duration-500 ease-out shadow-xs"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            {/* Current Status Box */}
-            <div className="rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] p-4 text-sm text-[#475569]">
-              <div className="flex items-start gap-2.5">
-                <Info className="h-4 w-4 text-[#1F4E8C] mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <span className="font-medium text-[#1E293B] block mb-1">Retrieving supporting knowledge</span>
-                  <div className="text-[#667085] leading-relaxed">
-                    {currentMsg}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-mono">
-                    <span className="bg-white border border-zinc-200 px-2 py-0.5 rounded text-zinc-500 shadow-xs">Sources being checked:</span>
-                    <span className="bg-white border border-zinc-200 px-2 py-0.5 rounded text-[#1F4E8C] shadow-xs">ICAR-CMFRI</span>
-                    <span className="bg-white border border-zinc-200 px-2 py-0.5 rounded text-[#1F4E8C] shadow-xs">ISRO MOSDAC</span>
-                    <span className="bg-white border border-zinc-200 px-2 py-0.5 rounded text-[#1F4E8C] shadow-xs">INCOIS</span>
-                    <span className="bg-white border border-zinc-200 px-2 py-0.5 rounded text-[#1F4E8C] shadow-xs">ORCA Research Index</span>
-                  </div>
+            {/* Live Terminal Stream Console */}
+            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-2xs font-mono text-xs">
+              <div className="flex items-center justify-between text-[11px] text-[#475569] bg-slate-100/90 border-b border-slate-200 px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[#1E293B] font-bold tracking-wide">SWARM TELEMETRY BUS (REAL-TIME STREAM)</span>
+                </div>
+                <span className="text-[#64748B] font-medium">Gemma 4 MoE + INCOIS Pipeline</span>
+              </div>
+              <div className="bg-[#0B132B] p-4 text-slate-300 space-y-2">
+                <div className="flex items-start gap-2 text-cyan-300">
+                  <span className="text-emerald-400 font-bold flex-shrink-0">&gt;</span>
+                  <span className="leading-relaxed animate-pulse">{currentMsg}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+                  <span>Target: [{latDisplay}°N, {lonDisplay}°E]</span>
+                  <span className="text-slate-600">·</span>
+                  <span>Marine Basin: {basin}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-cyan-400">Status: Illuminating active dossier sections</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Compact Agent Status */}
-            <div>
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#667085] mb-3 flex items-center gap-2">
-                <Cpu className="h-3.5 w-3.5 text-[#1F4E8C]" />
-                <span>Agent Status</span>
-              </h3>
-              <div className="bg-white border border-[#E1E5EA] rounded-xl overflow-hidden shadow-sm">
-                {[
-                  { id: "hydro", icon: Waves, title: "Ocean Data Agent", activeStage: 2, doneStage: 3 },
-                  { id: "fisheries", icon: Fish, title: "Species Agent", activeStage: 3, doneStage: 4 },
-                  { id: "defense", icon: Shield, title: "Safety Agent", activeStage: 4, doneStage: 5 },
-                  { id: "research", icon: BookOpen, title: "Research Agent", activeStage: 4, doneStage: 5 },
-                  { id: "routing", icon: Compass, title: "Navigation Agent", activeStage: 5, doneStage: 6 },
-                  { id: "synthesizer", icon: FileText, title: "Report Synthesis Agent", activeStage: 5, doneStage: 6 },
-                ].map((agent, index, arr) => {
-                  const AgentIcon = agent.icon;
-                  const isDone = stage >= agent.doneStage;
-                  const isActive = stage === agent.activeStage || (stage > agent.activeStage && !isDone);
-                  
-                  return (
-                    <div
-                      key={agent.id}
-                      className={`flex items-center justify-between p-3 ${
-                        index !== arr.length - 1 ? "border-b border-[#E1E5EA]" : ""
-                      } ${isActive ? "bg-[#F0F4FA]" : ""}`}
-                    >
+          {/* 6 Specialized Autonomous Swarm Agents */}
+          <div className="mb-8">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#475569] mb-3 flex items-center gap-2">
+              <Activity className="h-3.5 w-3.5 text-[#1F4E8C]" />
+              <span>Specialized Autonomous Swarm Agents</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                {
+                  id: "hydro",
+                  icon: Waves,
+                  title: "Hydrodynamic Telemetry Agent",
+                  sub: "Sentinel-3 SLSTR & INCOIS wave buoys",
+                  activeStage: 2,
+                  doneStage: 3,
+                },
+                {
+                  id: "fisheries",
+                  icon: Fish,
+                  title: "Fisheries Habitat Agent",
+                  sub: "PFZ chlorophyll fronts & CMFRI mandi rates",
+                  activeStage: 3,
+                  doneStage: 4,
+                },
+                {
+                  id: "defense",
+                  icon: Shield,
+                  title: "Sovereign Maritime Agent",
+                  sub: "IMBL standoff calculus & DGS circulars",
+                  activeStage: 4,
+                  doneStage: 5,
+                },
+                {
+                  id: "research",
+                  icon: BookOpen,
+                  title: "Oceanographic Research Agent",
+                  sub: "Thermocline depth & scientific literature",
+                  activeStage: 4,
+                  doneStage: 5,
+                },
+                {
+                  id: "routing",
+                  icon: Compass,
+                  title: "Navigation & Path Agent",
+                  sub: "Optimal heading vector & fuel conservation",
+                  activeStage: 5,
+                  doneStage: 6,
+                },
+                {
+                  id: "synthesizer",
+                  icon: Sparkles,
+                  title: "Master Synthesizer Agent",
+                  sub: "Gemma 4 MoE neural synthesis & watermarking",
+                  activeStage: 5,
+                  doneStage: 6,
+                },
+              ].map((agent) => {
+                const AgentIcon = agent.icon;
+                const isDone = stage >= agent.doneStage;
+                const isActive = stage === agent.activeStage || (stage > agent.activeStage && !isDone);
+
+                return (
+                  <div
+                    key={agent.id}
+                    className={`rounded-xl p-4 border transition-all duration-300 ${
+                      isDone
+                        ? "bg-white border-emerald-300 shadow-2xs hover:shadow-xs"
+                        : isActive
+                        ? "bg-[#F0F6FF] border-2 border-[#1F4E8C] ring-2 ring-[#1F4E8C]/15 shadow-xs"
+                        : "bg-white border-[#E1E5EA] shadow-2xs hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2.5">
-                        <AgentIcon className={`h-4 w-4 ${isDone ? "text-emerald-600" : isActive ? "text-[#1F4E8C]" : "text-zinc-400"}`} />
-                        <span className={`text-sm font-medium ${isDone || isActive ? "text-[#202124]" : "text-zinc-500"}`}>
-                          {agent.title}
+                        <div
+                          className={`p-2 rounded-lg transition-colors ${
+                            isDone
+                              ? "bg-emerald-50 text-emerald-600"
+                              : isActive
+                              ? "bg-[#1F4E8C] text-white shadow-xs"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <AgentIcon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className={`text-xs font-bold ${isActive ? "text-[#1F4E8C]" : "text-[#1E293B]"}`}>
+                            {agent.title}
+                          </div>
+                          <div className="text-[10px] text-[#64748B] truncate max-w-[170px]">
+                            {agent.sub}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isDone ? (
+                        <span className="flex items-center gap-1 text-[10px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <Check className="h-3 w-3" /> Ready
                         </span>
-                      </div>
-                      <div>
-                        {isDone ? (
-                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                            <Check className="h-3.5 w-3.5" /> Complete
-                          </span>
-                        ) : isActive ? (
-                          <span className="flex items-center gap-1.5 text-xs font-medium text-[#1F4E8C]">
-                            <RefreshCw className="h-3 w-3 animate-spin" /> Working
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-zinc-400">
-                            Waiting
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Dynamic Report Structure */}
-            <div>
-              <h3 className="text-xs font-mono uppercase tracking-wider text-[#667085] mb-3 flex items-center gap-2">
-                <Layers className="h-3.5 w-3.5 text-[#1F4E8C]" />
-                <span>Report Structure</span>
-              </h3>
-              <div className="bg-white border border-[#E1E5EA] rounded-xl overflow-hidden shadow-sm">
-                {[
-                  { label: "Data Synthesis", activeAt: 1, readyAt: 5 },
-                  { label: "Ocean Conditions", activeAt: 2, readyAt: 3 },
-                  { label: "Species Advisory", activeAt: 3, readyAt: 4 },
-                  { label: "Safety & IMBL", activeAt: 4, readyAt: 6 },
-                  { label: "Wave Assessment", activeAt: 2, readyAt: 4 },
-                  { label: "Research Integration", activeAt: 4, readyAt: 5 },
-                ].map((sec, index, arr) => {
-                  const isReady = stage >= sec.readyAt;
-                  const isBuilding = stage >= sec.activeAt && !isReady;
-
-                  return (
-                    <div
-                      key={sec.label}
-                      className={`flex items-center gap-3 p-3 ${
-                        index !== arr.length - 1 ? "border-b border-[#E1E5EA]" : ""
-                      } ${isBuilding ? "bg-[#F0F4FA]" : ""}`}
-                    >
-                      {isReady ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                      ) : isBuilding ? (
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#1F4E8C] ml-0.5 flex-shrink-0" />
+                      ) : isActive ? (
+                        <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-white bg-[#1F4E8C] px-2 py-0.5 rounded-full shadow-xs animate-pulse">
+                          <RefreshCw className="h-3 w-3 animate-spin" /> Active
+                        </span>
                       ) : (
-                        <div className="h-3 w-3 rounded-full border-2 border-zinc-300 ml-0.5 flex-shrink-0" />
+                        <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                          Queued
+                        </span>
                       )}
-                      <span className={`text-sm ${isReady || isBuilding ? "text-[#202124] font-medium" : "text-zinc-500"}`}>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 9-Section Real-Time Dossier Blueprint Assembly */}
+          <div>
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#475569] mb-3 flex items-center gap-2">
+              <Layers className="h-3.5 w-3.5 text-[#1F4E8C]" />
+              <span>Real-Time 9-Section Blueprint Assembly</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                { num: "01", label: "AI Neural Synthesis", activeAt: 1, readyAt: 5 },
+                { num: "02", label: "Habitat Suitability Advisory", activeAt: 2, readyAt: 3 },
+                { num: "03", label: "Observed Ocean Conditions", activeAt: 2, readyAt: 3 },
+                { num: "04", label: "Commercial Species Profile", activeAt: 3, readyAt: 4 },
+                { num: "05", label: "Habitat Suitability Matrix", activeAt: 3, readyAt: 4 },
+                { num: "06", label: "Sovereign Safety & IMBL", activeAt: 4, readyAt: 6 },
+                { num: "07", label: "Wave Hazard & Sea Dynamics", activeAt: 2, readyAt: 4 },
+                { num: "08", label: "Oceanographic Research", activeAt: 4, readyAt: 5 },
+                { num: "09", label: "Authoritative Earth Sources", activeAt: 5, readyAt: 6 },
+              ].map((sec) => {
+                const isReady = stage >= sec.readyAt;
+                const isBuilding = stage >= sec.activeAt && !isReady;
+
+                return (
+                  <div
+                    key={sec.num}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                      isReady
+                        ? "bg-white border-emerald-300 shadow-2xs text-[#1E293B]"
+                        : isBuilding
+                        ? "bg-[#F0F6FF] border-2 border-[#1F4E8C] ring-2 ring-[#1F4E8C]/15 shadow-xs text-[#1F4E8C]"
+                        : "bg-white border-[#E1E5EA] shadow-2xs text-[#64748B]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className={`font-mono text-xs font-bold ${
+                        isReady ? "text-emerald-600" : isBuilding ? "text-[#1F4E8C]" : "text-slate-400"
+                      }`}>
+                        {sec.num}
+                      </span>
+                      <span className={`text-xs ${
+                        isReady ? "text-[#1E293B] font-medium" : isBuilding ? "text-[#1F4E8C] font-bold" : "text-slate-600"
+                      }`}>
                         {sec.label}
                       </span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {isReady ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    ) : isBuilding ? (
+                      <Sparkles className="h-3.5 w-3.5 text-[#1F4E8C] animate-spin flex-shrink-0" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
