@@ -366,7 +366,7 @@ function formatInlineMarkdown(text: string): string {
 
 function FormattedChatMessage({ content, isUser }: { content: string; isUser: boolean }) {
   if (isUser) {
-    return <div className="leading-relaxed whitespace-pre-wrap text-white text-xs">{content}</div>;
+    return <div className="leading-relaxed whitespace-pre-wrap text-zinc-900 text-xs">{content}</div>;
   }
 
   // Strip emojis from content
@@ -1150,16 +1150,16 @@ function AIChatDrawer({
                     className="max-w-[95%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs"
                     style={
                       isUser
-                        ? { background: "#09090b", color: "#ffffff", borderRadius: "14px 14px 2px 14px" }
+                        ? { background: "#ffffff", border: "1px solid #e4e4e7", color: "#18181b", borderRadius: "14px 14px 2px 14px" }
                         : { background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "2px 14px 14px 14px", color: "#18181b" }
                     }
                   >
-                    <div className="text-[10px] font-mono mb-1.5 flex items-center justify-between gap-1.5 border-b border-zinc-100/60 pb-1" style={{ color: isUser ? "#a1a1aa" : "#71717a" }}>
+                    <div className="text-[10px] font-mono mb-1.5 flex items-center justify-between gap-1.5 border-b border-zinc-200 pb-1" style={{ color: "#71717a" }}>
                       <div className="flex items-center gap-1.5">
                         {isUser ? (
                           <>
-                            <User className="h-3 w-3 text-white" />
-                            <span className="font-semibold text-white">Operator</span>
+                            <User className="h-3 w-3 text-zinc-900" />
+                            <span className="font-semibold text-zinc-900">Operator</span>
                           </>
                         ) : (
                           <>

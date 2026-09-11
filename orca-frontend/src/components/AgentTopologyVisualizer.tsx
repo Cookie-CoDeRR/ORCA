@@ -1,38 +1,41 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Brain, Waves, ShieldAlert, Compass, BookOpen, Sparkles,
-  Play, RotateCcw, Download, CheckCircle2, AlertTriangle,
-  Clock, Cpu, Zap, Eye, Terminal, ArrowRight, ArrowLeft,
-  ChevronRight, Layers, FileCode2, Search, Filter, ShieldCheck,
-  Fish
+  Play, RotateCcw, CheckCircle2, AlertTriangle,
+  ArrowLeft, Layers, FileCode2, Search,
+  Fish, Wind, Check, Download, ChevronRight,
+  ZoomIn, ZoomOut, Maximize2, X, Clock, Database, CheckCheck,
+  Send, Server
 } from "lucide-react";
 
-// ─── Topologies & Types ───────────────────────────────────────────────────────
+// ─── Types & Definitions ──────────────────────────────────────────────────────
 
 export type AgentId =
-  | "supervisor"
-  | "ocean_analytics"
-  | "risk_geofencing"
+  | "orchestrator"
+  | "ocean"
+  | "species"
+  | "hazard"
+  | "weather"
+  | "risk"
   | "navigation"
-  | "policy_rag"
+  | "research"
+  | "policy"
+  | "validation"
   | "synthesizer";
 
-export interface AgentNode {
+export interface AgentDefinition {
   id: AgentId;
   label: string;
-  sub: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  x: number; // percentage (0-100)
-  y: number; // percentage (0-100)
-  accent: string;
-  glow: string;
-  model: string;
   role: string;
-  activeTools: string[];
-  systemPrompt: string;
+  category: "core" | "specialist" | "validation";
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  toolsUsed: string[];
+  defaultInputs: string[];
+  defaultOutputs: string[];
+  dataSources: string[];
 }
 
 export interface AuditLogEntry {
@@ -41,334 +44,416 @@ export interface AuditLogEntry {
   source: AgentId;
   target?: AgentId;
   message: string;
-  type: "dispatch" | "processing" | "result" | "safety_check" | "synthesis";
-  latencyMs?: number;
-  confidence?: number;
-  payload?: any;
+  type: "dispatch" | "result" | "validation" | "synthesis";
+  latencyMs: number;
 }
 
 export interface PresetScenario {
   id: string;
   name: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  color: string;
   query: string;
-  activeAgents: AgentId[];
+  activeSpecialists: AgentId[];
   logs: Omit<AuditLogEntry, "id" | "timestamp">[];
   finalOutput: string;
+  edgePayloads: Record<string, { summary: string; variables: string[]; source: string }>;
+  agentSpecificData: Partial<Record<AgentId, { task: string; inputs: string[]; output: string; latency: number }>>;
 }
 
-const AGENTS: Record<AgentId, AgentNode> = {
-  supervisor: {
-    id: "supervisor",
-    label: "SUPERVISOR",
-    sub: "Qwen 2.5 (7B-Instruct)",
+// ─── Agent Registry ───────────────────────────────────────────────────────────
+
+const AGENTS_REGISTRY: Record<AgentId, AgentDefinition> = {
+  orchestrator: {
+    id: "orchestrator",
+    label: "ORCA Orchestrator",
+    role: "Breaks user request into subtasks and coordinates specialist execution.",
+    category: "core",
     icon: Brain,
-    x: 18,
-    y: 50,
-    accent: "#38bdf8",
-    glow: "#083344",
-    model: "Qwen2.5-7B-Instruct (4-bit AWQ Air-Gapped)",
-    role: "Central Orchestrator & Multi-Turn Cognitive Decomposer",
-    activeTools: ["intent_classifier", "dag_scheduler", "tool_router", "safety_guardrail"],
-    systemPrompt: `You are the ORCA Master Supervisor. Decompose complex user maritime queries into parallel execution graphs for Ocean AI, Geofence, Navigation, and Policy RAG workers. Enforce sovereign Indian EEZ boundary safety.`,
+    toolsUsed: ["intent_classifier", "task_planner", "agent_router"],
+    defaultInputs: ["User Natural Language Query", "Spatial Coordinates", "Temporal Bounds"],
+    defaultOutputs: ["Structured Task DAG", "Agent Invocation Manifest"],
+    dataSources: ["Internal Task Planner", "Registry DB"],
   },
-  ocean_analytics: {
-    id: "ocean_analytics",
-    label: "OCEAN AI",
-    sub: "xarray / NetCDF4",
+  ocean: {
+    id: "ocean",
+    label: "Ocean Agent",
+    role: "Analyzes oceanographic parameters (SST, Chlorophyll-a, salinity, currents).",
+    category: "specialist",
     icon: Waves,
-    x: 50,
-    y: 16,
-    accent: "#10b981",
-    glow: "#064e3b",
-    model: "INCOIS NetCDF / PyXarray Engine",
-    role: "Thermal Front & Primary Productivity Extractor",
-    activeTools: ["sst_gradient_detector", "chl_anomaly_filter", "upwelling_index", "thermal_front_contour"],
-    systemPrompt: `Analyze multidimensional oceanographic rasters (SST, Chlorophyll-a, Salinity). Identify persistent frontal boundaries and calculate potential fish forage aggregation likelihood.`,
+    toolsUsed: ["netcdf_reader", "sst_anomaly_extractor", "current_vector_calculator"],
+    defaultInputs: ["MODIS/VIIRS SST", "OCM-2 Chlorophyll", "OSCAR Currents"],
+    defaultOutputs: ["Thermal front analysis", "Chlorophyll anomaly score", "Current drift vector"],
+    dataSources: ["INCOIS Ocean Portal", "Copernicus Marine (CMEMS)", "Sentinel-3 OLCI"],
   },
-  risk_geofencing: {
-    id: "risk_geofencing",
-    label: "RISK & GEO",
-    sub: "PostGIS 3.4 ST_DWithin",
+  species: {
+    id: "species",
+    label: "Species & Fisheries Agent",
+    role: "Evaluates marine species habitat, biological suitability, and PFZ cues.",
+    category: "specialist",
+    icon: Fish,
+    toolsUsed: ["habitat_suitability_model", "pfz_index_engine", "catch_history_query"],
+    defaultInputs: ["Species Biology Matrix", "Ocean Thermal Gradient", "Historical Catch Records"],
+    defaultOutputs: ["Yellowfin Tuna suitability score (0-1)", "Aggregation probability", "Depth band"],
+    dataSources: ["INCOIS PFZ Advisories", "CMFRI Catch Logs", "FishBase Taxonomy"],
+  },
+  hazard: {
+    id: "hazard",
+    label: "Hazard & Safety Agent",
+    role: "Assesses marine hazards, severe swell, high wind warnings, and vessel risks.",
+    category: "specialist",
+    icon: AlertTriangle,
+    toolsUsed: ["swell_surge_index", "hazard_geofence_checker", "cyclone_risk_estimator"],
+    defaultInputs: ["Wave Watch III Forecasts", "IMD Cyclone Bulletins", "Swell Surge Alerts"],
+    defaultOutputs: ["Hazard Level Index (1-5)", "Operational Advisory", "Safe distance buffer"],
+    dataSources: ["IMD Marine Warnings", "INCOIS Early Warning Center", "ECMWF Wave Model"],
+  },
+  weather: {
+    id: "weather",
+    label: "Weather Agent",
+    role: "Analyzes atmospheric conditions, surface winds, barometric pressure, and squalls.",
+    category: "specialist",
+    icon: Wind,
+    toolsUsed: ["gfs_wind_extractor", "barometric_trend_analyzer", "precipitation_radar"],
+    defaultInputs: ["GFS 0.25° Wind Grids", "INSAT-3D Satellite Imagery", "Barometric pressure logs"],
+    defaultOutputs: ["Beaufort scale rating", "Gust speed (knots)", "Precipitation probability"],
+    dataSources: ["India Meteorological Dept (IMD)", "NOAA GFS", "INSAT-3DR Rapid Scan"],
+  },
+  risk: {
+    id: "risk",
+    label: "Risk & Geo Agent",
+    role: "Performs spatial geofence, EEZ boundary, and maritime boundary (IMBL) checks.",
+    category: "specialist",
     icon: ShieldAlert,
-    x: 50,
-    y: 38,
-    accent: "#f43f5e",
-    glow: "#4c0519",
-    model: "PostGIS 3.4 Spatial Index (EPSG:4326)",
-    role: "Sovereign Maritime Boundary & Collision Monitor",
-    activeTools: ["st_distance_imbl", "eez_breach_detector", "mpa_containment_check", "ais_cpa_tcpa_evaluator"],
-    systemPrompt: `Enforce international maritime boundary line (IMBL) clearance and calculate closest point of approach (CPA) for surrounding commercial cargo vessels in real time.`,
+    toolsUsed: ["imbl_proximity_calculator", "eez_boundary_verifier", "mpa_geofence_checker"],
+    defaultInputs: ["Vessel GPS Coordinates", "IMBL Vector Line", "Indian EEZ Shapefile"],
+    defaultOutputs: ["Distance to IMBL (nm)", "Sovereign jurisdiction status", "Geofence alert level"],
+    dataSources: ["Survey of India Maritime Limits", "DG Shipping Geofence DB", "UNCLOS EEZ Base"],
   },
   navigation: {
     id: "navigation",
-    label: "NAVIGATION",
-    sub: "Continuous A* Router",
+    label: "Navigation Agent",
+    role: "Computes optimal navigation routes, heading, fuel savings, and current assist.",
+    category: "specialist",
     icon: Compass,
-    x: 50,
-    y: 62,
-    accent: "#f59e0b",
-    glow: "#451a03",
-    model: "Continuous A* Current-Vector Solver",
-    role: "Fuel-Optimal & Current-Assisted Waypoint Generator",
-    activeTools: ["ocean_current_drift_assist", "wave_resistance_penalty", "colregs_safe_corridor", "fuel_burn_integrator"],
-    systemPrompt: `Calculate Pareto-optimal maritime courses maximizing tailcurrent propulsion assist while strictly avoiding shallow bathymetry and high sea-state hazards.`,
+    toolsUsed: ["isochrone_router", "current_efficiency_evaluator", "fuel_burn_estimator"],
+    defaultInputs: ["Departure Port", "Destination Coordinates", "Surface Current Vector Field"],
+    defaultOutputs: ["Recommended heading", "Estimated transit time", "Projected fuel efficiency savings %"],
+    dataSources: ["Navionics Chart Basemap", "INCOIS Surface Currents", "AIS Density Maps"],
   },
-  policy_rag: {
-    id: "policy_rag",
-    label: "POLICY RAG",
-    sub: "pgvector / BGE-M3",
+  research: {
+    id: "research",
+    label: "Research Agent",
+    role: "Retrieves peer-reviewed oceanographic literature and empirical scientific evidence.",
+    category: "specialist",
     icon: BookOpen,
-    x: 50,
-    y: 84,
-    accent: "#a855f7",
-    glow: "#3b0764",
-    model: "BGE-M3 Dense + Sparse Hybrid Embeddings",
-    role: "Maritime Legal & Fisheries Regulation Retrieval",
-    activeTools: ["unclos_treaty_lookup", "monsoon_ban_calendar", "gear_mesh_validator", "subsidy_circular_retriever"],
-    systemPrompt: `Retrieve statutory legal clauses from the Territorial Waters Act, CMFRI marine advisories, and state monsoon trawling bans using cosine similarity ranking.`,
+    toolsUsed: ["rag_evidence_retriever", "semantic_literature_search", "citation_validator"],
+    defaultInputs: ["Ecosystem Query Vectors", "Regional Marine Taxa Index"],
+    defaultOutputs: ["Evidence corroboration score", "Literature citations", "Empirical thresholds"],
+    dataSources: ["ORCA Scientific RAG Index", "INCOIS Technical Bulletins", "Springer/Elsevier Marine"],
+  },
+  policy: {
+    id: "policy",
+    label: "Policy & Regulations Agent",
+    role: "Checks regulatory bans, seasonal monsoon restrictions, and fishing permits.",
+    category: "specialist",
+    icon: FileCode2,
+    toolsUsed: ["ban_calendar_evaluator", "gear_restriction_checker", "permit_validator"],
+    defaultInputs: ["Calendar Date", "Craft Category (Mechanized/Motorized)", "Coastal State Rules"],
+    defaultOutputs: ["Ban applicability status", "Permitted gear types", "Regulatory reference"],
+    dataSources: ["Dept of Fisheries Notification Gazettes", "CRZ & State Maritime Acts"],
+  },
+  validation: {
+    id: "validation",
+    label: "Cross-Agent Validation",
+    role: "Compares findings across agents, verifies evidence, and resolves contradictions.",
+    category: "validation",
+    icon: CheckCircle2,
+    toolsUsed: ["consensus_matrix_evaluator", "evidence_source_verifier", "uncertainty_scorer"],
+    defaultInputs: ["Specialist Agent Output Payloads", "Research Evidence Citations"],
+    defaultOutputs: ["Consensus Agreement (0-100%)", "Contradiction flags", "Validation Confidence"],
+    dataSources: ["Cross-Agent Consensus Engine", "Automated Fact-Checking Layer"],
   },
   synthesizer: {
     id: "synthesizer",
-    label: "SYNTHESIZER",
-    sub: "GeoJSON / Bhashini",
+    label: "Synthesizer",
+    role: "Combines validated multi-agent findings into a definitive, evidence-backed advisory.",
+    category: "core",
     icon: Sparkles,
-    x: 82,
-    y: 50,
-    accent: "#84cc16",
-    glow: "#1a2e05",
-    model: "ORCA Multilingual Consensus Synthesizer",
-    role: "Final Multilingual Advisory & GeoJSON Payload Formatter",
-    activeTools: ["geojson_feature_builder", "bhashini_regional_tts", "confidence_aggregator", "whatsapp_sms_formatter"],
-    systemPrompt: `Merge outputs from all specialist workers into an authoritative, actionable, plain-language advisory in coastal regional languages. Guarantee zero hallucinations.`,
+    toolsUsed: ["consensus_synthesizer", "structured_advisory_formatter"],
+    defaultInputs: ["Cross-Validated Specialist Findings", "Spatial Bounds", "Confidence Index"],
+    defaultOutputs: ["Final Actionable Maritime Advisory", "Structured GeoJSON metadata"],
+    dataSources: ["ORCA Synthesis Engine"],
   },
 };
 
-const PRESET_SCENARIOS: PresetScenario[] = [
+// ─── Demo Scenarios ───────────────────────────────────────────────────────────
+
+const DEMO_SCENARIOS: PresetScenario[] = [
   {
-    id: "fishing",
+    id: "tuna",
     name: "Tuna PFZ Verification",
     icon: Fish,
-    color: "#10b981",
-    query: "Can 4 mechanized boats fish 30km southwest of Veraval for Yellowfin Tuna?",
-    activeAgents: ["supervisor", "ocean_analytics", "risk_geofencing", "navigation", "synthesizer"],
+    query: "Can boats fish southwest of Veraval for Yellowfin Tuna?",
+    activeSpecialists: ["ocean", "species", "risk", "navigation", "research"],
+    finalOutput:
+      "Yes, craft can safely operate southwest of Veraval. Favorable oceanographic conditions for Yellowfin Tuna (PFZ) are confirmed with SST at 28.2°C and Chlorophyll front at 0.35 mg/m³. The target position is 42 nm southwest of Veraval harbor, well within the Indian sovereign EEZ (38 nm clear of the IMBL). Southward current assistance provides ~14% fuel efficiency on outbound heading 224°.",
+    edgePayloads: {
+      "orchestrator->ocean": { summary: "Ocean State Request", variables: ["SST", "Chlorophyll-a", "Wave Height"], source: "Internal Dispatch" },
+      "orchestrator->species": { summary: "Habitat Suitability Request", variables: ["Yellowfin Tuna Biomass", "Thermal Gradient"], source: "Internal Dispatch" },
+      "orchestrator->risk": { summary: "Maritime Boundary Check", variables: ["Coordinates", "IMBL Distance", "EEZ"], source: "Internal Dispatch" },
+      "orchestrator->navigation": { summary: "Route Optimization", variables: ["Veraval Port Coordinates", "Current Assistance"], source: "Internal Dispatch" },
+      "orchestrator->research": { summary: "Scientific Literature Retrieval", variables: ["Thunnus albacares Arabian Sea Cues"], source: "Internal Dispatch" },
+      "ocean->validation": { summary: "Thermal & Color Front Data", variables: ["SST: 28.2°C", "Chl-a: 0.35 mg/m³", "Wave: 1.2m"], source: "INCOIS OCM-2 & MODIS" },
+      "species->validation": { summary: "Biological Suitability Score", variables: ["Habitat Score: 0.88", "Depth: 60-120m"], source: "INCOIS PFZ Model" },
+      "risk->validation": { summary: "Boundary Verification Result", variables: ["Distance to IMBL: 38.4 nm", "Zone: Sovereign EEZ"], source: "Survey of India EEZ" },
+      "navigation->validation": { summary: "Navigation Trajectory Result", variables: ["Heading: 224°", "Fuel Savings: 14.2%"], source: "Navionics & OSCAR" },
+      "research->validation": { summary: "Empirical Validation Evidence", variables: ["Literature Match: 94%", "DO Threshold: >2.1 ml/L"], source: "ORCA Literature DB" },
+      "validation->synthesizer": { summary: "Consensus Approved", variables: ["Consensus Agreement: 100%", "Contradictions: 0"], source: "Cross-Agent Validator" },
+    },
+    agentSpecificData: {
+      orchestrator: { task: "Deconstruct Tuna PFZ query into ocean, habitat, geofence, and route tasks.", inputs: ["Query text", "Target: SW Veraval"], output: "5 specialist subtasks dispatched.", latency: 18 },
+      ocean: { task: "Extract SST fronts and chlorophyll gradients southwest of Veraval.", inputs: ["INCOIS SST 28.2°C", "Chlorophyll 0.35 mg/m³", "Waves 1.2m"], output: "Stable thermal front identified indicating forage concentration.", latency: 112 },
+      species: { task: "Assess habitat suitability index for Thunnus albacares.", inputs: ["SST range 27-29°C", "Thermal gradient delta 0.6°C/km"], output: "PFZ suitability score: 0.88 (High commercial potential).", latency: 95 },
+      risk: { task: "Calculate distance to International Maritime Boundary Line (IMBL).", inputs: ["Target: 20.45°N, 69.80°E", "IMBL baseline"], output: "Distance: 38.4 nm inside Indian EEZ. No border violation risk.", latency: 74 },
+      navigation: { task: "Calculate efficient route from Veraval harbor with current assistance.", inputs: ["Speed: 10 kn", "Current: 0.8 kn southwards"], output: "Optimum heading 224°, estimated transit 3.8h, 14.2% fuel reduction.", latency: 86 },
+      research: { task: "Corroborate findings against historical Arabian Sea tuna forage studies.", inputs: ["Arabian Sea PFZ research corpus", "Dissolved Oxygen profiles"], output: "Findings confirmed by CMFRI 2021 and INCOIS technical reports.", latency: 130 },
+      validation: { task: "Verify cross-agent consensus and evidence validity.", inputs: ["5 specialist output vectors"], output: "No spatial or biological conflicts. Consensus score: 1.0.", latency: 42 },
+      synthesizer: { task: "Generate comprehensive actionable advisory for vessel master.", inputs: ["Validated consensus payload"], output: "Evidence-backed advisory generated.", latency: 54 },
+    },
     logs: [
-      {
-        source: "supervisor",
-        target: "ocean_analytics",
-        message: "Decomposed query: Requesting 9km SST raster slice & Chl-a gradient at 20.75°N, 70.19°E.",
-        type: "dispatch",
-        latencyMs: 14,
-      },
-      {
-        source: "supervisor",
-        target: "risk_geofencing",
-        message: "Requesting PostGIS ST_Distance against Pakistan IMBL and active coastal defense corridors.",
-        type: "dispatch",
-        latencyMs: 18,
-      },
-      {
-        source: "ocean_analytics",
-        target: "synthesizer",
-        message: "Detected active thermal front (28.4°C → 26.1°C). Chlorophyll anomaly: +18.4%. PFZ Confidence: 93%.",
-        type: "result",
-        latencyMs: 112,
-        confidence: 0.93,
-      },
-      {
-        source: "risk_geofencing",
-        target: "synthesizer",
-        message: "Calculated ST_Distance to IMBL: 74.2 km (Clearance SAFE > 20km). Geofence status: GREEN.",
-        type: "safety_check",
-        latencyMs: 38,
-        confidence: 0.99,
-      },
-      {
-        source: "supervisor",
-        target: "navigation",
-        message: "Requesting current-assisted course from Veraval Harbor to target PFZ coordinate.",
-        type: "dispatch",
-        latencyMs: 12,
-      },
-      {
-        source: "navigation",
-        target: "synthesizer",
-        message: "Course: 215° bearing, 28.4 NM. 1.2 kt tailcurrent saves 18.4% fuel. Estimated transit: 2h 45m.",
-        type: "result",
-        latencyMs: 148,
-        confidence: 0.95,
-      },
-      {
-        source: "synthesizer",
-        message: "Consensus validated. Formatted bilingual advisory in Gujarati & English. Ready for dispatch.",
-        type: "synthesis",
-        latencyMs: 64,
-        confidence: 0.96,
-      },
+      { source: "orchestrator", target: "ocean", message: "Dispatched oceanographic analysis for southwest of Veraval.", type: "dispatch", latencyMs: 18 },
+      { source: "orchestrator", target: "species", message: "Dispatched Yellowfin Tuna habitat suitability query.", type: "dispatch", latencyMs: 22 },
+      { source: "orchestrator", target: "risk", message: "Dispatched IMBL proximity and sovereign EEZ check.", type: "dispatch", latencyMs: 15 },
+      { source: "orchestrator", target: "navigation", message: "Dispatched fuel-optimal route computation from Veraval.", type: "dispatch", latencyMs: 20 },
+      { source: "orchestrator", target: "research", message: "Dispatched empirical evidence retrieval for tuna forage cues.", type: "dispatch", latencyMs: 24 },
+      { source: "ocean", target: "validation", message: "Ocean state confirmed: SST front 28.2°C, Chl-a 0.35 mg/m³.", type: "result", latencyMs: 112 },
+      { source: "species", target: "validation", message: "Habitat suitability score 0.88: High aggregation likelihood.", type: "result", latencyMs: 95 },
+      { source: "risk", target: "validation", message: "Boundary safe: 38.4 nm inside EEZ clear of IMBL.", type: "result", latencyMs: 74 },
+      { source: "navigation", target: "validation", message: "Route planned: Heading 224°, 14% fuel savings with current assist.", type: "result", latencyMs: 86 },
+      { source: "research", target: "validation", message: "Peer-reviewed literature corroborates Arabian Sea PFZ alignment.", type: "result", latencyMs: 130 },
+      { source: "validation", target: "synthesizer", message: "Cross-agent validation passed. Consensus: 100% agreement.", type: "validation", latencyMs: 42 },
+      { source: "synthesizer", message: "Evidence-backed synthesis finalized with 5 verified sources.", type: "synthesis", latencyMs: 54 },
     ],
-    finalOutput: `[SEA STATUS: VERIFIED - SAFE TO VENTURE]\n\nTarget PFZ 28 km SW of Veraval at **20.75°N, 70.19°E** confirmed for **Yellowfin Tuna**.\n\n• **SST**: 28.4°C (Peak thermal front)\n• **Chl-a**: 1.26 mg/m³ (+18.4% anomaly)\n• **IMBL Clearance**: 74.2 km (SAFE GREEN)\n• **Optimal Bearing**: 215° with 1.2 kt tailcurrent assist (18.4% fuel saving)\n• **Solunar Feed Window**: 04:30 – 07:30 IST`,
   },
   {
-    id: "border_risk",
+    id: "cyclone",
+    name: "Cyclone Risk Assessment",
+    icon: Wind,
+    query: "Generate a cyclone risk assessment for southwest Saurashtra coast.",
+    activeSpecialists: ["ocean", "weather", "hazard", "research"],
+    finalOutput:
+      "No immediate tropical cyclone threat detected along the Saurashtra coast in the next 48 hours. A developing deep depression centered 420 nm south-southeast is moving north-northwest at 11 knots. Nearshore wave heights remain manageable at 1.4m to 1.8m, but offshore outer bands are forecast to bring 2.8m swells after 36 hours. Vessels operating beyond 30 nm should maintain HF radio watch.",
+    edgePayloads: {
+      "orchestrator->ocean": { summary: "Sea Surface State Request", variables: ["Tropical Cyclone Heat Potential", "SST"], source: "Internal Dispatch" },
+      "orchestrator->weather": { summary: "Atmospheric Pressure & Winds", variables: ["GFS 850hPa Vorticity", "Barometric Trend"], source: "Internal Dispatch" },
+      "orchestrator->hazard": { summary: "Hazard & Swell Surge Index", variables: ["Wave Watch III", "IMD Cyclone Tracks"], source: "Internal Dispatch" },
+      "orchestrator->research": { summary: "Historical Cyclone Analogs", variables: ["Arabian Sea Pre-monsoon Cyclones"], source: "Internal Dispatch" },
+      "ocean->validation": { summary: "TCHP & SST Report", variables: ["SST: 29.5°C", "TCHP: 65 kJ/cm²"], source: "INCOIS & CMEMS" },
+      "weather->validation": { summary: "Pressure & Wind Field", variables: ["Central Pressure: 1002 hPa", "Max Wind: 28 kn"], source: "IMD Synoptic Bulletin" },
+      "hazard->validation": { summary: "Swell & Surge Risk Level", variables: ["Nearshore: Low (1)", "Offshore 36h: Moderate (3)"], source: "INCOIS Early Warning" },
+      "research->validation": { summary: "Analog Trajectory Match", variables: ["Historical Track Alignment: 88%"], source: "IMD Cyclone e-Atlas" },
+      "validation->synthesizer": { summary: "Cyclone Findings Validated", variables: ["No Contradictions", "Risk: Level 2 (Advisory)"], source: "Cross-Agent Validator" },
+    },
+    agentSpecificData: {
+      orchestrator: { task: "Dispatch atmospheric, wave, and historical cyclone evaluation.", inputs: ["Query: Saurashtra coast", "Horizon: 48h"], output: "4 cyclone specialist subtasks dispatched.", latency: 19 },
+      ocean: { task: "Compute Tropical Cyclone Heat Potential (TCHP) in the region.", inputs: ["SST: 29.5°C", "Isotherm 26°C depth: 75m"], output: "TCHP at 65 kJ/cm² — capable of sustaining moderate cyclogenesis.", latency: 104 },
+      weather: { task: "Analyze IMD synoptic charts and GFS barometric pressure drop.", inputs: ["Surface pressure: 1002 hPa", "Pressure tendency: -1.2 hPa/3h"], output: "Low pressure area intensifying into depression 420 nm south.", latency: 118 },
+      hazard: { task: "Evaluate swell propagation and coastal wave surge threats.", inputs: ["Significant wave height: 1.6m", "Peak period: 11s"], output: "Nearshore safe (<2m); offshore swell increase to 2.8m in 36h.", latency: 92 },
+      research: { task: "Match current atmospheric parameters against Arabian Sea cyclone analogs.", inputs: ["Track direction: NNW", "Historical season: Pre-monsoon"], output: "Track analog model predicts curve towards Oman/Pakistan.", latency: 125 },
+      validation: { task: "Verify consistency across atmospheric and wave forecasts.", inputs: ["4 specialist output payloads"], output: "Consensus achieved: No immediate coastal landfall risk.", latency: 48 },
+      synthesizer: { task: "Format maritime cyclone bulletin.", inputs: ["Validated hazard status"], output: "Synthesized marine safety bulletin ready.", latency: 50 },
+    },
+    logs: [
+      { source: "orchestrator", target: "ocean", message: "Dispatched TCHP and sea surface temperature analysis.", type: "dispatch", latencyMs: 19 },
+      { source: "orchestrator", target: "weather", message: "Dispatched barometric pressure and wind field assessment.", type: "dispatch", latencyMs: 23 },
+      { source: "orchestrator", target: "hazard", message: "Dispatched swell surge and coastal hazard index computation.", type: "dispatch", latencyMs: 17 },
+      { source: "orchestrator", target: "research", message: "Dispatched cyclone track analog retrieval.", type: "dispatch", latencyMs: 21 },
+      { source: "ocean", target: "validation", message: "SST 29.5°C, TCHP 65 kJ/cm²: Sufficient heat for depression.", type: "result", latencyMs: 104 },
+      { source: "weather", target: "validation", message: "Depression center 420 nm south; wind gusts 28 kn.", type: "result", latencyMs: 118 },
+      { source: "hazard", target: "validation", message: "Nearshore safe (<2m); offshore swell increases to 2.8m in 36h.", type: "result", latencyMs: 92 },
+      { source: "research", target: "validation", message: "Historical analog matches NNW re-curvature away from coast.", type: "result", latencyMs: 125 },
+      { source: "validation", target: "synthesizer", message: "Cross-agent validation passed. Risk level: Advisory (Level 2).", type: "validation", latencyMs: 48 },
+      { source: "synthesizer", message: "Cyclone safety advisory synthesized for maritime craft.", type: "synthesis", latencyMs: 50 },
+    ],
+  },
+  {
+    id: "imbl",
     name: "IMBL Proximity Alert",
-    icon: AlertTriangle,
-    color: "#f43f5e",
-    query: "Vessel IND-GJ-04-MM-1982 heading 285° at 8.2 knots near Pakistani maritime line.",
-    activeAgents: ["supervisor", "risk_geofencing", "navigation", "synthesizer"],
+    icon: ShieldAlert,
+    query: "Verify vessel position relative to the International Maritime Boundary Line.",
+    activeSpecialists: ["ocean", "risk", "navigation", "policy"],
+    finalOutput:
+      "CRITICAL PROXIMITY ALERT: Vessel position (20°12.4'N, 68°34.1'E) is 1.4 nautical miles east of the International Maritime Boundary Line (IMBL). While legally inside Indian sovereign waters, the vessel is within the 2.0 nm High Risk Buffer Zone. Recommend immediate course change to Heading 062° (East-Northeast) to open distance from the boundary.",
+    edgePayloads: {
+      "orchestrator->risk": { summary: "IMBL Distance Calculation", variables: ["GPS Lat/Long", "IMBL Vector Line"], source: "Internal Dispatch" },
+      "orchestrator->navigation": { summary: "Evasive Heading Plan", variables: ["Current Speed", "Turning Radius"], source: "Internal Dispatch" },
+      "orchestrator->policy": { summary: "Maritime Detention Regulations", variables: ["UNCLOS Buffer Protocols"], source: "Internal Dispatch" },
+      "orchestrator->ocean": { summary: "Current Drift Vector Check", variables: ["Surface Drift Direction"], source: "Internal Dispatch" },
+      "risk->validation": { summary: "Proximity Critical Result", variables: ["IMBL Distance: 1.4 nm", "Buffer Status: ALERT"], source: "Survey of India Maritime Line" },
+      "navigation->validation": { summary: "Safe Vector Calculated", variables: ["Recommended Heading: 062°", "Clearance: 4.8 nm in 30m"], source: "ORCA Navigation Engine" },
+      "policy->validation": { summary: "Detention Risk Warning", variables: ["MHA Guidelines", "Coast Guard Advisory #14"], source: "Ministry of Home Affairs" },
+      "ocean->validation": { summary: "Cross-Drift Warning", variables: ["Drift: 1.1 kn Westward (Towards IMBL)"], source: "INCOIS Current Radar" },
+      "validation->synthesizer": { summary: "Geofence Alert Validated", variables: ["Unanimous High-Priority Alert"], source: "Cross-Agent Validator" },
+    },
+    agentSpecificData: {
+      orchestrator: { task: "Initiate high-priority IMBL boundary compliance assessment.", inputs: ["Vessel GPS: 20°12.4'N, 68°34.1'E"], output: "4 compliance specialist subtasks dispatched.", latency: 14 },
+      risk: { task: "Calculate precise geodesic distance to the IMBL line.", inputs: ["WGS84 Coordinates", "IMBL Treaty Coordinates"], output: "Distance to IMBL: 1.4 nm (Inside 2.0 nm buffer threshold).", latency: 58 },
+      navigation: { task: "Compute immediate evasive heading to clear boundary buffer zone.", inputs: ["Current speed: 8 kn", "Drift rate: 1.1 kn west"], output: "Recommended heading: 062° to gain 4.8 nm clearance in 30 min.", latency: 64 },
+      policy: { task: "Review Indian Coast Guard advisory on IMBL buffer transgressions.", inputs: ["Gazette notification on sensitive border waters"], output: "Strict compliance required. Violation risks detention under UNCLOS.", latency: 45 },
+      ocean: { task: "Check surface currents for westward drift risks towards boundary.", inputs: ["OSCAR surface current grid"], output: "Westward drift of 1.1 knots actively pushing vessel toward IMBL.", latency: 72 },
+      validation: { task: "Validate boundary proximity alert and heading safety.", inputs: ["Risk, navigation, policy, and drift vectors"], output: "High-priority alert verified. No contradictory data.", latency: 32 },
+      synthesizer: { task: "Generate high-priority border proximity warning.", inputs: ["Validated alert payload"], output: "Border alert synthesized with immediate corrective actions.", latency: 40 },
+    },
     logs: [
-      {
-        source: "supervisor",
-        target: "risk_geofencing",
-        message: "URGENT: Kinetic track evaluation for vessel heading 285° northwest.",
-        type: "dispatch",
-        latencyMs: 8,
-      },
-      {
-        source: "risk_geofencing",
-        target: "navigation",
-        message: "ST_DWithin breach detected: Vessel is 3.8 NM from Pakistan IMBL! Time to breach: 26 minutes.",
-        type: "safety_check",
-        latencyMs: 24,
-        confidence: 0.99,
-      },
-      {
-        source: "navigation",
-        target: "synthesizer",
-        message: "Emergency evasion vector computed: Immediate hard turn to 135° SE to re-enter Indian EEZ core.",
-        type: "result",
-        latencyMs: 42,
-        confidence: 0.98,
-      },
-      {
-        source: "synthesizer",
-        message: "High-priority siren alert dispatched via VHF Channel 16 & NavIC SMS broadcast.",
-        type: "synthesis",
-        latencyMs: 31,
-        confidence: 0.99,
-      },
+      { source: "orchestrator", target: "risk", message: "Dispatched high-priority IMBL boundary verification.", type: "dispatch", latencyMs: 14 },
+      { source: "orchestrator", target: "navigation", message: "Dispatched evasive heading and clearance calculation.", type: "dispatch", latencyMs: 16 },
+      { source: "orchestrator", target: "ocean", message: "Dispatched current drift assessment towards boundary line.", type: "dispatch", latencyMs: 18 },
+      { source: "orchestrator", target: "policy", message: "Dispatched maritime border detention protocols check.", type: "dispatch", latencyMs: 15 },
+      { source: "risk", target: "validation", message: "Proximity Alert: 1.4 nm from IMBL (Buffer threshold: 2.0 nm).", type: "result", latencyMs: 58 },
+      { source: "ocean", target: "validation", message: "Drift warning: 1.1 kn westward surface current pushing toward border.", type: "result", latencyMs: 72 },
+      { source: "navigation", target: "validation", message: "Course change computed: Heading 062° opens clearance by 4.8 nm in 30 min.", type: "result", latencyMs: 64 },
+      { source: "policy", target: "validation", message: "Advisory: Transgression risk high under Coast Guard guidelines.", type: "result", latencyMs: 45 },
+      { source: "validation", target: "synthesizer", message: "Cross-agent validation passed. Unanimous Critical Advisory flag.", type: "validation", latencyMs: 32 },
+      { source: "synthesizer", message: "Border alert synthesized with immediate corrective heading.", type: "synthesis", latencyMs: 40 },
     ],
-    finalOutput: `[CRITICAL BORDER PROXIMITY ALERT - IMMEDIATE ACTION REQUIRED]\n\n• **Vessel**: IND-GJ-04-MM-1982\n• **Distance to IMBL**: **3.8 Nautical Miles**\n• **Estimated Incursion**: **26 minutes at current speed**\n\n[MANDATORY EVASION COURSE]: Steer **135° SE** immediately to maintain sovereign clearance. Indian Coast Guard station alerted.`,
   },
   {
-    id: "monsoon_ban",
-    name: "Monsoon Ban & Regulation",
-    icon: BookOpen,
-    color: "#a855f7",
-    query: "Are mechanized bottom trawlers allowed to operate 15 NM off Mangalore in June?",
-    activeAgents: ["supervisor", "policy_rag", "risk_geofencing", "synthesizer"],
+    id: "monsoon",
+    name: "Monsoon Restriction Check",
+    icon: FileCode2,
+    query: "Is mechanized fishing permitted off the Gujarat coast during June-July?",
+    activeSpecialists: ["ocean", "weather", "hazard", "policy", "research"],
+    finalOutput:
+      "RESTRICTED: Mechanized fishing is strictly prohibited in the Gujarat EEZ during the annual 61-day uniform monsoon fishing ban (active June 1 to July 31). This restriction applies to all mechanized trawlers and purse-seiners to protect fish breeding grounds and safeguard fishermen from dangerous rough-sea conditions (significant waves 3.2m to 4.5m). Non-motorized traditional craft are exempt within 12 nm.",
+    edgePayloads: {
+      "orchestrator->policy": { summary: "Monsoon Ban Calendar Verification", variables: ["Gujarat Fisheries Act", "Dates: June 1 - July 31"], source: "Internal Dispatch" },
+      "orchestrator->ocean": { summary: "Rough Sea State Check", variables: ["Monsoon Swell Heights", "Currents"], source: "Internal Dispatch" },
+      "orchestrator->weather": { summary: "Southwest Monsoon Wind Speeds", variables: ["Squall Probability", "Winds >35 kn"], source: "Internal Dispatch" },
+      "orchestrator->hazard": { summary: "Marine Safety Risk Index", variables: ["Capsizing Hazard", "Rough Sea Alert"], source: "Internal Dispatch" },
+      "orchestrator->research": { summary: "Spawning Conservation Evidence", variables: ["Spawning Biomass Protection Data"], source: "Internal Dispatch" },
+      "policy->validation": { summary: "Ban Legally Enforced", variables: ["Status: Prohibited", "Craft: Mechanized", "Exempt: Traditional"], source: "Dept of Fisheries Gazette" },
+      "ocean->validation": { summary: "High Wave Conditions", variables: ["Wave Height: 3.8m", "Roughness: Severe"], source: "INCOIS Wave Watch" },
+      "weather->validation": { summary: "Monsoon Wind Gale", variables: ["Winds: 34-42 kn", "Squall Alert: Active"], source: "IMD Marine Monsoon Unit" },
+      "hazard->validation": { summary: "Extreme Safety Hazard", variables: ["Hazard Level: 4/5 (High Capsizing Risk)"], source: "INCOIS Early Warning" },
+      "research->validation": { summary: "Spawning Season Evidence", variables: ["Recruitment Protection Index: 92%"], source: "CMFRI Fishery Science Bulletin" },
+      "validation->synthesizer": { summary: "Ban Consensus Validated", variables: ["Policy & Safety Unanimously Restrictive"], source: "Cross-Agent Validator" },
+    },
+    agentSpecificData: {
+      orchestrator: { task: "Verify regulatory ban status and maritime safety conditions during monsoon.", inputs: ["Dates: June-July", "Region: Gujarat EEZ"], output: "5 regulatory and safety specialist subtasks dispatched.", latency: 16 },
+      policy: { task: "Query uniform 61-day West Coast fishing ban regulations.", inputs: ["Gujarat Fisheries Act 2003", "Central Gazette #2024"], output: "Mechanized ban active June 1 - July 31. Penalty: License suspension.", latency: 52 },
+      ocean: { task: "Extract monsoon wave heights and turbulence index.", inputs: ["Significant wave height: 3.8m", "Sea state: Rough (Code 6)"], output: "High wave turbulence incompatible with safe trawling.", latency: 98 },
+      weather: { task: "Analyze SW monsoon wind gusts and squall frequency.", inputs: ["Southwest monsoon jet: 36 kn", "Squall frequency: 4/day"], output: "Dangerous gale conditions active along coastal strip.", latency: 88 },
+      hazard: { task: "Calculate capsizing risk index for fishing craft <24m.", inputs: ["Wave steepness >0.06", "High wind shear"], output: "Hazard Level 4/5 (Severe risk of vessel capsizing).", latency: 76 },
+      research: { task: "Validate biological rationale for juvenile fish recruitment protection.", inputs: ["Pelagic spawning data June-July"], output: "Crucial spawning window; conservation ban justified scientifically.", latency: 114 },
+      validation: { task: "Corroborate regulatory restriction with physical ocean safety data.", inputs: ["Policy, ocean, weather, hazard, and research outputs"], output: "100% consensus: Mechanized fishing strictly banned.", latency: 36 },
+      synthesizer: { task: "Generate comprehensive seasonal ban and safety advisory.", inputs: ["Validated consensus payload"], output: "Monsoon restriction advisory compiled.", latency: 44 },
+    },
     logs: [
-      {
-        source: "supervisor",
-        target: "policy_rag",
-        message: "Querying Karnataka Marine Fisheries Regulation Act (KMFRA) monsoon ban dates.",
-        type: "dispatch",
-        latencyMs: 15,
-      },
-      {
-        source: "policy_rag",
-        target: "synthesizer",
-        message: "Matched clause: Uniform 61-day monsoon fishing ban on West Coast applies from June 1 to July 31.",
-        type: "result",
-        latencyMs: 89,
-        confidence: 0.98,
-      },
-      {
-        source: "risk_geofencing",
-        target: "synthesizer",
-        message: "15 NM coordinate falls inside Karnataka territorial surveillance geofence.",
-        type: "safety_check",
-        latencyMs: 28,
-        confidence: 0.99,
-      },
-      {
-        source: "synthesizer",
-        message: "Formulated advisory citing legal penalties under Section 7 of KMFRA.",
-        type: "synthesis",
-        latencyMs: 42,
-        confidence: 0.97,
-      },
+      { source: "orchestrator", target: "policy", message: "Dispatched regulatory ban calendar and legal compliance query.", type: "dispatch", latencyMs: 16 },
+      { source: "orchestrator", target: "ocean", message: "Dispatched monsoon sea state and wave height analysis.", type: "dispatch", latencyMs: 20 },
+      { source: "orchestrator", target: "weather", message: "Dispatched SW monsoon wind velocity and squall frequency check.", type: "dispatch", latencyMs: 18 },
+      { source: "orchestrator", target: "hazard", message: "Dispatched vessel stability and capsizing hazard computation.", type: "dispatch", latencyMs: 15 },
+      { source: "orchestrator", target: "research", message: "Dispatched spawning biomass and recruitment protection retrieval.", type: "dispatch", latencyMs: 22 },
+      { source: "policy", target: "validation", message: "Legal Restriction: 61-day uniform monsoon ban active until July 31.", type: "result", latencyMs: 52 },
+      { source: "ocean", target: "validation", message: "Sea state severe: Significant wave height 3.8m, period 9s.", type: "result", latencyMs: 98 },
+      { source: "weather", target: "validation", message: "Wind warning: SW gale 34-42 knots, high squall probability.", type: "result", latencyMs: 88 },
+      { source: "hazard", target: "validation", message: "Hazard Level 4/5: Extreme capsizing risk for mechanized craft.", type: "result", latencyMs: 76 },
+      { source: "research", target: "validation", message: "Scientific corroboration: Critical spawning window for pelagic species.", type: "result", latencyMs: 114 },
+      { source: "validation", target: "synthesizer", message: "Validation confirmed: Unanimous restriction recommendation.", type: "validation", latencyMs: 36 },
+      { source: "synthesizer", message: "Monsoon restriction advisory synthesized.", type: "synthesis", latencyMs: 44 },
     ],
-    finalOutput: `[OPERATION PROHIBITED: MONSOON TRAWLING BAN ACTIVE]\n\nUnder the **Karnataka Marine Fishing (Regulation) Act, 1986** and Central Ministry directive:\n• **Period**: June 1 to July 31 (61 days)\n• **Applicability**: All mechanized vessels and bottom trawlers\n• **Exemption**: Traditional non-mechanized crafts (up to 10 HP motors) operating within territorial waters\n• **Penalty**: Confiscation of catch and suspension of diesel subsidy.`,
-  },
-  {
-    id: "navigation",
-    name: "Fuel-Optimal Eco-Route",
-    icon: Compass,
-    color: "#f59e0b",
-    query: "Plot fuel-efficient commercial route from Kochi to Kavaratti Island avoiding monsoon swell.",
-    activeAgents: ["supervisor", "ocean_analytics", "navigation", "synthesizer"],
-    logs: [
-      {
-        source: "supervisor",
-        target: "ocean_analytics",
-        message: "Fetching Lakshadweep Sea current vector grid & wave spectra model.",
-        type: "dispatch",
-        latencyMs: 19,
-      },
-      {
-        source: "ocean_analytics",
-        target: "navigation",
-        message: "Surface current: 1.8 kts westward drift. SWH wave height: 2.1m reducing to 1.4m south of Kalpeni.",
-        type: "result",
-        latencyMs: 135,
-        confidence: 0.94,
-      },
-      {
-        source: "navigation",
-        target: "synthesizer",
-        message: "Continuous A* computed 4-waypoint route riding westward current jet. Fuel saving: 14.8%.",
-        type: "result",
-        latencyMs: 210,
-        confidence: 0.96,
-      },
-      {
-        source: "synthesizer",
-        message: "Generated GPX & GeoJSON waypoint corridor with ETA and bunkering telemetry.",
-        type: "synthesis",
-        latencyMs: 51,
-        confidence: 0.95,
-      },
-    ],
-    finalOutput: `[FUEL-OPTIMAL ECO-ROUTE CALCULATED - KOCHI TO KAVARATTI]\n\n• **Total Distance**: 224.6 Nautical Miles\n• **Estimated Time of Arrival**: 18 hours 40 mins @ 12.0 kts\n• **Net Fuel Saving**: **14.8%** (230 Liters saved)\n• **Strategy**: Slight southward deflection via Kalpeni channel to utilize 1.8 kt westward jet and avoid 2.6m swell zone.\n• **GeoJSON Corridor**: Export ready for ECDIS / NavIC receiver.`,
   },
 ];
 
-// Glassmorphism tokens (Clean White Theme)
-const glassPanel = {
-  background: "rgba(255, 255, 255, 0.98)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid #e2e8f0",
-  boxShadow: "0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02)",
-} as React.CSSProperties;
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AgentTopologyVisualizer() {
-  const [selectedAgent, setSelectedAgent] = useState<AgentId>("supervisor");
-  const [activeScenario, setActiveScenario] = useState<PresetScenario>(PRESET_SCENARIOS[0]);
-  const [customQuery, setCustomQuery] = useState(PRESET_SCENARIOS[0].query);
+  const [activeScenario, setActiveScenario] = useState<PresetScenario>(DEMO_SCENARIOS[0]);
+  const [customQuery, setCustomQuery] = useState(DEMO_SCENARIOS[0].query);
   const [isRunning, setIsRunning] = useState(false);
-  const [currentStepIndex, setCurrentStepIndex] = useState<number>(-1);
+  const [executionStep, setExecutionStep] = useState(0);
   const [displayedLogs, setDisplayedLogs] = useState<AuditLogEntry[]>([]);
-  const [activePulseNodes, setActivePulseNodes] = useState<AgentId[]>([]);
-  const [tokenUsage, setTokenUsage] = useState({ prompt: 1420, completion: 480, total: 1900, max: 8192 });
-  const [logFilter, setLogFilter] = useState<string>("all");
+  const [activeNodes, setActiveNodes] = useState<AgentId[]>([]);
+  const [activeEdges, setActiveEdges] = useState<{ source: AgentId; target: AgentId }[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<AgentId | null>("ocean");
+  const [selectedEdge, setSelectedEdge] = useState<{ source: AgentId; target: AgentId } | null>(null);
+  const [showRegistryDrawer, setShowRegistryDrawer] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll logs
-  useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [displayedLogs]);
+  // ─── Dynamic Layout Engine (Left-to-Right Horizontal DAG matching user design) ───
 
-  // Execute step-by-step simulation
-  const executeSimulation = useCallback((scenario: PresetScenario) => {
+  const layoutNodes = useMemo(() => {
+    const nodes: (AgentDefinition & { x: number; y: number })[] = [];
+
+    // Stage 1: Orchestrator (Far Left)
+    nodes.push({ ...AGENTS_REGISTRY.orchestrator, x: 11, y: 50 });
+
+    // Stage 2: Specialist Agents (Stacked Vertically in Column 2)
+    const specialists = activeScenario.activeSpecialists;
+    const numSpec = specialists.length;
+    specialists.forEach((spId, idx) => {
+      let y = 50;
+      if (numSpec > 1) {
+        const topY = numSpec >= 5 ? 16 : (numSpec === 4 ? 20 : 28);
+        const bottomY = numSpec >= 5 ? 84 : (numSpec === 4 ? 80 : 72);
+        y = topY + ((bottomY - topY) / (numSpec - 1)) * idx;
+      }
+      nodes.push({ ...AGENTS_REGISTRY[spId], x: 40, y });
+    });
+
+    // Stage 3: Cross-Agent Validation (Middle-Right)
+    nodes.push({ ...AGENTS_REGISTRY.validation, x: 69, y: 50 });
+
+    // Stage 4: Synthesizer (Far Right)
+    nodes.push({ ...AGENTS_REGISTRY.synthesizer, x: 89, y: 50 });
+
+    return nodes;
+  }, [activeScenario]);
+
+  // List of active edges in the DAG
+  const graphEdges = useMemo(() => {
+    const edges: { source: AgentId; target: AgentId; label?: string }[] = [];
+    const specIds = activeScenario.activeSpecialists;
+    
+    specIds.forEach(sp => {
+      // Orchestrator -> Specialist
+      edges.push({
+        source: "orchestrator",
+        target: sp,
+        label: AGENTS_REGISTRY[sp].label.split(" ")[0]
+      });
+      // Specialist -> Validation
+      edges.push({
+        source: sp,
+        target: "validation",
+        label: "Findings"
+      });
+    });
+
+    // Validation -> Synthesizer
+    edges.push({
+      source: "validation",
+      target: "synthesizer",
+      label: "Consensus"
+    });
+
+    return edges;
+  }, [activeScenario]);
+
+  // ─── Workflow Execution Engine ─────────────────────────────────────────────
+
+  const executeWorkflow = useCallback((scenario: PresetScenario) => {
     setIsRunning(true);
-    setCurrentStepIndex(0);
     setDisplayedLogs([]);
-    setActivePulseNodes(["supervisor"]);
+    setExecutionStep(0);
+    setActiveNodes(["orchestrator"]);
+    setActiveEdges([]);
+    setSelectedEdge(null);
 
     const logs = scenario.logs;
     let step = 0;
@@ -378,58 +463,60 @@ export default function AgentTopologyVisualizer() {
         const entry = logs[step];
         const newLog: AuditLogEntry = {
           ...entry,
-          id: Math.random().toString(36).slice(2, 9),
+          id: `log-${step}-${Date.now().toString(36)}`,
           timestamp: new Date().toLocaleTimeString("en-IN", { hour12: false }),
         };
 
-        setDisplayedLogs((prev) => [...prev, newLog]);
-        setCurrentStepIndex(step);
+        // Deduplicate logs if identical id already present
+        setDisplayedLogs(prev => {
+          if (prev.some(l => l.id === newLog.id)) return prev;
+          return [...prev, newLog];
+        });
 
-        // Highlight active nodes
-        const active: AgentId[] = [entry.source];
-        if (entry.target) active.push(entry.target);
-        setActivePulseNodes(active);
+        setExecutionStep(step + 1);
 
-        // Update simulated tokens
-        setTokenUsage((prev) => ({
-          ...prev,
-          prompt: prev.prompt + Math.floor(Math.random() * 80 + 40),
-          completion: prev.completion + Math.floor(Math.random() * 50 + 20),
-          total: prev.prompt + prev.completion,
-        }));
+        const currentActive: AgentId[] = [entry.source];
+        if (entry.target) currentActive.push(entry.target);
+        setActiveNodes(currentActive);
+
+        if (entry.target) {
+          setActiveEdges([{ source: entry.source, target: entry.target }]);
+        } else {
+          setActiveEdges([]);
+        }
 
         step++;
       } else {
         clearInterval(interval);
         setIsRunning(false);
-        setActivePulseNodes(["synthesizer"]);
+        setActiveNodes(["synthesizer"]);
+        setActiveEdges([]);
       }
-    }, 950);
+    }, 850);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Run initial scenario on mount
+  // Initial mount execution
   useEffect(() => {
-    executeSimulation(activeScenario);
+    executeWorkflow(activeScenario);
   }, []);
 
-  // Handle Preset Selection
-  const handleSelectPreset = (preset: PresetScenario) => {
-    setActiveScenario(preset);
-    setCustomQuery(preset.query);
-    executeSimulation(preset);
-  };
+  // Scroll logs smoothly
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [displayedLogs]);
 
-  // Particles animation along graph edges
+  // ─── Canvas Rendering & Particle Animation ──────────────────────────────────
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 800);
-    let height = (canvas.height = canvas.parentElement?.clientHeight || 500);
+    let width = (canvas.width = canvas.parentElement?.clientWidth || 900);
+    let height = (canvas.height = canvas.parentElement?.clientHeight || 540);
 
     const handleResize = () => {
       if (!canvas || !canvas.parentElement) return;
@@ -438,128 +525,107 @@ export default function AgentTopologyVisualizer() {
     };
     window.addEventListener("resize", handleResize);
 
-    // Particle structures
     const particles: {
-      x: number;
-      y: number;
       startX: number;
       startY: number;
       targetX: number;
       targetY: number;
       progress: number;
       speed: number;
-      color: string;
     }[] = [];
 
-    const supervisorPos = { x: (AGENTS.supervisor.x / 100) * width, y: (AGENTS.supervisor.y / 100) * height };
-    const synthesizerPos = { x: (AGENTS.synthesizer.x / 100) * width, y: (AGENTS.synthesizer.y / 100) * height };
-
-    const workerKeys: AgentId[] = ["ocean_analytics", "risk_geofencing", "navigation", "policy_rag"];
-
-    // Spawn animated particles
+    // Particle spawner along active horizontal edges
     const spawnTimer = setInterval(() => {
-      const workerKey = workerKeys[Math.floor(Math.random() * workerKeys.length)];
-      const worker = AGENTS[workerKey];
-      const workerPos = { x: (worker.x / 100) * width, y: (worker.y / 100) * height };
+      if (!isRunning) return;
+      
+      const candidateEdges = activeEdges.length > 0 ? activeEdges : graphEdges;
+      if (candidateEdges.length === 0) return;
+      const edge = candidateEdges[Math.floor(Math.random() * candidateEdges.length)];
+      const sourceNode = layoutNodes.find(n => n.id === edge.source);
+      const targetNode = layoutNodes.find(n => n.id === edge.target);
+      if (!sourceNode || !targetNode) return;
 
-      // Supervisor -> Worker
+      const sourceHalfW = sourceNode.id === "orchestrator" ? 78 : 77;
+      const targetHalfW = targetNode.id === "orchestrator" ? 78 : 77;
+
       particles.push({
-        x: supervisorPos.x,
-        y: supervisorPos.y,
-        startX: supervisorPos.x,
-        startY: supervisorPos.y,
-        targetX: workerPos.x,
-        targetY: workerPos.y,
+        startX: (sourceNode.x / 100) * width + sourceHalfW,
+        startY: (sourceNode.y / 100) * height,
+        targetX: (targetNode.x / 100) * width - targetHalfW,
+        targetY: (targetNode.y / 100) * height,
         progress: 0,
-        speed: 0.012 + Math.random() * 0.008,
-        color: AGENTS.supervisor.accent,
+        speed: 0.022 + Math.random() * 0.015,
       });
+    }, 380);
 
-      // Worker -> Synthesizer
-      setTimeout(() => {
-        particles.push({
-          x: workerPos.x,
-          y: workerPos.y,
-          startX: workerPos.x,
-          startY: workerPos.y,
-          targetX: synthesizerPos.x,
-          targetY: synthesizerPos.y,
-          progress: 0,
-          speed: 0.014 + Math.random() * 0.008,
-          color: worker.accent,
-        });
-      }, 500);
-    }, 420);
-
-    // Render loop
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // Draw Edges with gradient glowing lines
-      workerKeys.forEach((key) => {
-        const worker = AGENTS[key];
-        const wx = (worker.x / 100) * width;
-        const wy = (worker.y / 100) * height;
+      // Draw all Directed Horizontal Bezier Curves matching screenshot
+      graphEdges.forEach(edge => {
+        const sourceNode = layoutNodes.find(n => n.id === edge.source);
+        const targetNode = layoutNodes.find(n => n.id === edge.target);
+        if (!sourceNode || !targetNode) return;
 
-        // Edge: Supervisor -> Worker
-        ctx.beginPath();
-        ctx.moveTo(supervisorPos.x, supervisorPos.y);
-        ctx.bezierCurveTo(
-          (supervisorPos.x + wx) / 2, supervisorPos.y,
-          (supervisorPos.x + wx) / 2, wy,
-          wx, wy
-        );
-        ctx.strokeStyle = "rgba(37, 99, 235, 0.40)";
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        const sourceHalfW = sourceNode.id === "orchestrator" ? 78 : 77;
+        const targetHalfW = targetNode.id === "orchestrator" ? 78 : 77;
 
-        // Edge: Worker -> Synthesizer
+        const sx = (sourceNode.x / 100) * width + sourceHalfW;
+        const sy = (sourceNode.y / 100) * height;
+        const tx = (targetNode.x / 100) * width - targetHalfW;
+        const ty = (targetNode.y / 100) * height;
+
+        const isEdgeActive = isRunning && activeEdges.some(e => e.source === edge.source && e.target === edge.target);
+        const isEdgeSelected = selectedEdge?.source === edge.source && selectedEdge?.target === edge.target;
+
         ctx.beginPath();
-        ctx.moveTo(wx, wy);
-        ctx.bezierCurveTo(
-          (wx + synthesizerPos.x) / 2, wy,
-          (wx + synthesizerPos.x) / 2, synthesizerPos.y,
-          synthesizerPos.x, synthesizerPos.y
-        );
-        ctx.strokeStyle = `${worker.accent}55`;
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        ctx.moveTo(sx, sy);
+        // Horizontal S-curve bezier control points
+        const midX = (sx + tx) / 2;
+        ctx.bezierCurveTo(midX, sy, midX, ty, tx, ty);
+
+        if (isEdgeSelected) {
+          ctx.strokeStyle = "#1F4E8C";
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
+        } else if (isEdgeActive) {
+          ctx.save();
+          ctx.shadowColor = "#3b82f6";
+          ctx.shadowBlur = 8;
+          ctx.strokeStyle = "#2563eb";
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = "#E2E8F0"; // Soft light blue-gray exactly like screenshot
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
       });
 
-      // Draw Particles
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.progress += p.speed;
+      // Draw Animated Message Pulse along horizontal curve ONLY when running
+      if (isRunning) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.progress += p.speed;
 
-        // Bezier interpolation
-        const midX = (p.startX + p.targetX) / 2;
-        const t = p.progress;
-        const cx1 = midX;
-        const cy1 = p.startY;
-        const cx2 = midX;
-        const cy2 = p.targetY;
+          const t = p.progress;
+          const invT = 1 - t;
+          const midX = (p.startX + p.targetX) / 2;
 
-        p.x = Math.pow(1 - t, 3) * p.startX +
-              3 * Math.pow(1 - t, 2) * t * cx1 +
-              3 * (1 - t) * Math.pow(t, 2) * cx2 +
-              Math.pow(t, 3) * p.targetX;
+          const px = invT * invT * invT * p.startX + 3 * invT * invT * t * midX + 3 * invT * t * t * midX + t * t * t * p.targetX;
+          const py = invT * invT * invT * p.startY + 3 * invT * invT * t * p.startY + 3 * invT * t * t * p.targetY + t * t * t * p.targetY;
 
-        p.y = Math.pow(1 - t, 3) * p.startY +
-              3 * Math.pow(1 - t, 2) * t * cy1 +
-              3 * (1 - t) * Math.pow(t, 2) * cy2 +
-              Math.pow(t, 3) * p.targetY;
+          ctx.save();
+          ctx.shadowColor = "#3b82f6";
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = "#2563eb";
+          ctx.fill();
+          ctx.restore();
 
-        // Particle Glow
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 10;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        if (p.progress >= 1) {
-          particles.splice(i, 1);
+          if (p.progress >= 1) particles.splice(i, 1);
         }
       }
 
@@ -567,447 +633,611 @@ export default function AgentTopologyVisualizer() {
     };
 
     render();
-
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       clearInterval(spawnTimer);
       window.removeEventListener("resize", handleResize);
     };
-  }, []);
+  }, [layoutNodes, graphEdges, isRunning, activeEdges, selectedEdge]);
 
-  const agentDetail = AGENTS[selectedAgent];
+  // ─── Scenario Switch Handler ───────────────────────────────────────────────
+
+  const handleSelectScenario = (sc: PresetScenario) => {
+    setActiveScenario(sc);
+    setCustomQuery(sc.query);
+    setSelectedEdge(null);
+    setSelectedAgent(sc.activeSpecialists[0] || "orchestrator");
+    executeWorkflow(sc);
+  };
+
+  const handleNodeClick = (id: AgentId) => {
+    setSelectedAgent(id);
+    setSelectedEdge(null);
+  };
+
+  const handleEdgeClick = (edge: { source: AgentId; target: AgentId }) => {
+    setSelectedEdge(edge);
+    setSelectedAgent(null);
+  };
+
+  // ─── Derived Inspector Data ────────────────────────────────────────────────
+
+  const selectedAgentDef = selectedAgent ? AGENTS_REGISTRY[selectedAgent] : null;
+  const agentScenarioData = selectedAgent ? activeScenario.agentSpecificData[selectedAgent] : null;
+
+  const edgeKey = selectedEdge ? `${selectedEdge.source}->${selectedEdge.target}` : null;
+  const edgePayload = edgeKey ? activeScenario.edgePayloads[edgeKey] : null;
+
+  const totalRegisteredSpecialists = Object.values(AGENTS_REGISTRY).filter(a => a.category === "specialist").length;
+  const activeSpecialistCount = activeScenario.activeSpecialists.length;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-zinc-900 pt-4 pb-20 select-none">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 antialiased font-sans select-none pb-16 pt-3">
+      <div className="w-full max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* TOP BRAND & SOVEREIGN BADGE BAR                                         */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div
-          className="rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4 border border-zinc-200 bg-white shadow-sm"
-          style={glassPanel}
-        >
+        {/* ─── 1. STREAMLINED TOP HEADER ──────────────────────────────────────── */}
+        <header className="border-b border-slate-200 pb-3.5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 text-xs font-mono font-bold transition-all hover:bg-zinc-100 text-zinc-800 bg-zinc-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-2xs"
             >
-              <ArrowLeft className="h-3.5 w-3.5 text-blue-600" />
-              <span>3D Globe</span>
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Globe</span>
             </Link>
 
-            <div className="h-5 w-px bg-zinc-200 hidden sm:block" />
+            <div className="h-4 w-px bg-slate-200" />
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-black text-sm text-blue-600 tracking-wider">
-                  PROJECT ORCA · MULTI-AGENT SWARM
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                  Agent Workflow
                 </span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                  SIH26176
-                </span>
+                <h1 className="text-base font-semibold text-slate-900 leading-tight">
+                  ORCA Multi-Agent Runtime
+                </h1>
               </div>
-              <div className="text-[11px] font-mono text-zinc-500">
-                Live Topology Graph, Memory Token Gauge & Real-Time XAI Execution Auditor
-              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Dynamic task execution, cross-agent evidence validation and synthesis.
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono bg-emerald-50 border-emerald-200 text-emerald-700"
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold">100% AIR-GAPPED SOVEREIGN</span>
-            </div>
-
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => executeSimulation(activeScenario)}
+              onClick={() => executeWorkflow(activeScenario)}
               disabled={isRunning}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-all shadow-xs"
             >
               <RotateCcw className={`h-3.5 w-3.5 ${isRunning ? "animate-spin" : ""}`} />
-              <span>Replay DAG</span>
+              <span>{isRunning ? "Executing..." : "Run Agent Workflow"}</span>
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* INTERACTIVE PRESETS & QUERY LAUNCHER                                    */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div className="rounded-2xl p-4 sm:p-5 border border-zinc-200 bg-white space-y-4 shadow-sm" style={glassPanel}>
-          {/* Preset Buttons */}
+        {/* ─── 2. COMPACT CONTROL BAR: SCENARIOS & QUERY ──────────────────────── */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-mono text-zinc-500 flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-blue-600" />
-              Select SIH Presentation Scenarios:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {PRESET_SCENARIOS.map((preset) => {
-                const isSelected = activeScenario.id === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => handleSelectPreset(preset)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-mono transition-all hover:scale-105 active:scale-95 ${
-                      isSelected
-                        ? "bg-blue-50 border-2 text-zinc-900 font-bold shadow-xs"
-                        : "bg-zinc-50 border border-zinc-200 text-zinc-700 hover:bg-zinc-100"
-                    }`}
-                    style={{
-                      borderColor: isSelected ? preset.color : undefined,
-                    }}
-                  >
-                    {(() => {
-                      const PresetIcon = preset.icon;
-                      return <PresetIcon className="h-3.5 w-3.5" style={{ color: preset.color }} />;
-                    })()}
-                    <span>{preset.name}</span>
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Test Scenarios:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {DEMO_SCENARIOS.map((sc) => {
+                  const isSelected = activeScenario.id === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      onClick={() => handleSelectScenario(sc)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                        isSelected
+                          ? "bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <sc.icon className="h-3 w-3" />
+                      <span>{sc.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setShowRegistryDrawer(!showRegistryDrawer)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-200 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <Layers className="h-3 w-3 text-blue-600" />
+                <span>Agents {activeSpecialistCount} / {totalRegisteredSpecialists}</span>
+              </button>
+
+              {/* Compact Registry Popover */}
+              {showRegistryDrawer && (
+                <div className="absolute right-0 top-8 w-72 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-50 text-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-semibold text-slate-900">Agent Registry</span>
+                    <button onClick={() => setShowRegistryDrawer(false)} className="text-slate-400 hover:text-slate-600">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-semibold text-slate-400 mb-1.5 tracking-wider">
+                      Active For Task ({activeSpecialistCount})
+                    </div>
+                    <div className="space-y-1">
+                      {activeScenario.activeSpecialists.map(id => {
+                        const ag = AGENTS_REGISTRY[id];
+                        return (
+                          <div key={id} className="flex items-center justify-between py-0.5">
+                            <span className="flex items-center gap-1.5 text-slate-700">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                              {ag.label}
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-medium">Selected</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] uppercase font-semibold text-slate-400 mb-1.5 tracking-wider">
+                      Available on Standby ({totalRegisteredSpecialists - activeSpecialistCount})
+                    </div>
+                    <div className="space-y-1">
+                      {Object.values(AGENTS_REGISTRY)
+                        .filter(a => a.category === "specialist" && !activeScenario.activeSpecialists.includes(a.id))
+                        .map(ag => (
+                          <div key={ag.id} className="flex items-center justify-between py-0.5 text-slate-400">
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full border border-slate-300" />
+                              {ag.label}
+                            </span>
+                            <span className="text-[10px]">Standby</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Custom Query Input */}
-          <div className="flex flex-col sm:flex-row items-center gap-2 pt-1 border-t border-zinc-100">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          {/* Search / Ask Input */}
+          <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 value={customQuery}
                 onChange={(e) => setCustomQuery(e.target.value)}
-                placeholder="Enter maritime question for multi-agent DAG evaluation..."
-                className="w-full bg-zinc-50 border border-zinc-300 rounded-xl pl-9 pr-4 py-2.5 text-xs font-mono text-zinc-900 placeholder-zinc-400 outline-none focus:bg-white focus:border-blue-600 shadow-xs"
+                placeholder="Ask ORCA agents a maritime question..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 outline-none transition-colors"
               />
             </div>
             <button
-              onClick={() => {
-                const customScenario: PresetScenario = {
-                  ...activeScenario,
-                  query: customQuery,
-                };
-                executeSimulation(customScenario);
-              }}
+              onClick={() => executeWorkflow({ ...activeScenario, query: customQuery })}
               disabled={isRunning}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition shadow-xs hover:bg-blue-700 disabled:opacity-40 bg-blue-600 text-white cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-2xs"
             >
-              <Play className="h-3.5 w-3.5 fill-current" />
-              <span>Execute DAG Swarm</span>
+              <span>Execute</span>
+              <Send className="h-3 w-3" />
             </button>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* MAIN VISUALIZER: TOPOLOGY GRAPH CANVAS + LIVE METRICS GAUGES            */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ─── 3. WORKFLOW STATUS STRIP ──────────────────────────────────────── */}
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${isRunning ? "bg-blue-600 animate-ping" : "bg-emerald-500"}`} />
+              {activeScenario.name}
+            </span>
+            <div className="h-3 w-px bg-slate-200" />
+            <div className="text-slate-500 flex items-center gap-2">
+              {isRunning ? (
+                <span className="text-blue-600 font-medium">
+                  Running Step {executionStep} / {activeScenario.logs.length}
+                </span>
+              ) : (
+                <span className="text-emerald-700 font-medium flex items-center gap-1">
+                  <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  Workflow Complete · Validation Passed
+                </span>
+              )}
+            </div>
+          </div>
 
-          {/* Left 2 Cols: 2D Multi-Agent Network Topology Canvas */}
-          <div className="lg:col-span-2 rounded-3xl p-6 border border-zinc-200 bg-white relative overflow-hidden flex flex-col justify-between shadow-sm" style={{ ...glassPanel, minHeight: 520 }}>
-            {/* Canvas Header */}
-            <div className="flex items-center justify-between z-10 mb-2">
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                <span className="text-blue-600 font-bold">LANGGRAPH MULTI-AGENT TOPOLOGY</span>
-                <span className="text-zinc-400">· Directed Acyclic Graph</span>
+          <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
+            <span>Specialists: <strong className="text-slate-800">{activeSpecialistCount}</strong></span>
+            <span>Latency: <strong className="text-slate-800">485ms</strong></span>
+            <span>Consensus: <strong className="text-emerald-600">100%</strong></span>
+          </div>
+        </div>
+
+        {/* ─── 4. MAIN WORKSPACE: GRAPH (72%) + DOCKED INSPECTOR (28%) ────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+          
+          {/* Main Runtime DAG Canvas (Col 1-8 / 9) - Expanded to fill available space */}
+          <div className="lg:col-span-8 xl:col-span-9 bg-[#FBFCFE] border border-[#E4E9F0] rounded-xl relative overflow-hidden shadow-2xs flex flex-col min-h-[600px] lg:min-h-[630px]">
+            
+            {/* Minimal Clean Canvas Toolbar */}
+            <div className="px-4 py-2.5 border-b border-[#E4E9F0] flex items-center justify-between bg-white/80 backdrop-blur-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-xs sm:text-sm text-[#1E293B] font-sans">
+                  Runtime Agent Graph
+                </span>
+                <span className="text-[11px] text-slate-500 font-normal font-sans">
+                  Dynamic Topology
+                </span>
               </div>
-              <div className="text-[11px] font-mono text-zinc-500">
-                Click any agent node to inspect runtime state
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setZoomScale(s => Math.min(s + 0.1, 1.3))}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-slate-500 hover:text-[#1F4E8C] hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setZoomScale(s => Math.max(s - 0.1, 0.8))}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-slate-500 hover:text-[#1F4E8C] hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setZoomScale(1)}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-slate-500 hover:text-[#1F4E8C] hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Fit View"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => executeWorkflow(activeScenario)}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded text-slate-500 hover:text-[#1F4E8C] hover:bg-slate-100 transition-colors cursor-pointer ml-1"
+                  title="Replay Workflow"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
-            {/* Canvas Container with Interactive Nodes */}
-            <div className="relative flex-1 w-full h-full min-h-[420px] bg-slate-50/50 rounded-2xl border border-zinc-100">
-              {/* HTML5 Canvas for animated particle streams */}
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
+            {/* Canvas Stage with Nodes - Expanded */}
+            <div
+              className="relative flex-1 w-full min-h-[540px] lg:min-h-[570px] bg-[#FBFCFE] overflow-hidden"
+              style={{ transform: `scale(${zoomScale})`, transformOrigin: "center center", transition: "transform 0.2s ease" }}
+            >
+              {/* HTML5 Canvas for Curves & Particles */}
+              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
-              {/* Interactive Agent Nodes */}
-              {Object.values(AGENTS).map((agent) => {
-                const isSelected = selectedAgent === agent.id;
-                const isPulsing = activePulseNodes.includes(agent.id);
+              {/* Dynamic Agent Nodes matching user design exactly */}
+              {layoutNodes.map((node) => {
+                const isSelected = selectedAgent === node.id;
+                const isExecuting = isRunning && activeNodes.includes(node.id);
+                
+                // Track if agent finished execution
+                const isCompleted = !isRunning || (!isExecuting && activeNodes.length > 0 && node.id !== "synthesizer");
+
+                const isOrchestrator = node.id === "orchestrator";
+                const isValidation = node.id === "validation";
+                const isSynthesizer = node.id === "synthesizer";
+
+                // Base dimensions
+                let cardDims = isOrchestrator || isValidation || isSynthesizer ? "w-[155px] h-[74px]" : "w-[155px] h-[66px]";
+
+                // Default Complete styling (clean green border, emerald icon, static Complete checkmark)
+                let cardBorder = isOrchestrator
+                  ? "border-2 border-[#1F4E8C] ring-1 ring-[#1F4E8C] ring-offset-2 ring-offset-white"
+                  : isSynthesizer
+                  ? "border border-blue-600"
+                  : "border border-emerald-500";
+                let cardBg = "bg-white";
+                let iconColor = isSynthesizer ? "text-blue-700" : "text-emerald-600";
+                let iconAnim = "";
+                let statusIcon = <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />;
+                let statusText = "Complete";
+                let statusTextColor = "text-emerald-600";
+                let pulseHalo = false;
+
+                if (isExecuting) {
+                  // Vibrant colors and animation ONLY when working!
+                  pulseHalo = true;
+                  cardBg = "bg-gradient-to-r from-blue-50/95 via-sky-50/90 to-indigo-50/90";
+                  cardBorder = "border-2 border-blue-600 shadow-md shadow-blue-500/25";
+                  iconColor = "text-blue-600";
+                  iconAnim = "animate-bounce";
+                  statusTextColor = "text-blue-700 font-semibold";
+                  statusText = isOrchestrator ? "Dispatching..." : isValidation ? "Validating..." : isSynthesizer ? "Synthesizing..." : "Working...";
+                  statusIcon = (
+                    <div className="flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+                      </span>
+                      <RotateCcw className="h-3 w-3 text-blue-700 animate-spin shrink-0" />
+                    </div>
+                  );
+                } else if (!isRunning) {
+                  // All complete when idle
+                  statusText = "Complete";
+                  statusTextColor = "text-emerald-600";
+                  statusIcon = <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />;
+                } else if (isCompleted) {
+                  statusText = "Complete";
+                  statusTextColor = "text-emerald-600";
+                  statusIcon = <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />;
+                } else {
+                  // Waiting state before agent starts
+                  cardBorder = "border border-slate-200";
+                  cardBg = "bg-white";
+                  iconColor = "text-slate-400";
+                  statusText = "Waiting";
+                  statusTextColor = "text-slate-400";
+                  statusIcon = <div className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />;
+                }
+
+                // Render structured labels matching screenshot
+                const renderTitle = () => {
+                  if (isOrchestrator) return <>ORCA<br />Orchestrator</>;
+                  if (node.id === "risk") return <>Risk & Geo<br />Agent</>;
+                  if (node.id === "navigation") return <>Navigation<br />Agent</>;
+                  if (isValidation) return <>Cross-Agent<br />Validation</>;
+                  return <>{node.label}</>;
+                };
+
+                const selectedStyle = isSelected
+                  ? { boxShadow: "0 0 0 3px rgba(31, 78, 140, 0.15)" }
+                  : {};
 
                 return (
                   <div
-                    key={agent.id}
-                    onClick={() => setSelectedAgent(agent.id)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10 transition-transform duration-200 hover:scale-110"
-                    style={{ left: `${agent.x}%`, top: `${agent.y}%` }}
+                    key={node.id}
+                    onClick={() => handleNodeClick(node.id)}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all rounded-xl p-2.5 flex flex-col justify-between shadow-2xs z-20 select-none ${cardBg} ${cardDims} ${cardBorder} ${isExecuting ? "scale-[1.03]" : ""}`}
+                    style={{ left: `${node.x}%`, top: `${node.y}%`, ...selectedStyle }}
                   >
-                    {/* Outer Glowing Rings */}
-                    {isPulsing && (
-                      <div
-                        className="absolute -inset-2.5 rounded-2xl animate-ping opacity-25"
-                        style={{ background: agent.accent }}
-                      />
+                    {/* Animated Halo ONLY when working */}
+                    {pulseHalo && (
+                      <span className="absolute -inset-[3px] rounded-xl bg-blue-500/25 animate-pulse -z-10 pointer-events-none" />
                     )}
 
-                    {/* Node Card */}
-                    <div
-                      className="rounded-2xl p-3 sm:p-3.5 border flex items-center gap-3 shadow-sm transition-all"
-                      style={{
-                        background: isSelected ? "#ffffff" : "#ffffff",
-                        borderColor: isSelected ? agent.accent : isPulsing ? agent.accent : "#e2e8f0",
-                        boxShadow: isSelected || isPulsing ? `0 4px 16px ${agent.accent}35` : "0 1px 3px rgba(0,0,0,0.06)",
-                        width: agent.id === "supervisor" || agent.id === "synthesizer" ? 170 : 160,
-                      }}
-                    >
-                      <div
-                        className="h-10 w-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 border"
-                        style={{ background: `${agent.accent}15`, borderColor: `${agent.accent}35` }}
-                      >
-                        {(() => {
-                          const AgentIcon = agent.icon;
-                          return <AgentIcon className="h-5 w-5" style={{ color: agent.accent }} />;
-                        })()}
+                    <div className="flex items-center gap-2">
+                      <node.icon className={`h-4 w-4 shrink-0 ${iconColor} ${iconAnim}`} />
+                      <div className="text-[12px] font-semibold text-slate-900 leading-tight font-sans">
+                        {renderTitle()}
                       </div>
+                    </div>
 
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold font-mono tracking-wider text-zinc-900">
-                          {agent.label}
-                        </div>
-                        <div className="text-[10px] text-zinc-500 font-mono truncate">
-                          {agent.sub}
-                        </div>
-                        {isPulsing && (
-                          <div className="text-[9px] font-mono font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            ACTIVE
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium font-sans">
+                      {statusIcon}
+                      <span className={statusTextColor}>{statusText}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* Topology Legend Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-100 z-10 text-[10px] font-mono text-zinc-500">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-600" />
-                  <span>Cognitive Orchestrator</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>Bio-Physical Workers</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  <span>Consensus Synthesizer</span>
-                </div>
-              </div>
-              <div className="text-zinc-400">
-                Zero cloud egress · Local Inference Guaranteed
-              </div>
-            </div>
           </div>
 
-          {/* Right 1 Col: Agent Inspector & Memory Token Gauge */}
-          <div className="space-y-6">
-            {/* Agent Node Inspector */}
-            <div className="rounded-3xl p-5 border border-zinc-200 bg-white space-y-4 shadow-sm" style={glassPanel}>
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-mono text-blue-600 uppercase font-bold flex items-center gap-1.5">
-                  <Eye className="h-3.5 w-3.5" />
-                  Agent State Inspector
-                </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
-                  NODE: {agentDetail.id.toUpperCase()}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-zinc-50 border border-zinc-200">
-                {(() => {
-                  const DetailIcon = agentDetail.icon;
-                  return (
-                    <div
-                      className="h-10 w-10 rounded-xl flex items-center justify-center border"
-                      style={{ background: `${agentDetail.accent}15`, borderColor: `${agentDetail.accent}40` }}
-                    >
-                      <DetailIcon className="h-5 w-5" style={{ color: agentDetail.accent }} />
+          {/* Docked Inspector Beside Graph (Col 9-12 / 3-4) */}
+          <div className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4">
+            
+            {/* 4A. Selected Node or Edge Inspector */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs min-h-[300px]">
+              
+              {/* Edge Inspector View */}
+              {selectedEdge && edgePayload ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-blue-700">Communication</div>
+                      <div className="font-semibold text-xs text-slate-900">
+                        {AGENTS_REGISTRY[selectedEdge.source].label} → {AGENTS_REGISTRY[selectedEdge.target].label}
+                      </div>
                     </div>
-                  );
-                })()}
-                <div>
-                  <h4 className="text-sm font-bold text-zinc-900">{agentDetail.label}</h4>
-                  <div className="text-[11px] font-mono text-zinc-500">{agentDetail.model}</div>
+                    <button onClick={() => setSelectedEdge(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Payload Summary</div>
+                    <div className="text-xs font-semibold text-slate-800 mt-0.5">{edgePayload.summary}</div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Parameters Exchanged</div>
+                    <div className="mt-1 space-y-1">
+                      {edgePayload.variables.map((v, i) => (
+                        <div key={i} className="text-xs bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-slate-700 font-mono">
+                          {v}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
+                    <span>Source Authority:</span>
+                    <strong className="text-slate-700">{edgePayload.source}</strong>
+                  </div>
                 </div>
+              ) : selectedAgentDef ? (
+                /* Node Inspector View */
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
+                      <selectedAgentDef.icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs text-slate-900">{selectedAgentDef.label}</div>
+                      <div className="text-[10px] text-slate-500 capitalize">{selectedAgentDef.category} Layer</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Scientific Role</div>
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{selectedAgentDef.role}</p>
+                  </div>
+
+                  {agentScenarioData && (
+                    <div>
+                      <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Assigned Task</div>
+                      <p className="text-xs text-slate-800 font-medium mt-0.5 leading-relaxed bg-slate-50 p-2 rounded border border-slate-200">
+                        {agentScenarioData.task}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Data Sources</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedAgentDef.dataSources.map((ds, i) => (
+                        <span key={i} className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                          {ds}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Tools Used</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedAgentDef.toolsUsed.map((t, i) => (
+                        <span key={i} className="font-mono text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {agentScenarioData && (
+                    <div className="pt-2 border-t border-slate-100 text-[11px] font-mono text-slate-500 flex justify-between">
+                      <span>Execution Latency:</span>
+                      <strong className="text-slate-800">{agentScenarioData.latency}ms</strong>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  Click any agent node or connection line to inspect details.
+                </div>
+              )}
+            </div>
+
+            {/* 4B. Compact Execution Trace Timeline */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-col h-[230px]">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span className="font-semibold text-xs text-slate-900">Execution Trace</span>
+                <button
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(displayedLogs, null, 2));
+                    const dl = document.createElement("a");
+                    dl.setAttribute("href", dataStr);
+                    dl.setAttribute("download", `orca-audit-${activeScenario.id}.json`);
+                    dl.click();
+                  }}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Export JSON</span>
+                </button>
               </div>
 
-              <div>
-                <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider mb-1">Assigned Operational Role:</div>
-                <p className="text-xs text-zinc-700 leading-relaxed">
-                  {agentDetail.role}
-                </p>
-              </div>
-
-              <div>
-                <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider mb-1.5">Active Sovereign Tools:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {agentDetail.activeTools.map((tool) => (
-                    <span key={tool} className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-blue-700">
-                      <Zap className="h-3 w-3 inline mr-1 text-blue-600" />{tool}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-zinc-100">
-                <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider mb-1">System Prompt Directive:</div>
-                <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-[10px] font-mono text-zinc-600 leading-relaxed max-h-24 overflow-y-auto">
-                  {agentDetail.systemPrompt}
-                </div>
+              <div className="flex-1 overflow-y-auto pt-2 space-y-2.5 pr-1">
+                {displayedLogs.map((log) => (
+                  <div key={log.id} className="relative pl-3 text-[11px] border-l-2 border-slate-200 ml-1">
+                    <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-blue-600" />
+                    <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
+                      <span>{log.timestamp}</span>
+                      <span>{log.latencyMs}ms</span>
+                    </div>
+                    <div className="font-medium text-slate-800 text-[11px] leading-tight mt-0.5">
+                      {AGENTS_REGISTRY[log.source]?.label} {log.target ? `→ ${AGENTS_REGISTRY[log.target]?.label}` : ""}
+                    </div>
+                    <div className="text-slate-500 text-[10px] mt-0.5 line-clamp-2">
+                      {log.message}
+                    </div>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
               </div>
             </div>
 
-            {/* Memory Token Gauge & Inference Metrics */}
-            <div className="rounded-3xl p-5 border border-zinc-200 bg-white space-y-4 shadow-sm" style={glassPanel}>
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-mono text-amber-600 uppercase font-bold flex items-center gap-1.5">
-                  <Cpu className="h-3.5 w-3.5" />
-                  Memory & KV Token Gauge
-                </div>
-                <span className="text-[10px] font-mono text-emerald-600 font-semibold">vLLM / AWQ</span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-mono">
-                  <span className="text-zinc-500">Context Allocation:</span>
-                  <span className="text-blue-600 font-bold">{tokenUsage.total.toLocaleString()} / {tokenUsage.max.toLocaleString()} tokens</span>
-                </div>
-                <div className="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden border border-zinc-200">
-                  <div
-                    className="bg-gradient-to-r from-blue-600 via-amber-500 to-blue-400 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${(tokenUsage.total / tokenUsage.max) * 100}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] font-mono text-zinc-400">
-                  <span>Prompt: {tokenUsage.prompt} tk</span>
-                  <span>Completion: {tokenUsage.completion} tk</span>
-                  <span>Free: {(tokenUsage.max - tokenUsage.total).toLocaleString()} tk</span>
-                </div>
-              </div>
-
-              {/* Latency & Compression telemetry */}
-              <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono">
-                <div className="p-2 rounded-xl bg-zinc-50 border border-zinc-200">
-                  <div className="text-[10px] text-zinc-500">Avg DAG Latency</div>
-                  <div className="font-bold text-emerald-600 text-sm mt-0.5">382 ms</div>
-                </div>
-                <div className="p-2 rounded-xl bg-zinc-50 border border-zinc-200">
-                  <div className="text-[10px] text-zinc-500">KV Compression</div>
-                  <div className="font-bold text-amber-600 text-sm mt-0.5">4-bit AWQ (3.2x)</div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        {/* REAL-TIME XAI EXECUTION AUDIT LOG STREAM                                */}
-        {/* ═══════════════════════════════════════════════════════════════════════ */}
-        <div className="rounded-3xl p-6 border border-zinc-200 bg-white space-y-4 shadow-sm" style={glassPanel}>
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+        {/* ─── 5. FINAL SYNTHESIS COMPONENT ──────────────────────────────────── */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs border-l-4 border-l-emerald-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-blue-600" />
-              <h3 className="text-sm font-mono font-bold text-zinc-900">
-                Real-Time XAI Execution Audit Log Stream (JSONL Verified)
-              </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                {displayedLogs.length} Events
+              <span className="p-1 rounded-md bg-emerald-50 text-emerald-700">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <h2 className="font-semibold text-xs text-slate-900">FINAL SYNTHESIS</h2>
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                Evidence-backed result · Cross-agent validated
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(displayedLogs, null, 2));
-                  const downloadAnchor = document.createElement("a");
-                  downloadAnchor.setAttribute("href", dataStr);
-                  downloadAnchor.setAttribute("download", `orca_agent_audit_${Date.now()}.json`);
-                  document.body.appendChild(downloadAnchor);
-                  downloadAnchor.click();
-                  downloadAnchor.remove();
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono border text-blue-600 border-zinc-200 hover:bg-zinc-50 transition cursor-pointer shadow-xs"
-              >
-                <Download className="h-3 w-3" />
-                <span>Export Audit JSON</span>
-              </button>
+            <div className="flex items-center gap-4 text-[11px] text-slate-500 font-mono">
+              <span>Validation: <strong className="text-emerald-700">Passed</strong></span>
+              <span>Agents: <strong className="text-slate-800">{activeSpecialistCount}</strong></span>
+              <span>Sources: <strong className="text-slate-800">4 Verified</strong></span>
             </div>
           </div>
 
-          {/* Log Stream Container */}
-          <div className="rounded-2xl p-4 bg-zinc-50 border border-zinc-200 font-mono text-xs max-h-72 overflow-y-auto space-y-2">
-            {displayedLogs.length === 0 ? (
-              <div className="text-center py-8 text-zinc-400 font-mono text-xs">
-                Executing cognitive multi-agent DAG...
+          <p className="text-xs text-slate-800 leading-relaxed font-normal">
+            {activeScenario.finalOutput}
+          </p>
+        </div>
+
+        {/* ─── 6. COLLAPSIBLE TECHNICAL RUNTIME DETAILS ───────────────────────── */}
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+          <button
+            onClick={() => setShowTechDetails(!showTechDetails)}
+            className="w-full flex items-center justify-between p-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Server className="h-3.5 w-3.5 text-slate-500" />
+              <span>Technical Runtime Details</span>
+            </span>
+            <ChevronRight className={`h-4 w-4 transition-transform ${showTechDetails ? "rotate-90" : ""}`} />
+          </button>
+
+          {showTechDetails && (
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3 font-mono text-xs text-slate-600">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-400">Runtime Model</div>
+                  <div className="font-semibold text-slate-800 text-[11px] mt-0.5">Qwen2.5-7B-Instruct (4-bit AWQ)</div>
+                </div>
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-400">Execution Mode</div>
+                  <div className="font-semibold text-emerald-700 text-[11px] mt-0.5">Local / Sovereign (No API Call)</div>
+                </div>
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-400">Total Latency</div>
+                  <div className="font-semibold text-slate-800 text-[11px] mt-0.5">485ms (P95: 520ms)</div>
+                </div>
+                <div className="p-2 bg-white rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-400">KV Cache Hit Rate</div>
+                  <div className="font-semibold text-slate-800 text-[11px] mt-0.5">88.4% · 1,420 Tokens Cached</div>
+                </div>
               </div>
-            ) : (
-              displayedLogs.map((log) => {
-                const srcAgent = AGENTS[log.source];
-                const tgtAgent = log.target ? AGENTS[log.target] : null;
 
-                return (
-                  <div
-                    key={log.id}
-                    className="p-2.5 rounded-xl bg-white border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-blue-300 transition shadow-xs"
-                  >
-                    <div className="flex items-start sm:items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-zinc-400 flex-shrink-0">{log.timestamp}</span>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: `${srcAgent.accent}15`, color: srcAgent.accent }}>
-                          {srcAgent.label}
-                        </span>
-                        {tgtAgent && (
-                          <>
-                            <ArrowRight className="h-3 w-3 text-zinc-400" />
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: `${tgtAgent.accent}15`, color: tgtAgent.accent }}>
-                              {tgtAgent.label}
-                            </span>
-                          </>
-                        )}
+              <div className="pt-2 border-t border-slate-200/60 text-[11px]">
+                <div className="text-slate-500 mb-1 font-sans font-semibold text-xs">Participating Agent Execution Timings:</div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {activeScenario.activeSpecialists.map(spId => {
+                    const ag = AGENTS_REGISTRY[spId];
+                    const data = activeScenario.agentSpecificData[spId];
+                    return (
+                      <div key={spId} className="flex justify-between bg-white px-2 py-1 rounded border border-slate-200 text-[10px]">
+                        <span>{ag.label.split(" ")[0]}:</span>
+                        <span className="font-semibold text-slate-800">{data?.latency || 90}ms</span>
                       </div>
-
-                      <span className="text-xs text-zinc-800 truncate">{log.message}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0 text-[10px]">
-                      {log.confidence && (
-                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">
-                          {(log.confidence * 100).toFixed(0)}% Conf
-                        </span>
-                      )}
-                      {log.latencyMs && (
-                        <span className="text-zinc-500 font-medium">
-                          +{log.latencyMs}ms
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={logsEndRef} />
-          </div>
-
-          {/* Final Synthesized Output Card */}
-          {!isRunning && displayedLogs.length > 0 && (
-            <div className="mt-4 p-5 rounded-2xl bg-emerald-50/70 border border-emerald-300 space-y-2 animate-fadeIn shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-emerald-800 flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4 text-emerald-600" />
-                  Synthesizer Final Consensus Output (Air-Gapped Result)
-                </span>
-                <span className="text-[10px] font-mono text-emerald-700 font-semibold">Zero Hallucination Guarantee</span>
-              </div>
-              <div className="text-xs text-zinc-900 leading-relaxed whitespace-pre-line font-sans">
-                {activeScenario.finalOutput}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
