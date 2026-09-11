@@ -24,6 +24,8 @@ export type SectionType =
   | "research"
   | "sources"
   | "ai_synthesis"
+  | "glossary"
+  | "news"
   | "generic";
 
 export interface ReportTelemetry {
@@ -102,6 +104,7 @@ export interface ReportSection {
   content?: string;
   data?: any; // flexible payload depending on section type
   sources?: string[];
+  agentSource?: "Report Generator Agent" | "Glossary Agent" | "News Agent" | "Research Papers Agent" | string;
 }
 
 export interface Report {
@@ -134,6 +137,8 @@ export interface Report {
   };
 }
 
+export type AgentPipelineStage = "report_generator" | "glossary" | "news" | "research";
+
 export interface ReportGenerationProgress {
   stage: number;
   totalStages: number;
@@ -142,4 +147,11 @@ export interface ReportGenerationProgress {
   progressPercent: number;
   estimatedSecondsRemaining?: number;
   totalEstimatedSeconds?: number;
+  activeAgent?: AgentPipelineStage;
+  agentStatuses?: {
+    report_generator: "idle" | "working" | "done";
+    glossary: "idle" | "working" | "done";
+    news: "idle" | "working" | "done";
+    research: "idle" | "working" | "done";
+  };
 }

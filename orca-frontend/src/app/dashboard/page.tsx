@@ -660,10 +660,17 @@ function AIChatDrawer({
       const progressMsgId = uid();
       const initialProgress: ReportGenerationProgress = {
         stage: 1,
-        totalStages: 6,
-        stageName: "Understanding request",
-        message: `Analyzing intent & extracting topic from: "${targetTopic}"...`,
-        progressPercent: 16,
+        totalStages: 4,
+        stageName: "Report Generator Agent Active",
+        message: `Compiling operational baseline for "${targetTopic}"...`,
+        progressPercent: 25,
+        activeAgent: "report_generator",
+        agentStatuses: {
+          report_generator: "working",
+          glossary: "idle",
+          news: "idle",
+          research: "idle",
+        },
       };
 
       setGeneratingProgress(initialProgress);
@@ -682,6 +689,8 @@ function AIChatDrawer({
       ]);
 
       try {
+        let hasScrolledToReport = false;
+
         const newReport = await generateReportPipeline(
           targetTopic,
           {
@@ -691,14 +700,42 @@ function AIChatDrawer({
             isEEZ: true,
             imblDistanceKm: 74.2,
           },
-          (progress) => {
-            setGeneratingProgress(progress);
-            onGeneratingProgress?.(true, progress);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === progressMsgId ? { ...msg, progressData: progress } : msg
-              )
-            );
+          {
+            onProgress: (progress) => {
+              setGeneratingProgress(progress);
+              onGeneratingProgress?.(true, progress);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === progressMsgId ? { ...msg, progressData: progress } : msg
+                )
+              );
+            },
+            onAgentComplete: (agentName, updatedReport, agentMessage) => {
+              // Immediately paste into bottom dossier and update state!
+              if (onReportGenerated) {
+                onReportGenerated(updatedReport);
+              }
+
+              // On the very first agent completion (report_generator), scroll to bottom so user sees it live!
+              if (!hasScrolledToReport) {
+                hasScrolledToReport = true;
+                setTimeout(() => {
+                  onOpenReport?.();
+                }, 200);
+              }
+
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === progressMsgId
+                    ? {
+                        ...msg,
+                        generatedReport: updatedReport,
+                        content: agentMessage,
+                      }
+                    : msg
+                )
+              );
+            },
           }
         );
 
@@ -708,7 +745,7 @@ function AIChatDrawer({
             msg.id === progressMsgId
               ? {
                   ...msg,
-                  content: `✅ **Report Complete: ${newReport.title}**\n\nGenerated ${newReport.sections.length} dynamic sections for ${newReport.location}. Scroll down to inspect full dossier below.`,
+                  content: `✅ **Dossier Enriched by All 4 Agents: ${newReport.title}**\n\nAll 4 autonomous sub-agents (Report Generator, Glossary, News, Research Papers) have completed execution and appended ${newReport.sections.length} dynamic sections.`,
                   generatedReport: newReport,
                 }
               : msg
@@ -719,7 +756,7 @@ function AIChatDrawer({
         setGeneratingProgress(null);
         onGeneratingProgress?.(false, null);
 
-        // Automatically update active dossier in parent & scroll to it
+        // Automatically update active dossier in parent
         if (onReportGenerated) {
           onReportGenerated(newReport);
         }
@@ -1181,8 +1218,40 @@ function AIChatDrawer({
               // Dynamic Report Generation Progress Card
               if (msg.isReportProgress && msg.progressData) {
                 const p = msg.progressData;
-                const isComplete = !!msg.generatedReport;
+                const isComplete = p.stage >= p.totalStages && (!p.activeAgent || p.agentStatuses?.research === "done");
                 const estRemaining = p.estimatedSecondsRemaining ?? Math.max(1, (p.totalStages - p.stage + 1) * 2);
+
+                const agentChecklist = [
+                  {
+                    id: "report_generator",
+                    name: "Report Generator Agent",
+                    sub: "Baseline Dossier & Telemetry",
+                    icon: FileText,
+                    status: p.agentStatuses?.report_generator || (isComplete ? "done" : "working"),
+                  },
+                  {
+                    id: "glossary",
+                    name: "Glossary Agent",
+                    sub: "Marine Terminology & Standards",
+                    icon: BookOpen,
+                    status: p.agentStatuses?.glossary || (isComplete ? "done" : "idle"),
+                  },
+                  {
+                    id: "news",
+                    name: "News Agent",
+                    sub: "Live INCOIS Bulletins & Ban Notices",
+                    icon: Radio,
+                    status: p.agentStatuses?.news || (isComplete ? "done" : "idle"),
+                  },
+                  {
+                    id: "research",
+                    name: "Research Papers Agent",
+                    sub: "Peer-Reviewed Literature (RAG)",
+                    icon: Microscope,
+                    status: p.agentStatuses?.research || (isComplete ? "done" : "idle"),
+                  },
+                ];
+
                 return (
                   <div key={msg.id} className="p-4 rounded-xl border border-zinc-200 bg-white shadow-xs space-y-3">
                     <div className="flex items-center justify-between">
@@ -1193,7 +1262,7 @@ function AIChatDrawer({
                           <Sparkles className="h-4 w-4 text-[#1F4E8C] animate-spin" />
                         )}
                         <span className="text-xs font-bold text-zinc-900">
-                          {isComplete ? "Report Complete" : p.stageName}
+                          {isComplete ? "Dossier Fully Enriched" : p.stageName}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
@@ -1219,13 +1288,74 @@ function AIChatDrawer({
                       </div>
                     </div>
 
-                    {isComplete && (
+                    {/* 4-Agent Pipeline Checklist */}
+                    <div className="space-y-1 pt-2 border-t border-zinc-100">
+                      {agentChecklist.map((ag) => {
+                        const AgIcon = ag.icon;
+                        const isDone = ag.status === "done";
+                        const isWorking = ag.status === "working";
+                        return (
+                          <div
+                            key={ag.id}
+                            className={`flex items-center justify-between p-2 rounded-lg text-[11px] border transition ${
+                              isWorking
+                                ? "bg-blue-50/70 border-[#1F4E8C]/30 text-zinc-900"
+                                : isDone
+                                ? "bg-zinc-50 border-zinc-200/80 text-zinc-800"
+                                : "bg-transparent border-transparent text-zinc-400"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 pr-1">
+                              <div
+                                className={`p-1 rounded shrink-0 ${
+                                  isWorking
+                                    ? "bg-[#1F4E8C] text-white"
+                                    : isDone
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-zinc-100 text-zinc-400"
+                                }`}
+                              >
+                                {isWorking ? (
+                                  <Sparkles className="h-3 w-3 animate-spin" />
+                                ) : isDone ? (
+                                  <CheckCircle2 className="h-3 w-3" />
+                                ) : (
+                                  <AgIcon className="h-3 w-3" />
+                                )}
+                              </div>
+                              <div className="truncate">
+                                <span className="font-semibold">{ag.name}</span>
+                                <span className="hidden sm:inline text-[10px] text-zinc-500 ml-1.5">
+                                  · {ag.sub}
+                                </span>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                                isWorking
+                                  ? "bg-blue-100 text-[#1F4E8C] animate-pulse"
+                                  : isDone
+                                  ? "bg-emerald-50 text-emerald-700 font-bold"
+                                  : "text-zinc-400"
+                              }`}
+                            >
+                              {isWorking ? "WORKING" : isDone ? "POSTED" : "QUEUED"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Quick navigation to bottom dossier */}
+                    {(msg.generatedReport || p.agentStatuses?.report_generator === "done" || isComplete) && (
                       <button
                         onClick={onOpenReport}
                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#1F4E8C] hover:bg-[#173F72] text-white text-xs font-semibold shadow-xs transition mt-1 cursor-pointer"
                       >
                         <FileText className="h-3.5 w-3.5" />
-                        <span>Open Generated Dossier ▼</span>
+                        <span>
+                          {isComplete ? "Inspect Complete Dossier Below ▼" : "View Live Dossier Below (Updating Live) ▼"}
+                        </span>
                       </button>
                     )}
                   </div>

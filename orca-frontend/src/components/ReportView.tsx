@@ -426,9 +426,10 @@ export default function ReportView({
   }, [sections]);
 
   // ─── 1. REAL-TIME MULTI-AGENT SWARM STREAMING VIEW ─────────────────────────
-  if (isGenerating) {
+  // Only show full-screen blocking skeleton if Agent 1 has NOT yet generated the base report
+  if (isGenerating && (!currentReport || !currentReport.sections || currentReport.sections.length === 0)) {
     const stage = generationProgress?.stage || 1;
-    const totalStages = generationProgress?.totalStages || 6;
+    const totalStages = generationProgress?.totalStages || 4;
     const progressPercent = generationProgress?.progressPercent || Math.round((stage / totalStages) * 100);
     const stageName = generationProgress?.stageName || "Synthesizing Operational Knowledge";
     const currentMsg = generationProgress?.message || "Autonomous agent swarm coordinating multi-spectral sensors...";
@@ -1094,6 +1095,136 @@ export default function ReportView({
           </div>
         </header>
 
+        {/* ─── 4-AGENT AUTONOMOUS WORKFLOW STATUS BAR ───────────────────────── */}
+        <div className="rounded-xl border border-[#E1E5EA] bg-white p-4 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#F1F5F9] pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-[#F0F4FA] border border-[#CBD5E1] text-[#1F4E8C]">
+                <Cpu className={`h-3.5 w-3.5 ${isGenerating ? "animate-spin" : ""}`} />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-[#202124]">
+                  Autonomous 4-Agent Intelligence Pipeline
+                </span>
+                <span className="hidden sm:inline text-[11px] text-[#667085] ml-2">
+                  (Report Generator · Glossary · News · Research Papers)
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {isGenerating ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1F4E8C] font-mono text-[10px] font-semibold border border-blue-200 animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#1F4E8C] animate-ping" />
+                  <span>
+                    {generationProgress?.stageName || "Agents actively enriching dossier..."}
+                  </span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-mono text-[10px] font-semibold border border-emerald-200">
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span>All 4 Agents Completed & Attached</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            {[
+              {
+                id: "report_generator",
+                label: "1. Report Agent",
+                targetId: "sec-advisory",
+                desc: "Baseline Telemetry & Safety",
+                hasData: sections.some((s) => s.agentSource === "Report Generator Agent" || s.id === "sec-conditions" || s.id === "sec-advisory" || s.id === "sec-situation"),
+                isActive: isGenerating && (generationProgress?.activeAgent === "report_generator" || !generationProgress?.activeAgent),
+                icon: FileText,
+              },
+              {
+                id: "glossary",
+                label: "2. Glossary Agent",
+                targetId: "sec-glossary",
+                desc: "Technical Standards & Formulas",
+                hasData: sections.some((s) => s.id === "sec-glossary" || s.type === "glossary"),
+                isActive: isGenerating && generationProgress?.activeAgent === "glossary",
+                icon: BookOpen,
+              },
+              {
+                id: "news",
+                label: "3. News Agent",
+                targetId: "sec-news",
+                desc: "Live INCOIS Bulletins & Bans",
+                hasData: sections.some((s) => s.id === "sec-news" || s.type === "news"),
+                isActive: isGenerating && generationProgress?.activeAgent === "news",
+                icon: Radio,
+              },
+              {
+                id: "research",
+                label: "4. Research Agent",
+                targetId: "sec-research",
+                desc: "Peer-Reviewed RAG Literature",
+                hasData: sections.some((s) => s.id === "sec-research" || s.type === "research"),
+                isActive: isGenerating && generationProgress?.activeAgent === "research",
+                icon: Microscope,
+              },
+            ].map((agent) => {
+              const AgentIcon = agent.icon;
+              const isDone = agent.hasData;
+              const isRunning = agent.isActive && !isDone;
+              return (
+                <button
+                  key={agent.id}
+                  onClick={() => {
+                    const el = document.getElementById(agent.targetId);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className={`p-3 rounded-lg border text-left transition flex items-start gap-2.5 ${
+                    isRunning
+                      ? "bg-blue-50/70 border-[#1F4E8C] ring-1 ring-[#1F4E8C]/20 shadow-xs"
+                      : isDone
+                      ? "bg-[#F8FAFC] border-[#CBD5E1] hover:border-[#1F4E8C] hover:bg-white cursor-pointer"
+                      : "bg-zinc-50/60 border-zinc-200 opacity-60"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-md mt-0.5 shrink-0 ${
+                    isRunning
+                      ? "bg-[#1F4E8C] text-white"
+                      : isDone
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-zinc-200 text-zinc-500"
+                  }`}>
+                    {isRunning ? (
+                      <Sparkles className="h-3.5 w-3.5 animate-spin" />
+                    ) : isDone ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <AgentIcon className="h-3.5 w-3.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-bold text-[#202124] truncate">
+                        {agent.label}
+                      </span>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+                        isRunning
+                          ? "bg-blue-200/60 text-[#1F4E8C]"
+                          : isDone
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-zinc-200/70 text-zinc-500"
+                      }`}>
+                        {isRunning ? "WORKING" : isDone ? "POSTED" : "QUEUED"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#667085] truncate mt-0.5">
+                      {agent.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ─── DYNAMIC SECTION ITERATION ───────────────────────────────────── */}
         {sections.map((sec, idx) => {
           const sectionNum = String(idx + 1).padStart(2, "0");
@@ -1107,8 +1238,16 @@ export default function ReportView({
               <div className="space-y-6">
                 {/* Section Header */}
                 <div>
-                  <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase mb-1">
-                    {sectionNum} — {sec.label}
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <div className="text-xs font-sans font-semibold tracking-wider text-[#E87524] uppercase">
+                      {sectionNum} — {sec.label}
+                    </div>
+                    {sec.agentSource && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#F0F4FA] text-[#1F4E8C] border border-[#CBD5E1]">
+                        <Cpu className="h-2.5 w-2.5" />
+                        <span>{sec.agentSource}</span>
+                      </span>
+                    )}
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-bold text-[#202124]">
                     {sectionTitle}
@@ -2046,7 +2185,132 @@ function renderSectionContent(sec: ReportSection, state: any) {
 
 
     // ═════════════════════════════════════════════════════════════════════════
-    // SOURCES / GLOSSARY
+    // GLOSSARY (Agent 2: Glossary Agent)
+    // ═════════════════════════════════════════════════════════════════════════
+    case "glossary": {
+      const terms = data?.terms || GLOSSARY_TERMS.slice(0, 6);
+      return (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#667085] font-mono px-1">
+            <span>GLOSSARY AGENT: {terms.length} SECTOR TERMS EXTRACTED</span>
+            <span className="text-[#98A2B3]">STANDARDS: INCOIS / UNCLOS / WMO</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {terms.map((item: any) => (
+              <div
+                key={item.term}
+                className="p-5 rounded-xl bg-white border border-[#E1E5EA] shadow-2xs space-y-3 hover:border-[#1F4E8C]/40 transition flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[#202124]">{item.term}</span>
+                      {item.acronym && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#F0F4FA] text-[#1F4E8C] border border-[#CBD5E1]">
+                          {item.acronym}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-mono text-[#667085] uppercase tracking-wide">
+                      {item.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#475569] leading-relaxed">
+                    {item.definition}
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-[#F1F5F9] text-xs">
+                  {item.formulaOrStandard && (
+                    <div className="p-2.5 rounded-md bg-[#F8FAFC] border border-[#E1E5EA] font-mono text-[11px] text-[#1E293B]">
+                      <span className="text-[9px] font-sans text-[#64748B] block uppercase font-medium">Standard / Formula:</span>
+                      {item.formulaOrStandard}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-[#1F4E8C] flex items-start gap-1">
+                    <strong className="font-semibold shrink-0">Relevance:</strong>
+                    <span className="leading-snug">{item.importance}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // NEWS (Agent 3: News Agent)
+    // ═════════════════════════════════════════════════════════════════════════
+    case "news": {
+      const advisories = data?.advisories || [];
+      return (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#667085] font-mono px-1">
+            <span>NEWS AGENT: {advisories.length} ACTIVE MARITIME ADVISORIES</span>
+            <span className="text-[#98A2B3]">DISSEMINATION: NAVIC / SAMUDRA PORTAL</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {advisories.map((adv: any) => (
+              <div
+                key={adv.id || adv.title}
+                className="p-5 rounded-xl bg-white border border-[#E1E5EA] shadow-2xs space-y-3 hover:border-[#1F4E8C]/40 transition flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        {adv.bulletin || "ADVISORY"}
+                      </span>
+                      <span className="text-[10px] font-sans text-[#667085]">
+                        {adv.date}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                      {adv.status || "ACTIVE"}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-[#202124] leading-snug">
+                    {adv.title}
+                  </h4>
+
+                  <div className="text-[11px] font-mono text-[#1F4E8C]">
+                    {adv.agency}
+                  </div>
+
+                  <p className="text-xs text-[#475569] leading-relaxed">
+                    {adv.summary}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-[#F1F5F9] flex items-center justify-between text-[11px]">
+                  {adv.coordinates && (
+                    <span className="font-mono text-[#667085]">
+                      Sector: {adv.coordinates}
+                    </span>
+                  )}
+                  <a
+                    href={adv.websiteUrl || "https://incois.gov.in"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[#1F4E8C] hover:text-[#173F72] font-semibold hover:underline ml-auto"
+                  >
+                    <span>Read Official Bulletin</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // SOURCES / GLOSSARY (Authoritative Feeds)
     // ═════════════════════════════════════════════════════════════════════════
     case "sources":
       return (
