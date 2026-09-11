@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Plus, Minus, Compass, RotateCcw, Grid } from "lucide-react";
 import { createCurrentsLayer } from "./CurrentsLayer";
-import { isOceanCoordinate } from "../lib/oceanMask";
+import { isOceanCoordinate, isIndianControlledOcean } from "../lib/oceanMask";
 
 export type EnvironmentalRasterType = "none" | "sst" | "chlorophyll" | "currents" | "bathymetry";
 
@@ -35,7 +35,7 @@ export interface ThreeGlobeProps {
   /** Optional target coordinate to center and zoom into */
   targetCoords?: { lat: number; lon: number } | null;
   /** Callback when user double-clicks a location on the globe */
-  onLocationSelect?: (coords: { lat: number; lon: number; isOcean?: boolean } | null) => void;
+  onLocationSelect?: (coords: { lat: number; lon: number; isOcean?: boolean; isIndianRoute?: boolean } | null) => void;
   /** Whether the right chat drawer is open (shifts controls out from under drawer) */
   chatOpen?: boolean;
   /** Mutually exclusive environmental base layer */
@@ -1048,7 +1048,7 @@ export default function ThreeGlobe({
     globeGroup.add(graticuleMesh);
 
     // ── 8h. GPU-Accelerated Hydrodynamic Ocean Current Flow Field (GPGPU Shaders) ──
-    const currentsLayer = createCurrentsLayer(radius, 36000);
+    const currentsLayer = createCurrentsLayer(radius, 24000);
     globeGroup.add(currentsLayer.mesh);
 
     let lastTileUpdate = 0;
@@ -1412,12 +1412,28 @@ export default function ThreeGlobe({
 
         if (!isOcean) {
           isLockedRef.current = false;
-          setLandWarning(`Ocean not selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
+          setLandWarning(`Landmass selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
           if (onLocationSelectRef.current) {
             onLocationSelectRef.current({
               lat: Number(lat.toFixed(3)),
               lon: Number(lon.toFixed(3)),
               isOcean: false,
+              isIndianRoute: false,
+            });
+          }
+          return;
+        }
+
+        const isIndianRoute = isIndianControlledOcean(lat, lon);
+        if (!isIndianRoute) {
+          isLockedRef.current = false;
+          setLandWarning(`Outside Indian routes · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is in a foreign ocean.`);
+          if (onLocationSelectRef.current) {
+            onLocationSelectRef.current({
+              lat: Number(lat.toFixed(3)),
+              lon: Number(lon.toFixed(3)),
+              isOcean: true,
+              isIndianRoute: false,
             });
           }
           return;
@@ -1432,6 +1448,7 @@ export default function ThreeGlobe({
             lat: Number(lat.toFixed(3)),
             lon: Number(lon.toFixed(3)),
             isOcean: true,
+            isIndianRoute: true,
           });
         }
       } else {
@@ -1448,10 +1465,11 @@ export default function ThreeGlobe({
         const touchX = e.touches[0].clientX;
         const touchY = e.touches[0].clientY;
         const timeDiff = now - lastTouchTime;
-        const distDiff = Math.hypot(touchX - lastTouchPos.x, touchY - lastTouchPos.y);
+        const distMoved = Math.hypot(touchX - lastTouchPos.x, touchY - lastTouchPos.y);
 
-        if (timeDiff < 350 && distDiff < 35) {
-          // Double-tap detected on touch screen!
+        // Double-tap detected (within 350ms and 24px)
+        if (timeDiff < 350 && distMoved < 24) {
+          e.preventDefault();
           const rect = renderer.domElement.getBoundingClientRect();
           mouseVec.x = ((touchX - rect.left) / rect.width) * 2 - 1;
           mouseVec.y = -((touchY - rect.top) / rect.height) * 2 + 1;
@@ -1471,12 +1489,29 @@ export default function ThreeGlobe({
 
             if (!isOcean) {
               isLockedRef.current = false;
-              setLandWarning(`Ocean not selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
+              setLandWarning(`Landmass selected · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is on land.`);
               if (onLocationSelectRef.current) {
                 onLocationSelectRef.current({
                   lat: Number(lat.toFixed(3)),
                   lon: Number(lon.toFixed(3)),
                   isOcean: false,
+                  isIndianRoute: false,
+                });
+              }
+              lastTouchTime = 0;
+              return;
+            }
+
+            const isIndianRoute = isIndianControlledOcean(lat, lon);
+            if (!isIndianRoute) {
+              isLockedRef.current = false;
+              setLandWarning(`Outside Indian routes · [${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E] is in a foreign ocean.`);
+              if (onLocationSelectRef.current) {
+                onLocationSelectRef.current({
+                  lat: Number(lat.toFixed(3)),
+                  lon: Number(lon.toFixed(3)),
+                  isOcean: true,
+                  isIndianRoute: false,
                 });
               }
               lastTouchTime = 0;

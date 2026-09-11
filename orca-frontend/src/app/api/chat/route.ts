@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import glossaryData from "@/data/marine_glossary.json";
 import researchKbData from "@/data/research_kb.json";
+import { isOceanCoordinate, isIndianControlledOcean } from "@/lib/oceanMask";
 
 export interface MapContextPayload {
   activeBaseLayer: string;
@@ -107,6 +108,65 @@ export async function POST(req: NextRequest) {
 
     const userMessage = messages?.[messages.length - 1]?.content || "Provide an operational summary of the active map view.";
     const isReport = userMessage.toLowerCase().includes("report") || userMessage.toLowerCase().includes("dossier");
+
+    const selLat = mapContext.selectedCoord?.lat;
+    const selLon = mapContext.selectedCoord?.lon;
+
+    // ── GUARD 1: Landmass Selection ───────────────────────────────────────────
+    if (selLat !== undefined && selLon !== undefined && !isOceanCoordinate(selLat, selLon)) {
+      const landWarning = `⚠️ **Landmass selected**\n\nThe coordinates **${selLat.toFixed(3)}°N, ${selLon.toFixed(3)}°E** are located on land.\n\nI am designed for information provided for oceans, not land. No telemetry, hydrodynamic data, or operational reports can be provided for terrestrial landmasses.\n\nPlease select an ocean location within **Indian controlled ocean routes** on the 3D globe to receive marine intelligence.`;
+
+      if (body.stream) {
+        const encoder = new TextEncoder();
+        const customReadable = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "chunk", text: landWarning })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "complete", agent: "Matsya-Sutradhar (Landmass Protection)", content: landWarning })}\n\n`));
+            controller.close();
+          },
+        });
+        return new Response(customReadable, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+          },
+        });
+      }
+
+      return NextResponse.json({
+        agent: "Matsya-Sutradhar (Landmass Protection)",
+        agentType: "conversational",
+        content: landWarning,
+      });
+    }
+
+    // ── GUARD 2: Outside Indian Controlled Ocean Routes ─────────────────────────
+    if (selLat !== undefined && selLon !== undefined && !isIndianControlledOcean(selLat, selLon)) {
+      const outOfBoundsWarning = `⚠️ **Outside Indian Controlled Ocean Routes**\n\nThe coordinates **${selLat.toFixed(3)}°N, ${selLon.toFixed(3)}°E** are located in foreign ocean waters outside Indian operational jurisdiction.\n\nProject ORCA is exclusively designed for **Indian controlled ocean routes**, the **Indian Exclusive Economic Zone (EEZ)**, and the **Northern Indian Ocean Basin** (Arabian Sea, Bay of Bengal, Andaman Sea, and strategic Indian shipping corridors).\n\nInformation is not provided for foreign oceans (Pacific, Atlantic, Arctic). Please select an ocean coordinate within Indian maritime routes or sovereign waters.`;
+
+      if (body.stream) {
+        const encoder = new TextEncoder();
+        const customReadable = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "chunk", text: outOfBoundsWarning })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "complete", agent: "Matsya-Sutradhar (Geofencing Guard)", content: outOfBoundsWarning })}\n\n`));
+            controller.close();
+          },
+        });
+        return new Response(customReadable, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+          },
+        });
+      }
+
+      return NextResponse.json({
+        agent: "Matsya-Sutradhar (Geofencing Guard)",
+        agentType: "conversational",
+        content: outOfBoundsWarning,
+      });
+    }
 
     const targetCoords = mapContext.selectedCoord
       ? [mapContext.selectedCoord.lat, mapContext.selectedCoord.lon]

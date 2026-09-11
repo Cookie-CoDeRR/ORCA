@@ -2,18 +2,14 @@
 
 import React, { useRef, useEffect } from "react";
 import * as THREE from "three";
-import { isOceanCoordinate } from "../lib/oceanMask";
+import { isOceanCoordinate, isIndianControlledOcean } from "../lib/oceanMask";
 
 // ── 1. GPGPU Data Simulation: Velocity DataTexture Generator ────────────────
 /**
- * Generates a 512x256 Float/Byte DataTexture simulating global hydrodynamic ocean currents.
- * Land pixels are strictly zeroed out (speed = 0, u = 0, v = 0) so no currents exist on land.
- * Uses continuous Gaussian-blended circulation vectors with zero rectangular discontinuities:
- * - West India Coastal Current (WICC): Southward along the Indian west coast shelf.
- * - Somali Jet: Broad northeastward drift across the Arabian Sea.
- * - Somali Western Boundary Current: Strong northward boundary jet along East Africa.
- * - Equatorial Jet: Rapid eastward flow south of Sri Lanka into Bay of Bengal.
- * - East India Coastal Current (EICC): Northward flow along Bay of Bengal western boundary.
+ * Generates a 512x256 Float/Byte DataTexture simulating hydrodynamic ocean currents
+ * EXCLUSIVELY for Indian Controlled Ocean Routes:
+ * (Arabian Sea, Bay of Bengal, Andaman Sea, Lakshadweep, Indian EEZ, and vital Indian trade routes).
+ * Land pixels AND foreign oceans (Pacific, Atlantic, Arctic, Southern Ocean) are strictly zeroed out.
  */
 export function generateVelocityDataTexture(width = 512, height = 256): THREE.DataTexture {
   const size = width * height;
@@ -29,8 +25,9 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
       const lonDeg = lonNorm * 360.0 - 180.0;
       const lonRad = lonDeg * (Math.PI / 180.0);
 
-      // Check landmask: if on land, strictly zero out velocity & speed!
-      if (!isOceanCoordinate(latDeg, lonDeg)) {
+      // Strictly restrict currents to Indian controlled ocean routes:
+      // Zero out any coordinate that is on land OR in foreign oceans (Pacific, Atlantic, Arctic, etc.)
+      if (!isIndianControlledOcean(latDeg, lonDeg)) {
         const idx = (j * width + i) * 4;
         data[idx] = 128;     // u = 0 (encoded as 0.5 * 255)
         data[idx + 1] = 128; // v = 0 (encoded as 0.5 * 255)
@@ -39,7 +36,7 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
         continue;
       }
 
-      // Multi-frequency harmonic streamfunction (incompressible global curl-derived gyres)
+      // Multi-frequency harmonic streamfunction (incompressible curl-derived gyres)
       const psi =
         Math.sin(latRad * 4.0) * Math.cos(lonRad * 2.0) * 0.55 +
         Math.sin(latRad * 7.0 + Math.cos(lonRad * 3.0)) * 0.30 +
@@ -60,12 +57,6 @@ export function generateVelocityDataTexture(width = 512, height = 256): THREE.Da
 
       let u = (psiLat - psi) / delta;
       let v = -(psiLon - psi) / delta;
-
-      // Antarctic Circumpolar Current (ACC) eastward flow at Southern Ocean [-65° to -45°]
-      if (latDeg >= -65.0 && latDeg <= -45.0) {
-        const accWeight = Math.sin(((latDeg - -65.0) / 20.0) * Math.PI);
-        u += 1.35 * accWeight;
-      }
 
       // ── Smooth Organic Regional Blending (Zero Hard Rectangular Seams) ──
       // 1. Somali Jet & Central Arabian Sea Basin (Northeastward drift)
@@ -344,15 +335,16 @@ export interface CurrentsLayerInstance {
 /**
  * Creates the high-performance GPU-accelerated CurrentsLayer instance.
  * Features:
+ * - Strictly restricted to Indian Controlled Ocean Routes (Arabian Sea, Bay of Bengal, Andaman Sea, Lakshadweep, Indian EEZ).
+ *   Foreign oceans (Pacific, Atlantic, Arctic, Southern) have ZERO currents.
  * - Slender, hydrodynamic arrow width profile (narrow head & body)
  * - Dynamic zoom LOD scaling:
- *   * Zoomed out: very few particles (only ~3.5% active), larger bold arrows, perfectly uniform.
- *   * Zoomed in: progressive increase in particle numbers (all 36k active), slender delicate arrows.
- * - Zero rectangular boundaries: uses smooth continuous Gaussian dispersion for regional coastal focus.
+ *   * Zoomed out: sparse, calm, larger bold arrows in the Indian Ocean basin (~1,080 active).
+ *   * Zoomed in: rich high-density slender streamlines across coastal and shipping waters (all 24,000 active).
  */
 export function createCurrentsLayer(
   globeRadius: number,
-  particleCount = 36000
+  particleCount = 24000
 ): CurrentsLayerInstance {
   // 1. Generate Hydrodynamic Velocity DataTexture with smooth blending
   const dataTexture = generateVelocityDataTexture(512, 256);
@@ -376,45 +368,20 @@ export function createCurrentsLayer(
     ];
   };
 
-  const countGlobal = Math.floor(particleCount * 0.38); // 13,680 uniform global particles
-  const countRegional = particleCount - countGlobal;     // 22,320 smooth Gaussian regional particles
+  const sinMin = Math.sin(-15.0 * (Math.PI / 180.0));
+  const sinMax = Math.sin(30.5 * (Math.PI / 180.0));
 
   for (let i = 0; i < particleCount; i++) {
     let lat = 0;
     let lon = 0;
     let attempts = 0;
 
-    if (i < countGlobal) {
-      // 1. Global Uniform Ocean Sampling (Zero bias, whole planet)
-      do {
-        lon = Math.random() * 360.0 - 180.0;
-        lat = Math.asin(Math.random() * 2.0 - 1.0) * (180.0 / Math.PI);
-        attempts++;
-      } while (!isOceanCoordinate(lat, lon) && attempts < 40);
-
-      // Global LOD thresholds span [0.0, 0.40] so baseline arrows remain visible at all zoom levels
-      lodThreshold[i] = (i / countGlobal) * 0.40;
-    } else {
-      // 2. Smooth Gaussian Marine Focus (Arabian Sea, Bay of Bengal, Indian Ocean)
-      // Continuous 2D Gaussian dispersion with ZERO rectangular boundaries or seams!
-      const regionalIdx = i - countGlobal;
-      do {
-        let u = 0, v = 0;
-        while (u === 0) u = Math.random();
-        while (v === 0) v = Math.random();
-        const z0 = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-        const z1 = Math.sqrt(-2.0 * Math.log(u)) * Math.sin(2.0 * Math.PI * v);
-
-        lat = 13.5 + z0 * 12.0;
-        lon = 73.5 + z1 * 18.0;
-        attempts++;
-      } while (!isOceanCoordinate(lat, lon) && attempts < 45);
-
-      // Regional LOD thresholds span [0.045, 1.0]
-      // Completely culled when zoomed out in orbit (visibleRatio <= 0.035),
-      // then progressively activate as the user zooms into the marine region!
-      lodThreshold[i] = 0.045 + (regionalIdx / countRegional) * 0.955;
-    }
+    // Sample strictly within Indian Controlled Ocean waters [42°E - 102°E], [-15°S - 30.5°N]
+    do {
+      lon = 42.0 + Math.random() * 60.0;
+      lat = Math.asin(sinMin + Math.random() * (sinMax - sinMin)) * (180.0 / Math.PI);
+      attempts++;
+    } while (!isIndianControlledOcean(lat, lon) && attempts < 60);
 
     const [x, y, z] = geodeticPoint(lat, lon, globeRadius);
 
@@ -430,6 +397,7 @@ export function createCurrentsLayer(
     life[i] = Math.random();
     speed[i] = 0.75 + Math.random() * 0.50;
     size[i] = 2.0 + Math.random() * 2.0;
+    lodThreshold[i] = (i + 0.5) / particleCount;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));

@@ -22,7 +22,7 @@ import { sendMultiAgentMessage, fetchLiveOceanCurrent, LiveOceanCurrentResponse 
 import { isReportRequest, generateReportPipeline } from "@/lib/reportGenerator";
 import { reportStore, DEFAULT_TUNA_REPORT } from "@/lib/reportStore";
 import { Report, ReportGenerationProgress } from "@/lib/reportTypes";
-import { isOceanCoordinate } from "@/lib/oceanMask";
+import { isOceanCoordinate, isIndianControlledOcean } from "@/lib/oceanMask";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Persona = "navigator" | "researcher" | "defense" | "student" | "guest";
@@ -615,10 +615,28 @@ function AIChatDrawer({
         const landWarnMsg: ChatMessage = {
           id: uid(),
           role: "ai",
-          content: `⚠️ **Ocean not selected**\n\nThe coordinates **${coordToUse.lat.toFixed(3)}°N, ${coordToUse.lon.toFixed(3)}°E** are located on land.\n\nProject ORCA is an ocean intelligence platform calibrated specifically for marine waters, exclusive economic zones (EEZ), and sea states. Reports cannot be compiled for landmasses.\n\nPlease double-click an ocean sector on the 3D globe to select an active marine cell.`,
+          content: `⚠️ **Landmass selected**\n\nThe coordinates **${coordToUse.lat.toFixed(3)}°N, ${coordToUse.lon.toFixed(3)}°E** are located on land.\n\nI am designed for information provided for oceans, not land. Operational reports cannot be compiled for terrestrial landmasses.\n\nPlease select an ocean location within **Indian controlled ocean routes** on the 3D globe.`,
           timestamp: now(),
         };
         setMessages((m) => [...m, userMsg, landWarnMsg]);
+        return;
+      }
+
+      // Foreign ocean check: restrict reports strictly to Indian controlled ocean routes
+      if (!isIndianControlledOcean(coordToUse.lat, coordToUse.lon)) {
+        const userMsg: ChatMessage = {
+          id: uid(),
+          role: "user",
+          content: `Generate report: ${targetTopic}`,
+          timestamp: now(),
+        };
+        const outOfBoundsMsg: ChatMessage = {
+          id: uid(),
+          role: "ai",
+          content: `⚠️ **Outside Indian Controlled Ocean Routes**\n\nThe coordinates **${coordToUse.lat.toFixed(3)}°N, ${coordToUse.lon.toFixed(3)}°E** are located in foreign ocean waters outside Indian operational jurisdiction.\n\nProject ORCA is exclusively designed for **Indian controlled ocean routes**, the **Indian Exclusive Economic Zone (EEZ)**, and the **Northern Indian Ocean Basin** (Arabian Sea, Bay of Bengal, Andaman Sea, and strategic Indian shipping corridors).\n\nReports are not compiled for foreign oceans (Pacific, Atlantic, Arctic). Please select an ocean coordinate within Indian maritime routes or sovereign waters.`,
+          timestamp: now(),
+        };
+        setMessages((m) => [...m, userMsg, outOfBoundsMsg]);
         return;
       }
 
@@ -753,10 +771,24 @@ function AIChatDrawer({
         const landWarnMsg: ChatMessage = {
           id: uid(),
           role: "ai",
-          content: `⚠️ **Ocean not selected**\n\nThe coordinates **${selectedCoord.lat.toFixed(3)}°N, ${selectedCoord.lon.toFixed(3)}°E** are located on land.\n\nORCA marine intelligence is dedicated to ocean waters, exclusive economic zones (EEZ), and sea state monitoring.\n\nPlease double-click an ocean location on the 3D globe to analyze marine data.`,
+          content: `⚠️ **Landmass selected**\n\nThe coordinates **${selectedCoord.lat.toFixed(3)}°N, ${selectedCoord.lon.toFixed(3)}°E** are located on land.\n\nI am designed for information provided for oceans, not land. No telemetry, hydrodynamic data, or operational information can be provided for terrestrial landmasses.\n\nPlease select an ocean location within **Indian controlled ocean routes** on the 3D globe to receive marine intelligence.`,
           timestamp: now(),
         };
         setMessages((m) => [...m, userMsg, landWarnMsg]);
+        return;
+      }
+
+      // Check if user is asking questions for coordinates outside Indian controlled ocean routes
+      if (selectedCoord && !isIndianControlledOcean(selectedCoord.lat, selectedCoord.lon)) {
+        setInput("");
+        const userMsg: ChatMessage = { id: uid(), role: "user", content: q, timestamp: now() };
+        const outOfBoundsMsg: ChatMessage = {
+          id: uid(),
+          role: "ai",
+          content: `⚠️ **Outside Indian Controlled Ocean Routes**\n\nThe coordinates **${selectedCoord.lat.toFixed(3)}°N, ${selectedCoord.lon.toFixed(3)}°E** are located in foreign ocean waters outside Indian operational jurisdiction.\n\nProject ORCA is exclusively designed for **Indian controlled ocean routes**, the **Indian Exclusive Economic Zone (EEZ)**, and the **Northern Indian Ocean Basin** (Arabian Sea, Bay of Bengal, Andaman Sea, and strategic Indian shipping corridors).\n\nInformation is not provided for foreign oceans (Pacific, Atlantic, Arctic). Please select a coordinate within Indian maritime routes or sovereign waters.`,
+          timestamp: now(),
+        };
+        setMessages((m) => [...m, userMsg, outOfBoundsMsg]);
         return;
       }
 

@@ -47,3 +47,24 @@ export function isOceanCoordinate(lat: number, lon: number): boolean {
   if (byteIndex >= bytes.length) return false;
   return ((bytes[byteIndex] >> bitOffset) & 1) === 1;
 }
+
+/**
+ * Returns true if the coordinate is strictly within Indian controlled ocean routes:
+ * Arabian Sea, Bay of Bengal, Andaman Sea, Lakshadweep, Indian EEZ, and Northern Indian Ocean trade corridors.
+ * Excludes all terrestrial landmasses as well as foreign oceans (Pacific, Atlantic, Arctic, Southern Ocean).
+ */
+export function isIndianControlledOcean(lat: number, lon: number): boolean {
+  // Normalize lon to [-180, 180]
+  let nLon = lon;
+  while (nLon < -180.0) nLon += 360.0;
+  while (nLon > 180.0) nLon -= 360.0;
+
+  // Indian Controlled Ocean Operational Bounds:
+  // Longitude: 42°E (Horn of Africa / Bab-el-Mandeb approach) to 102°E (Andaman Sea / Malacca Strait approach)
+  // Latitude: -15°S (Equatorial / Southern Indian Ocean shipping route) to 30.5°N (Northern Arabian Sea / Gulf of Oman)
+  if (nLon < 42.0 || nLon > 102.0) return false;
+  if (lat < -15.0 || lat > 30.5) return false;
+
+  // Must strictly be an ocean / water coordinate (not land)
+  return isOceanCoordinate(lat, nLon);
+}
